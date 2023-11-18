@@ -18,6 +18,44 @@ const handleError = (errorMessage) => {
     console.error(errorMessage);
     process.exit(1);
 };
+
+const getAnswer = async (question) => new Promise((res, rej) => rl.question(question, ans => res(ans)))
+
+const UserInputInitSettings = () => {
+    return new Promise((resolve, reject) => {
+        rl.question('Enter the full file path to start search. WILL SEARCH ALL SUB FOLDERS: ', async (filePath) => {
+            if (filePath === '') handleError('Must specify file path!');
+            settings.filePath = filePath;
+            console.log(`File path: ${settings.filePath}`);
+            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav): ', (inputFormatString) => {
+                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav'];
+                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav'].includes(format))) {
+                    reject('Invalid output format. Only mp3 and wav are allowed.');
+                }
+                console.log(`Input formats: ${settings.inputFormats}`);
+
+                rl.question('Enter the output formats. Leave blank for all (e.g., ogg m4a): ', (outputFormatString) => {
+                    settings.outputFormats = outputFormatString ? outputFormatString.toLowerCase().split(' ') : ['ogg', 'm4a'];
+                    if (settings.outputFormats.length === 0 || !settings.outputFormats.every(format => ['ogg', 'm4a'].includes(format))) {
+                        reject('Invalid output format. Only ogg and m4a are allowed.');
+                    }
+                    console.log(`Output formats: ${settings.outputFormats}`);
+
+                    rl.question('Enter the audio bitrate from 64 to 320. Leave blank for 192 (e.g., 128): ', (bitrateString) => {
+                        const defaultBitrate = 192;
+                        const bitrateStringFinal = bitrateString || defaultBitrate;
+                        settings.bitrate = parseInt(bitrateStringFinal);
+                        if (isNaN(settings.bitrate) || settings.bitrate < 64 || settings.bitrate > 320) {
+                            reject('Invalid bitrate. Bitrate must be 64-320.');
+                        }
+                        console.log(`Bitrate: ${settings.bitrate}`);
+                        resolve(settings);
+                    });
+                });
+            });
+        });
+    });
+};
 const searchFiles = (settings) => {
     const fileExtensions = settings.inputFormats.map(format => `.${format}`);
     const searchPath = settings.filePath;
@@ -107,7 +145,7 @@ const deleteDuplicateFiles = (files) => {
 const createConversionList = async (settings, files) => {
 
     // return new Promise((resolve, reject) => {
-        let conversionList = [];
+        const conversionList = [];
         let didPickAll = false;
 
         for (const inputFile of files) {
@@ -144,13 +182,12 @@ const createConversionList = async (settings, files) => {
 
         console.log('Pending conversion:', conversionList);
         
-        conversionList = conversionList.filter(x => x.outputFile !== 'skipped!');
 
 
         const accept_answer = await getAnswer('This is the list of files to be converted. Accept? Type yes or no: ');
         if(/^no$/i.test(accept_answer)) throw new Error('Conversion cancelled');
         if(!/^yes$/i.test(accept_answer)) throw new Error('invalid input, please use "yes" or "no"')
-        return conversionList
+        return conversionList.filter(x => x.outputFile !== 'skipped!');
 };
 
 // const convertAudio = (settings, files) => {
@@ -178,6 +215,55 @@ const createConversionList = async (settings, files) => {
 //     })
 // })
 // };
+
+
+const convertAudio2 = async (settings, files) => {
+    for (const{inputFile, outputFile, outputFormat } of files) {
+        try {
+            
+            const wtf = await new Promise((resolve, reject) => {
+        
+                // const cmd = `${path.join(__dirname, 'ffmpeg.exe')} -i ${inputFile} -c:a ${outputFormat === 'ogg' ? 'libvorbis' : 'aac'} -b:a ${settings.bitrate.toString()} -y ${outputFile}`;
+        
+                // const conversion = spawn(cmd);
+        
+                // conversion.on('close', () => {
+                //     console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
+                //     resolve(outputFile);
+                //   });
+            
+                //   conversion.on('error', (err) => reject(err));
+          
+                const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
+                  '-i',
+                  inputFile,
+                  '-c:a',
+                  outputFormat === 'ogg' ? 'libvorbis' : 'aac',
+                  '-b:a',
+                  `${settings.bitrate.toString()}k`,
+                  '-y',
+                  outputFile
+                ], {shell: true});
+          
+                ffmpegCommand.on('close', (code) => {
+                    if (code === 0) {
+                      console.log(`Conversion successful for ${inputFile}`);
+                      resolve(outputFile);
+                    } else {
+                      console.error(`Conversion failed for ${inputFile}. Exit code: ${code}`);
+                      reject(new Error(`Conversion failed for ${inputFile}. Exit code: ${code}`));
+                    }
+                  });
+          
+                ffmpegCommand.on('exit', (code) => resolve(code));
+                ffmpegCommand.on('error', (err) => reject(err));
+              });
+              console.log('wtf :>> ', wtf);
+        } catch (error) {
+            console.error('wtf error',error);
+        }
+    }
+}
 
 const convertAudio = (settings, files) => {
     console.info('settings', settings);
@@ -224,51 +310,14 @@ const rl = readline.createInterface({
     output: process.stdout,
 });
 
-const getAnswer = async (question) => new Promise((res, rej) => rl.question(question, ans => res(ans)))
-
-const UserInputInitSettings = () => {
-    return new Promise((resolve, reject) => {
-        rl.question('Enter the full file path to start search. WILL SEARCH ALL SUB FOLDERS: ', async (filePath) => {
-            if (filePath === '') handleError('Must specify file path!');
-            settings.filePath = filePath;
-            console.log(`File path: ${settings.filePath}`);
-            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav): ', (inputFormatString) => {
-                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav'];
-                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav'].includes(format))) {
-                    reject('Invalid output format. Only mp3 and wav are allowed.');
-                }
-                console.log(`Input formats: ${settings.inputFormats}`);
-
-                rl.question('Enter the output formats. Leave blank for all (e.g., ogg m4a): ', (outputFormatString) => {
-                    settings.outputFormats = outputFormatString ? outputFormatString.toLowerCase().split(' ') : ['ogg', 'm4a'];
-                    if (settings.outputFormats.length === 0 || !settings.outputFormats.every(format => ['ogg', 'm4a'].includes(format))) {
-                        reject('Invalid output format. Only ogg and m4a are allowed.');
-                    }
-                    console.log(`Output formats: ${settings.outputFormats}`);
-
-                    rl.question('Enter the audio bitrate from 64 to 320. Leave blank for 192 (e.g., 128): ', (bitrateString) => {
-                        const defaultBitrate = 192;
-                        const bitrateStringFinal = bitrateString || defaultBitrate;
-                        settings.bitrate = parseInt(bitrateStringFinal);
-                        if (isNaN(settings.bitrate) || settings.bitrate < 64 || settings.bitrate > 320) {
-                            reject('Invalid bitrate. Bitrate must be 64-320.');
-                        }
-                        console.log(`Bitrate: ${settings.bitrate}`);
-                        resolve(settings);
-                    });
-                });
-            });
-        });
-    });
-};
-
 UserInputInitSettings()
     .then((settings) => searchFiles(settings))
     .then((files) => deleteDuplicateFiles(files))
     .then((files) => createConversionList(settings, files))
-    .then((files) => Promise.all([...convertAudio(settings, files)]))
+    .then(async (files) => await convertAudio2(settings, files))
+    // .then(async (files) => await Promise.all([...convertAudio(settings, files)]))
     .catch((error) => {
         handleError(error);
     })
-    .finally(() => rl.close());
+    // .finally(() => rl.close());
 
