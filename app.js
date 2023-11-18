@@ -2,6 +2,8 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const readline = require('readline');
 const path = require('path');
+const { readdirSync, statSync } = require('fs');
+const { join, basename, extname } = require('path');
 
 let settings = {
     filePath: '',
@@ -18,37 +20,40 @@ const handleError = (errorMessage) => {
     process.exit(1);
 };
 const searchFiles = (settings) => {
-    return new Promise((resolve, reject) => {
-        const fileExtensions = settings.inputFormats.map(format => `${format}`);
-        const searchPath = settings.filePath;
+    const fileExtensions = settings.inputFormats.map(format => `.${format}`);
+    const searchPath = settings.filePath;
 
-        console.log('Search Path:', searchPath);
-        console.log('File Extensions:', fileExtensions);
+    console.log('Search Path:', searchPath);
+    console.log('File Extensions:', fileExtensions);
 
-        fs.readdirSycn(searchPath, (err, files) => {
-            if (err) {
-                reject(err);
+    const allFiles = [];
+
+    const walk = (dir) => {
+        const files = readdirSync(dir);
+
+        for (const file of files) {
+            const filePath = join(dir, file);
+            const stats = statSync(filePath);
+
+            if (stats.isDirectory()) {
+                // Recursively walk into subdirectories
+                walk(filePath);
             } else {
-                // Filter the files to only include those with matching extensions
-                const matchingFiles = files.filter(file => {
-                    const fileExtension = path.extname(file).toLowerCase();
-                    return fileExtensions.includes(fileExtension);
-                });
-
-                // Create an array of file paths for the matching files
-                const filePaths = matchingFiles.map(file => path.join(searchPath, file));
-
-                // Assign the file paths to files.inputFiles
-                files.inputFiles = filePaths;
-
-                // Log the result
-                console.log('Matching Files:', filePaths);
-
-                // Resolve the promise with the modified files object
-                resolve(files);
+                // Check if the file has a matching extension
+                const fileExtension = path.extname(file).toLowerCase();
+                if (fileExtensions.includes(fileExtension)) {
+                    allFiles.push(filePath);
+                }
             }
-        });
-    });
+        }
+    };
+
+    walk(searchPath);
+
+    console.log('Matching Files:', allFiles);
+
+    // Resolve the promise with the list of matching file paths
+    return Promise.resolve({ inputFiles: allFiles });
 };
 
 const deleteDuplicateFiles = (files) => {
@@ -68,7 +73,7 @@ const deleteDuplicateFiles = (files) => {
 
         const uniqueFiles = Array.from(fileMap.keys()).map((fileName) => {
             const ext = fileMap.get(fileName);
-            return path.join(path.dirname(inputFiles[0]), `${fileName}${ext}`);
+            return path.join(path.dirname(files.inputFiles[0]), `${fileName}${ext}`);
         });
 
         files.inputFiles = uniqueFiles;
@@ -102,6 +107,23 @@ const createConversionList = (settings, files) => {
                 reject('Conversion canceled.');
             }
         });
+    });
+};
+
+const convertAudio = async (settings, files) => {
+    return new Promise((resolve, reject) => {
+        const outputFilePath = join(settings.filePath, `${basename(inputPath, extname(inputPath))}.${outputFormat}`);
+
+        const ffmpegCommand = ffmpeg(inputPath)
+            .audioCodec(fileList.outputFormats.includes('ogg') ? 'libvorbis' : 'aac')
+            .audioBitrate(fileList.bitrate)
+            .toFormat(outputFormat)
+            .on('end', () => {
+                console.log(`Converted ${inputPath} to ${outputFormat} with bitrate ${fileList.bitrate}`);
+                resolve(outputFilePath);
+            })
+            .on('error', (err) => reject(err))
+            .save(outputFilePath);
     });
 };
 
@@ -148,8 +170,9 @@ const UserInputInitSettings = () => {
 
 UserInputInitSettings()
     .then((settings) => searchFiles(settings))
-    //.then((files) => deleteDuplicateFiles(files))
+    .then((files) => deleteDuplicateFiles(files))
     .then((files) => createConversionList(settings, files))
+    .then((files) => convertAudio(settings, files))
     .catch((error) => {
         handleError(error);
     });
