@@ -5,7 +5,8 @@ const readline = require('readline');
 const path = require('path');
 const { readdirSync, statSync } = require('fs');
 const { join, basename, extname } = require('path');
-
+const { spawn } = require('child_process');
+// const pathToFfmpeg = require('.')
 let settings = {
     filePath: '',
     inputFormats: [],
@@ -55,25 +56,31 @@ const searchFiles = (settings) => {
 };
 
 const deleteDuplicateFiles = (files) => {
-    const priorityList = ['mp3', 'wav'];
+    const priorityList = ['.mp3', '.wav'];
     console.log('files', files);
     const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
 
     const uniq = new Map();
 
     for (const [name, ext] of fileobjs) {
+        console.log('name :>> ', name);
+        console.log('ext :>> ', ext);
         if(!uniq.has(name)) {
             uniq.set(name, ext);
             continue;
         }
 
         const current = uniq.get(name);
+        console.log('current :>> ', current);
+        console.log('priorityList.indexOf(ext) :>> ', priorityList.indexOf(ext));
+        console.log('priorityList.indexOf(current) :>> ', priorityList.indexOf(current));
+        console.log('priorityList.indexOf(ext) > priorityList.indexOf(current) :>> ', priorityList.indexOf(ext) > priorityList.indexOf(current));
         if(priorityList.indexOf(ext) > priorityList.indexOf(current)){
             uniq.set(name, ext)
         }
     }
 
-    console.log(Array.from(uniq));
+    return Array.from(uniq.entries()).reduce((p,c) => [...p, `${c[0]}${c[1]}`], [])
 
 };
 
@@ -97,65 +104,127 @@ const deleteDuplicateFiles = (files) => {
     // return Promise.resolve({ inputFiles: uniqueFiles });
 // };
 
-const createConversionList = (settings, files) => {
-    return new Promise((resolve, reject) => {
-        const conversionList = [];
+const createConversionList = async (settings, files) => {
 
-        for (const inputFile of files.inputFiles) {
+    // return new Promise((resolve, reject) => {
+        let conversionList = [];
+        let didPickAll = false;
+
+        for (const inputFile of files) {
             for (const outputFormat of settings.outputFormats) {
-                const outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
+                let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
+                if(fs.existsSync(outputFile)) {
+                    if(didPickAll) {
+                        if(didPickAll === 'r') outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+                        if(didPickAll === 's') outputFile = 'skipped!';
+                    }else {
+                        const response = await getAnswer(`[O]verwrite, [R]ename or [S]kip ${outputFile}? : `)
+                        if(/^r$/i.test(response.trim())) {
+                            outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+                        }
+                        if(/^ra$/i.test(response.trim())) {
+                            outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+                            didPickAll = 'r';
+                        }
+                        if(/^s$/i.test(response.trim())) outputFile = 'skipped!';
+                        if(/^sa$/i.test(response.trim())) {
+                            outputFile = 'skipped!';
+                            didPickAll = 's';
+                        }
+                    }
+                }
                 conversionList.push({
                     inputFile,
                     outputFile,
                     outputFormat
                 });
+                
             }
         }
-        console.log('Pending conversion:', conversionList);
 
-        rl.question('This is the list of files to be converted. Accept? Type yes or no: ', (input) => {
-            input.toLowerCase();
-            if (input === 'yes') {
-                console.log('Conversion accepted.');
-                resolve(conversionList);
-            } else {
-                console.log('Conversion canceled.');
-                reject('Conversion canceled.');
-            }
-        });
-    });
+        console.log('Pending conversion:', conversionList);
+        
+        conversionList = conversionList.filter(x => x.outputFile !== 'skipped!');
+
+
+        const accept_answer = await getAnswer('This is the list of files to be converted. Accept? Type yes or no: ');
+        if(/^no$/i.test(accept_answer)) throw new Error('Conversion cancelled');
+        if(!/^yes$/i.test(accept_answer)) throw new Error('invalid input, please use "yes" or "no"')
+        return conversionList
 };
+
+// const convertAudio = (settings, files) => {
+//     console.info('settings', settings);
+//     console.info('files', files);
+//     // {
+//     //     inputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.wav',
+//     //     outputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.ogg',
+//     //     outputFormat: 'ogg'
+//     //   },
+//     return files.map(file => { 
+//         return new Promise((resolve, reject) => {
+//             const {inputFile, outputFile, outputFormat} = file;
+
+//             const ffmpegCommand = ffmpeg(inputFile)
+//                 .audioCodec(outputFormat === 'ogg' ? 'libvorbis' : 'aac')
+//                 .audioBitrate(settings.bitrate)
+//                 .toFormat(outputFormat)
+//                 .on('end', () => {
+//                     console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
+//                     resolve(outputFile);
+//                 })
+//                 .on('error', (err) => reject(err))
+//                 .save(outputFile);
+//     })
+// })
+// };
 
 const convertAudio = (settings, files) => {
     console.info('settings', settings);
     console.info('files', files);
-    // {
-    //     inputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.wav',
-    //     outputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.ogg',
-    //     outputFormat: 'ogg'
-    //   },
-    return files.map(file => { 
-        return new Promise((resolve, reject) => {
-            const {inputFile, outputFile, outputFormat} = file;
+  
+    return files.map(file => {
+      return new Promise((resolve, reject) => {
+        const { inputFile, outputFile, outputFormat } = file;
 
-            const ffmpegCommand = ffmpeg(inputFile)
-                .audioCodec(outputFormat === 'ogg' ? 'libvorbis' : 'aac')
-                .audioBitrate(settings.bitrate)
-                .toFormat(outputFormat)
-                .on('end', () => {
-                    console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
-                    resolve(outputFile);
-                })
-                .on('error', (err) => reject(err))
-                .save(outputFile);
-    })
-})
-};
+        // const cmd = `${path.join(__dirname, 'ffmpeg.exe')} -i ${inputFile} -c:a ${outputFormat === 'ogg' ? 'libvorbis' : 'aac'} -b:a ${settings.bitrate.toString()} -y ${outputFile}`;
+
+        // const conversion = spawn(cmd);
+
+        // conversion.on('close', () => {
+        //     console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
+        //     resolve(outputFile);
+        //   });
+    
+        //   conversion.on('error', (err) => reject(err));
+  
+        const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
+          '-i',
+          inputFile,
+          '-c:a',
+          outputFormat === 'ogg' ? 'libvorbis' : 'aac',
+          '-b:a',
+          `${settings.bitrate.toString()}k`,
+          '-y',
+          outputFile
+        ], {shell: true});
+  
+        ffmpegCommand.on('close', () => {
+          console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
+          resolve(outputFile);
+        });
+  
+        ffmpegCommand.on('error', (err) => reject(err));
+      });
+    });
+  };
 
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
 });
+
+const getAnswer = async (question) => new Promise((res, rej) => rl.question(question, ans => res(ans)))
 
 const UserInputInitSettings = () => {
     return new Promise((resolve, reject) => {
@@ -200,5 +269,6 @@ UserInputInitSettings()
     .then((files) => Promise.all([...convertAudio(settings, files)]))
     .catch((error) => {
         handleError(error);
-    });
+    })
+    .finally(() => rl.close());
 
