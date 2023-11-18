@@ -1,4 +1,5 @@
 const ffmpeg = require('fluent-ffmpeg');
+// const ffmpeg = require('ffmpeg');
 const fs = require('fs');
 const readline = require('readline');
 const path = require('path');
@@ -87,7 +88,7 @@ const createConversionList = (settings, files) => {
 
         for (const inputFile of files.inputFiles) {
             for (const outputFormat of settings.outputFormats) {
-                const outputFile = `${path.basename(inputFile, path.extname(inputFile))}.${outputFormat}`;
+                const outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
                 conversionList.push({
                     inputFile,
                     outputFile,
@@ -110,21 +111,25 @@ const createConversionList = (settings, files) => {
     });
 };
 
-const convertAudio = async (settings, files) => {
-    return new Promise((resolve, reject) => {
-        const outputFilePath = join(settings.filePath, `${basename(inputPath, extname(inputPath))}.${outputFormat}`);
+const convertAudio = (settings, files) => {
+    console.info('settings', settings);
+    console.info('files', files);
+    return files.map(file => { 
+        return new Promise((resolve, reject) => {
+            const {inputFile, outputFile, outputFormat} = file;
 
-        const ffmpegCommand = ffmpeg(inputPath)
-            .audioCodec(fileList.outputFormats.includes('ogg') ? 'libvorbis' : 'aac')
-            .audioBitrate(fileList.bitrate)
-            .toFormat(outputFormat)
-            .on('end', () => {
-                console.log(`Converted ${inputPath} to ${outputFormat} with bitrate ${fileList.bitrate}`);
-                resolve(outputFilePath);
-            })
-            .on('error', (err) => reject(err))
-            .save(outputFilePath);
-    });
+            const ffmpegCommand = ffmpeg(inputFile)
+                .audioCodec(outputFormat === 'ogg' ? 'libvorbis' : 'aac')
+                .audioBitrate(settings.bitrate)
+                .toFormat(outputFormat)
+                .on('end', () => {
+                    console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
+                    resolve(outputFile);
+                })
+                .on('error', (err) => reject(err))
+                .save(outputFile);
+    })
+})
 };
 
 const rl = readline.createInterface({
@@ -172,7 +177,8 @@ UserInputInitSettings()
     .then((settings) => searchFiles(settings))
     .then((files) => deleteDuplicateFiles(files))
     .then((files) => createConversionList(settings, files))
-    .then((files) => convertAudio(settings, files))
+    .then((files) => Promise.all([...convertAudio(settings, files)]))
     .catch((error) => {
         handleError(error);
     });
+
