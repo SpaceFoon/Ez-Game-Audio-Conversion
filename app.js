@@ -12,10 +12,7 @@ let settings = {
     outputFormats: [],
     bitrate: 0,
 };
-let files = {
-    inputFiles: [],
-    outputFiles: []
-}
+
 const handleError = (errorMessage) => {
     console.error(errorMessage);
     process.exit(1);
@@ -54,33 +51,51 @@ const searchFiles = (settings) => {
     console.log('Matching Files:', allFiles);
 
     // Resolve the promise with the list of matching file paths
-    return Promise.resolve({ inputFiles: allFiles });
+    return Promise.resolve(allFiles);
 };
 
 const deleteDuplicateFiles = (files) => {
-    return new Promise((resolve, reject) => {
-        const fileMap = new Map();
+    const priorityList = ['mp3', 'wav'];
+    console.log('files', files);
+    const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
 
-        for (const file of files.inputFiles) {
-            const fileName = path.basename(file, path.extname(file));
-            const ext = path.extname(file).toLowerCase();
+    const uniq = new Map();
 
-            if (!fileMap.has(fileName) || ext.length > path.extname(fileMap.get(fileName)).length) {
-                fileMap.set(fileName, ext);
-            } else {
-                console.warn(`Deleted from list: ${file}`); // Log the deleted file
-            }
+    for (const [name, ext] of fileobjs) {
+        if(!uniq.has(name)) {
+            uniq.set(name, ext);
+            continue;
         }
 
-        const uniqueFiles = Array.from(fileMap.keys()).map((fileName) => {
-            const ext = fileMap.get(fileName);
-            return path.join(path.dirname(files.inputFiles[0]), `${fileName}${ext}`);
-        });
+        const current = uniq.get(name);
+        if(priorityList.indexOf(ext) > priorityList.indexOf(current)){
+            uniq.set(name, ext)
+        }
+    }
 
-        files.inputFiles = uniqueFiles;
-        resolve(files);
-    });
+    console.log(Array.from(uniq));
+
 };
+
+    // const uniq = fileobjs.reduce((acc, curr) => {
+    //     const existingFile = acc.find(file => file.name === curr.name);
+    //     if (!existingFile) {
+    //         acc.push(curr);
+    //     } else {
+    //         const existingPriority = priorityList.indexOf(path.extname(existingFile.name).toLowerCase());
+    //         const currentPriority = priorityList.indexOf(curr.ext.toLowerCase());
+    //         if (currentPriority < existingPriority) {
+    //             acc = acc.filter(file => file.name !== existingFile.name);
+    //             acc.push(curr);
+    //         }
+    //     }
+    //     return acc;
+    // }, []);
+
+    // const uniqueFiles = uniq.map(file => path.join(path.dirname(file), `${file.name}${file.ext}`));
+
+    // return Promise.resolve({ inputFiles: uniqueFiles });
+// };
 
 const createConversionList = (settings, files) => {
     return new Promise((resolve, reject) => {
@@ -114,6 +129,11 @@ const createConversionList = (settings, files) => {
 const convertAudio = (settings, files) => {
     console.info('settings', settings);
     console.info('files', files);
+    // {
+    //     inputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.wav',
+    //     outputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.ogg',
+    //     outputFormat: 'ogg'
+    //   },
     return files.map(file => { 
         return new Promise((resolve, reject) => {
             const {inputFile, outputFile, outputFormat} = file;
