@@ -9,7 +9,7 @@ RMMV uses m4a as well but not really needed
 Features	        MP3	Ogg	WAV	MIDI
 Loop OK	NO	        YES	YES	YES
 Loop Inside (Tags)	NO	YES	NO	YES
-File Size Optimiz.	YES	YES	NO	OMG YES
+File Size Optimize.	YES	YES	NO	OMG YES
 Realistic Sound	    YES	YES	YES	NO
 RMMV Compatible	    NO	YES	NO	NO
 RMVX/Ace Compatible	YES	YES	YES	YES
@@ -153,12 +153,13 @@ const deleteDuplicateFiles = (files) => {
 const createConversionList = async (settings, files) => {
     const conversionList = [];
     let response = null;
-    let conversionFunction = null;
     for (const inputFile of files) {
         for (const outputFormat of settings.outputFormats) {
             let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
+            console.log(`${inputFile}`)
+            console.log(`${outputFile}`)
             let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
-            if(fs.existsSync(outputFile)) {
+            if(outputFile) {
                 const responseActions = {
                     o: () => {response = null;},
                     oa: () => {/* Nothing to do as default is overwrite */},
@@ -177,11 +178,10 @@ const createConversionList = async (settings, files) => {
                     case 'oa':
                         console.log('OVERWRITE FILE', outputFile);
                         break;
-                    case '':
-                        response = null;
                     default:
+                        console.log(`${response}`)
                         if (!response){
-                            response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (ie: Oa, Ra, Sa)'\n'${outputFile}? : `);
+                            response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (e.g., oa, ra, sa)'\n'${outputFile}? : `);
                             response = response.trim().toLowerCase();
                             if (responseActions[response]) {
                                 responseActions[response]();
@@ -192,19 +192,12 @@ const createConversionList = async (settings, files) => {
                         }
                         break;
                 }
-                if (/\.ogg$/i.test(outputFormat)) {
-                    conversionFunction = 1;
-                }
-                if (/\.m4a$/i.test(outputFormat)) {
-                    conversionFunction = 2;
-                }
                 conversionList.push({
                     inputFile,
                     outputFile,
                     outputFormat,
-                    conversionFunction
                 });
-            }
+            }else{console.error("file does not exist")}
         }
     }
     console.log('Pending conversion:', conversionList);
@@ -215,7 +208,6 @@ const createConversionList = async (settings, files) => {
 };
 
 const checkFileCodec = (files) => {
-    // Replace 'inputFile.mp4' with the path to your multimedia file
 
 array.forEach(files => {
     ffmpeg.ffprobe(files[i], (err, metadata) => {
@@ -278,7 +270,7 @@ const convertAudio2 = async (settings, files) => {
                       resolve(outputFile);
                     } else {
                       console.error(`Conversion failed for ${inputFile} to ${outputFile}. Exit code: ${code}`);
-                      reject(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
+                      resolve(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
                     }
                   });
           
@@ -338,7 +330,7 @@ UserInputInitSettings()
     //save the file that has the best format. Flac > wav > m4a > mp3
     .then((files) => deleteDuplicateFiles(files))
     //go through lis of input files and make output list.
-    //there can be mutiple outputs and user input is needed here for output files
+    //there can be multiple outputs and user input is needed here for output files
     // that already exist.
     .then((files) => createConversionList(settings, files))
     //This is needed to decided what codec to use for the conversion.
@@ -347,10 +339,13 @@ UserInputInitSettings()
     // this is used to convert audio to m4a
     .then(async (files) => await convertAudio2(settings, files))
     // this is used to convert audio to ogg
-    //.then(async (files) => convertAudio(files))
+    ///////////////////.then(async (files) => await convertAudio(settings, files))
     // .then(async (files) => await Promise.all([...convertAudio(settings, files)]))
     .catch((error) => {
         handleError(error);
     })
-    .finally(() => rl.close());
+    .finally(() => {
+        console.log('Have a nice day');
+        rl.close();
+    });
 
