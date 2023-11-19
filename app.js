@@ -69,12 +69,12 @@ const UserInputInitSettings = () => {
                     }
                     console.log(`Output formats: ${settings.outputFormats}`);
 
-                    rl.question('Enter the audio bitrate from 64 to 320. Leave blank for 192 (e.g., 128): ', (bitrateString) => {
+                    rl.question('Enter the audio bitrate from 32 to 320. Leave blank for 192 (e.g., 128): ', (bitrateString) => {
                         const defaultBitrate = 192;
                         const bitrateStringFinal = bitrateString || defaultBitrate;
                         settings.bitrate = parseInt(bitrateStringFinal);
-                        if (isNaN(settings.bitrate) || settings.bitrate < 64 || settings.bitrate > 320) {
-                            reject('Invalid bitrate. Bitrate must be 64-320.');
+                        if (isNaN(settings.bitrate) || settings.bitrate < 32 || settings.bitrate > 320) {
+                            reject('Invalid bitrate. Bitrate must be 32-320.');
                         }
                         console.log(`Bitrate: ${settings.bitrate}`);
                         resolve(settings);
@@ -162,10 +162,9 @@ const createConversionList = async (settings, files) => {
                 if(fs.existsSync(outputFile)) {
                         switch (response) {
                             case 'ra':
-                                outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
-                                break;
+                                responseActions['ra']
                             case 'sa':
-                                outputFile = 'skipped!';
+                                responseActions['sa']
                                 break;
                             case 'oa':
                                 console.log('OVERWRITE FILE', outputFile)
