@@ -24,7 +24,7 @@ const ffmpeg = require('fluent-ffmpeg');
 // const ffmpeg = require('ffmpeg');
 const fs = require('fs');
 const readline = require('readline');
-//const path = require('path');
+const path = require('path');
 const { readdirSync, statSync } = require('fs');
 const { join, basename, extname } = require('path');
 const { spawn } = require('child_process');
@@ -151,60 +151,67 @@ const deleteDuplicateFiles = (files) => {
 };
 
 const createConversionList = async (settings, files) => {
-
-    // return new Promise((resolve, reject) => {
-        const conversionList = [];
-        let response = null;
-        for (const inputFile of files) {
-            for (const outputFormat of settings.outputFormats) {
-                let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
-                let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
-                if(fs.existsSync(outputFile)) {
-                        switch (response) {
-                            case 'ra':
-                                responseActions['ra']
-                            case 'sa':
-                                responseActions['sa']
-                                break;
-                            case 'oa':
-                                console.log('OVERWRITE FILE', outputFile)
-                                break;
-                            default:
-                                const responseActions = {
-                                    o: () => {response = null;},
-                                    oa: () => {/* Nothing to do as default is overwrite */},
-                                    r: () => { outputFile = outputFileCopy; response = null;},
-                                    ra: () => { outputFile = outputFileCopy;},
-                                    s: () => { outputFile = 'skipped!'; response = null},
-                                    sa: () => { outputFile = 'skipped!'; }
-                                }
-                                while (response == null){
-                                response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (ie Oa, Ra, Sa)'\n'${outputFile}? : `).trim().toLowerCase();
-                                if (responseActions[response]) {
-                                    responseActions[response]();
-                                    }else{
-                                        console.log('You did not enter a valid selection, try again.')
-                                    }
-                                }
-                                break;
+    const conversionList = [];
+    let response = null;
+    let conversionFunction = null;
+    for (const inputFile of files) {
+        for (const outputFormat of settings.outputFormats) {
+            let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
+            let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+            if(fs.existsSync(outputFile)) {
+                const responseActions = {
+                    o: () => {response = null;},
+                    oa: () => {/* Nothing to do as default is overwrite */},
+                    r: () => { outputFile = outputFileCopy; response = null;},//copies fail to convert
+                    ra: () => { outputFile = outputFileCopy;},
+                    s: () => { outputFile = 'skipped!'; response = null},
+                    sa: () => { outputFile = 'skipped!'; }
+                }
+                switch (response) {
+                    case 'ra':
+                        responseActions['ra']();
+                        break;
+                    case 'sa':
+                        responseActions['sa']();
+                        break;
+                    case 'oa':
+                        console.log('OVERWRITE FILE', outputFile);
+                        break;
+                    case '':
+                        response = null;
+                    default:
+                        if (!response){
+                            response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (ie: Oa, Ra, Sa)'\n'${outputFile}? : `);
+                            response = response.trim().toLowerCase();
+                            if (responseActions[response]) {
+                                responseActions[response]();
+                            } else {
+                                response = null;
+                                console.log('You did not enter a valid selection, try again.');
+                            }
                         }
+                        break;
+                }
+                if (/\.ogg$/i.test(outputFormat)) {
+                    conversionFunction = 1;
+                }
+                if (/\.m4a$/i.test(outputFormat)) {
+                    conversionFunction = 2;
+                }
                 conversionList.push({
                     inputFile,
                     outputFile,
-                    outputFormat
+                    outputFormat,
+                    conversionFunction
                 });
-                
             }
         }
     }
-        console.log('Pending conversion:', conversionList);
-        
-
-
-        const accept_answer = await getAnswer('This is the list of files to be converted. Accept? Type yes or no: ');
-        if(/^no$/i.test(accept_answer)) throw new Error('Conversion cancelled');
-        if(!/^yes$/i.test(accept_answer)) throw new Error('invalid input, please use "yes" or "no"')
-        return conversionList.filter(x => x.outputFile !== 'skipped!');
+    console.log('Pending conversion:', conversionList);
+    const accept_answer = await getAnswer('This is the list of files to be converted. Accept? Type yes or no: ');
+    if(/^no$/i.test(accept_answer)) throw new Error('Conversion cancelled');
+    if(!/^yes$/i.test(accept_answer)) throw new Error('invalid input, please use "yes" or "no"');
+    return conversionList.filter(x => x.outputFile !== 'skipped!');
 };
 
 const checkFileCodec = (files) => {
@@ -251,7 +258,7 @@ array.forEach(files => {
 const convertAudio2 = async (settings, files) => {
     for (const{inputFile, outputFile, outputFormat } of files) {
         try {
-            
+
             const wtf = await new Promise((resolve, reject) => {
                 
                 const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
@@ -267,10 +274,10 @@ const convertAudio2 = async (settings, files) => {
           
                 ffmpegCommand.on('close', (code) => {
                     if (code === 0) {
-                      console.log(`Conversion successful for ${inputFile}`);
+                      console.log(`Conversion successful for ${inputFile} to ${outputFile}`);
                       resolve(outputFile);
                     } else {
-                      console.error(`Conversion failed for ${inputFile}. Exit code: ${code}`);
+                      console.error(`Conversion failed for ${inputFile} to ${outputFile}. Exit code: ${code}`);
                       reject(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
                     }
                   });
@@ -278,7 +285,6 @@ const convertAudio2 = async (settings, files) => {
                 ffmpegCommand.on('exit', (code) => resolve(code));
                 ffmpegCommand.on('error', (err) => reject(err));
               });
-              console.log('wtf :>> ', wtf);
         } catch (error) {
             console.error('wtf error',error);
         }
@@ -288,7 +294,7 @@ const convertAudio2 = async (settings, files) => {
 const convertAudio = (settings, files) => {
     console.info('settings', settings);
     console.info('files', files);
-  
+
     return files.map(file => {
       return new Promise((resolve, reject) => {
         const { inputFile, outputFile, outputFormat } = file;
@@ -326,10 +332,10 @@ const convertAudio = (settings, files) => {
   };
 
 UserInputInitSettings()
-    // find all files in all folders
+    // find all files of specified type in provided folder and all subfolders
     .then((settings) => searchFiles(settings))
     //delete files from the list that have the same name but different file extensions.
-    //save the file that has the best format. Flac, wav, m4a, mp3
+    //save the file that has the best format. Flac > wav > m4a > mp3
     .then((files) => deleteDuplicateFiles(files))
     //go through lis of input files and make output list.
     //there can be mutiple outputs and user input is needed here for output files
@@ -337,11 +343,11 @@ UserInputInitSettings()
     .then((files) => createConversionList(settings, files))
     //This is needed to decided what codec to use for the conversion.
     //Had problems with output
-    .then((files) => checkFileCodec(files))
+    /////////////////.then((files) => checkFileCodec(files))
     // this is used to convert audio to m4a
     .then(async (files) => await convertAudio2(settings, files))
     // this is used to convert audio to ogg
-    .then(async (files) => convertAudio(files))
+    //.then(async (files) => convertAudio(files))
     // .then(async (files) => await Promise.all([...convertAudio(settings, files)]))
     .catch((error) => {
         handleError(error);
