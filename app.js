@@ -1,12 +1,36 @@
+/*
+EZ GAME AUDIO CONVERSION
+
+
+
+https://rpgmaker.net/articles/2633/
+RMMV uses m4a as well but not really needed
+
+Features	        MP3	Ogg	WAV	MIDI
+Loop OK	NO	        YES	YES	YES
+Loop Inside (Tags)	NO	YES	NO	YES
+File Size Optimiz.	YES	YES	NO	OMG YES
+Realistic Sound	    YES	YES	YES	NO
+RMMV Compatible	    NO	YES	NO	NO
+RMVX/Ace Compatible	YES	YES	YES	YES
+RMXP Compatible	    YES	YES	YES	YES
+RM2003 Compatible	YES	NO	YES	YES
+
+M4A files are compressed using the 'AAC' lossy
+
+*/
+
 const ffmpeg = require('fluent-ffmpeg');
 // const ffmpeg = require('ffmpeg');
 const fs = require('fs');
 const readline = require('readline');
-const path = require('path');
+//const path = require('path');
 const { readdirSync, statSync } = require('fs');
 const { join, basename, extname } = require('path');
 const { spawn } = require('child_process');
 // const pathToFfmpeg = require('.')
+
+//setup object and functions.
 let settings = {
     filePath: '',
     inputFormats: [],
@@ -21,6 +45,10 @@ const handleError = (errorMessage) => {
 
 const getAnswer = async (question) => new Promise((res, rej) => rl.question(question, ans => res(ans)))
 
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+});
 const UserInputInitSettings = () => {
     return new Promise((resolve, reject) => {
         rl.question('Enter the full file path to start search. WILL SEARCH ALL SUB FOLDERS: ', async (filePath) => {
@@ -122,55 +150,45 @@ const deleteDuplicateFiles = (files) => {
 
 };
 
-    // const uniq = fileobjs.reduce((acc, curr) => {
-    //     const existingFile = acc.find(file => file.name === curr.name);
-    //     if (!existingFile) {
-    //         acc.push(curr);
-    //     } else {
-    //         const existingPriority = priorityList.indexOf(path.extname(existingFile.name).toLowerCase());
-    //         const currentPriority = priorityList.indexOf(curr.ext.toLowerCase());
-    //         if (currentPriority < existingPriority) {
-    //             acc = acc.filter(file => file.name !== existingFile.name);
-    //             acc.push(curr);
-    //         }
-    //     }
-    //     return acc;
-    // }, []);
-
-    // const uniqueFiles = uniq.map(file => path.join(path.dirname(file), `${file.name}${file.ext}`));
-
-    // return Promise.resolve({ inputFiles: uniqueFiles });
-// };
-
 const createConversionList = async (settings, files) => {
 
     // return new Promise((resolve, reject) => {
         const conversionList = [];
-        let didPickAll = false;
-
+        let response = null;
         for (const inputFile of files) {
             for (const outputFormat of settings.outputFormats) {
                 let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
+                let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
                 if(fs.existsSync(outputFile)) {
-                    if(didPickAll) {
-                        if(didPickAll === 'r') outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
-                        if(didPickAll === 's') outputFile = 'skipped!';
-                    }else {
-                        const response = await getAnswer(`[O]verwrite, [R]ename or [S]kip ${outputFile}? : `)
-                        if(/^r$/i.test(response.trim())) {
-                            outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+                        switch (response) {
+                            case 'ra':
+                                outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+                                break;
+                            case 'sa':
+                                outputFile = 'skipped!';
+                                break;
+                            case 'oa':
+                                console.log('OVERWRITE FILE', outputFile)
+                                break;
+                            default:
+                                const responseActions = {
+                                    o: () => {response = null;},
+                                    oa: () => {/* Nothing to do as default is overwrite */},
+                                    r: () => { outputFile = outputFileCopy; response = null;},
+                                    ra: () => { outputFile = outputFileCopy;},
+                                    s: () => { outputFile = 'skipped!'; response = null},
+                                    sa: () => { outputFile = 'skipped!'; }
+                                }
+                                while (response == null){
+                                response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (ie Oa, Ra, Sa)'\n'${outputFile}? : `).trim().toLowerCase();
+                                if (responseActions[response]) {
+                                    responseActions[response]();
+                                    }else{
+                                        console.log('You did not enter a valid selection, try again.')
+                                    }
+                                }
+                                break;
                         }
-                        if(/^ra$/i.test(response.trim())) {
-                            outputFile = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
-                            didPickAll = 'r';
-                        }
-                        if(/^s$/i.test(response.trim())) outputFile = 'skipped!';
-                        if(/^sa$/i.test(response.trim())) {
-                            outputFile = 'skipped!';
-                            didPickAll = 's';
-                        }
-                    }
-                }
                 conversionList.push({
                     inputFile,
                     outputFile,
@@ -179,7 +197,7 @@ const createConversionList = async (settings, files) => {
                 
             }
         }
-
+    }
         console.log('Pending conversion:', conversionList);
         
 
@@ -190,14 +208,28 @@ const createConversionList = async (settings, files) => {
         return conversionList.filter(x => x.outputFile !== 'skipped!');
 };
 
+const checkFileCodec = (files) => {
+    // Replace 'inputFile.mp4' with the path to your multimedia file
+
+array.forEach(files => {
+    ffmpeg.ffprobe(files[i], (err, metadata) => {
+      if (err) {
+        console.error('Error while probing:', err);
+      } else {
+        // Access the codec information from the metadata object
+        const audioCodec = metadata.streams.find(stream => stream.codec_type === 'audio').codec_name;
+        const videoCodec = metadata.streams.find(stream => stream.codec_type === 'video').codec_name;
+    
+        console.log('Audio codec:', audioCodec);
+        console.log('Video codec:', videoCodec);
+      }
+    });
+    })
+};
+
 // const convertAudio = (settings, files) => {
 //     console.info('settings', settings);
 //     console.info('files', files);
-//     // {
-//     //     inputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.wav',
-//     //     outputFile: '/home/acdavis/desktop/LostAges/audio/bgm/POL-no-way-out-short.ogg',
-//     //     outputFormat: 'ogg'
-//     //   },
 //     return files.map(file => { 
 //         return new Promise((resolve, reject) => {
 //             const {inputFile, outputFile, outputFormat} = file;
@@ -222,18 +254,7 @@ const convertAudio2 = async (settings, files) => {
         try {
             
             const wtf = await new Promise((resolve, reject) => {
-        
-                // const cmd = `${path.join(__dirname, 'ffmpeg.exe')} -i ${inputFile} -c:a ${outputFormat === 'ogg' ? 'libvorbis' : 'aac'} -b:a ${settings.bitrate.toString()} -y ${outputFile}`;
-        
-                // const conversion = spawn(cmd);
-        
-                // conversion.on('close', () => {
-                //     console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
-                //     resolve(outputFile);
-                //   });
-            
-                //   conversion.on('error', (err) => reject(err));
-          
+                
                 const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
                   '-i',
                   inputFile,
@@ -251,7 +272,7 @@ const convertAudio2 = async (settings, files) => {
                       resolve(outputFile);
                     } else {
                       console.error(`Conversion failed for ${inputFile}. Exit code: ${code}`);
-                      reject(new Error(`Conversion failed for ${inputFile}. Exit code: ${code}`));
+                      reject(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
                     }
                   });
           
@@ -305,19 +326,26 @@ const convertAudio = (settings, files) => {
     });
   };
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-});
-
 UserInputInitSettings()
+    // find all files in all folders
     .then((settings) => searchFiles(settings))
+    //delete files from the list that have the same name but different file extensions.
+    //save the file that has the best format. Flac, wav, m4a, mp3
     .then((files) => deleteDuplicateFiles(files))
+    //go through lis of input files and make output list.
+    //there can be mutiple outputs and user input is needed here for output files
+    // that already exist.
     .then((files) => createConversionList(settings, files))
+    //This is needed to decided what codec to use for the conversion.
+    //Had problems with output
+    .then((files) => checkFileCodec(files))
+    // this is used to convert audio to m4a
     .then(async (files) => await convertAudio2(settings, files))
+    // this is used to convert audio to ogg
+    .then(async (files) => convertAudio(files))
     // .then(async (files) => await Promise.all([...convertAudio(settings, files)]))
     .catch((error) => {
         handleError(error);
     })
-    // .finally(() => rl.close());
+    .finally(() => rl.close());
 
