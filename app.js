@@ -154,7 +154,7 @@ const createConversionList = async (settings, files) => {
     const conversionList = [];
     let response = null;
     for (const inputFile of files) {
-         for (const outputFormat of settings.outputFormats) {
+        for (const outputFormat of settings.outputFormats) {
             let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
             //console.log(`${inputFile}`)
             //console.log(`${outputFile}`)
@@ -186,7 +186,7 @@ const createConversionList = async (settings, files) => {
                             response = response.trim().toLowerCase();
                             if (responseActions[response]) {
                                 responseActions[response]();
-                                break
+                                break;
                             } else {
                                 response = null;
                                 console.log('You did not enter a valid selection, try again.');
@@ -247,42 +247,76 @@ array.forEach(files => {
 //     })
 // })
 // };
+const convertAudio2 = async (settings, files) => {
+    const maxRetries = 3;
+    const failedFiles = [];
 
+    const convertWithRetry = async (inputFile, outputFile, outputFormat) => {
+        let retryCount = 0;
+        let success = false;
 
-const convertAudio2 = (settings, files) => {
-    for (const{inputFile, outputFile, outputFormat } of files) {
-        try {
+        while (!success && retryCount < maxRetries) {
+            try {
+                await new Promise((resolve, reject) => {
+                    const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
+                        '-i',
+                        inputFile,
+                        '-c:a',
+                        outputFormat === 'ogg' ? 'libopus' : 'aac',
+                        '-b:a',
+                        `${settings.bitrate.toString()}k`,
+                        '-y',
+                        outputFile
+                    ], { shell: true });
 
-            const wtf = new Promise((resolve, reject) => {
-                
-                const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
-                  '-i',
-                  inputFile,
-                  '-c:a',
-                  outputFormat === 'ogg' ? 'libvorbis' : 'aac',
-                  '-b:a',
-                  `${settings.bitrate.toString()}k`,
-                  '-y',
-                  outputFile
-                ], {shell: true});
-          
-                ffmpegCommand.on('close', (code) => {
-                    if (code === 0) {
-                      resolve(console.log(`Conversion successful for ${inputFile} to ${outputFile}`));
-                    } else {
-                      console.error(`Conversion failed for ${inputFile} to ${outputFile}. Exit code: ${code}`);
-                      reject(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
-                    }
-                  });
-          
-                ffmpegCommand.on('exit', (code) => resolve(code));
-                ffmpegCommand.on('error', (err) => reject(err));
-              });
-        } catch (error) {
-            console.error('wtf error',error);
+                    ffmpegCommand.on('close', (code) => {
+                        if (code === 0) {
+                            console.log(`Conversion successful for ${getFilename(inputFile)} to ${getFilename(outputFile)}`);
+                            success = true;
+                            resolve();
+                        } else {
+                            console.error(`Conversion failed for ${getFilename(inputFile)} to ${getFilename(outputFile)}. Exit code: ${code}`);
+                            retryCount++;
+                            console.log(`Retrying... (Attempt ${retryCount}/${maxRetries})`);
+                            reject(new Error(`Conversion failed for ${inputFile}. Exit code: ${code}`));
+                        }
+                    });
+
+                    ffmpegCommand.on('error', (err) => {
+                        console.error(`Error during conversion for ${getFilename(inputFile)} to ${getFilename(outputFile)}. Retrying...`);
+                        retryCount++;
+                        console.log(`Retrying... (Attempt ${retryCount}/${maxRetries})`);
+                        reject(err);
+                    });
+                });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (error) {
+                console.error(`Failed to convert ${getFilename(inputFile)} to ${getFilename(outputFile)}. Retrying...`);
+                retryCount++;
+                console.log(`Retrying... (Attempt ${retryCount}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
         }
+
+        if (!success) {
+            console.error(`Failed to convert ${getFilename(inputFile)} to ${getFilename(outputFile)} after ${maxRetries} retries.`);
+            failedFiles.push({ inputFile, outputFile, outputFormat });
+        }
+    };
+
+    for (const { inputFile, outputFile, outputFormat } of files) {
+        await convertWithRetry(inputFile, outputFile, outputFormat);
     }
-}
+
+    console.log('Failed files:', failedFiles);
+};
+
+const getFilename = (filePath) => {
+    const match = filePath.match(/[^\\]+$/);
+    return match ? match[0] : 'unknown';
+};
+
+
 
 const convertAudio = (settings, files) => {
     console.info('settings', settings);
