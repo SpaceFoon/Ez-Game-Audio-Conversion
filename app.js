@@ -123,24 +123,24 @@ const searchFiles = (settings) => {
 
 const deleteDuplicateFiles = (files) => {
     const priorityList = ['.mp3', '.wav'];
-    console.log('files', files);
+    //console.log('files', files);
     const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
 
     const uniq = new Map();
 
     for (const [name, ext] of fileobjs) {
-        console.log('name :>> ', name);
-        console.log('ext :>> ', ext);
+        //console.log('name :>> ', name);
+        //console.log('ext :>> ', ext);
         if(!uniq.has(name)) {
             uniq.set(name, ext);
             continue;
         }
 
         const current = uniq.get(name);
-        console.log('current :>> ', current);
-        console.log('priorityList.indexOf(ext) :>> ', priorityList.indexOf(ext));
-        console.log('priorityList.indexOf(current) :>> ', priorityList.indexOf(current));
-        console.log('priorityList.indexOf(ext) > priorityList.indexOf(current) :>> ', priorityList.indexOf(ext) > priorityList.indexOf(current));
+        // console.log('current :>> ', current);
+        // console.log('priorityList.indexOf(ext) :>> ', priorityList.indexOf(ext));
+        // console.log('priorityList.indexOf(current) :>> ', priorityList.indexOf(current));
+        // console.log('priorityList.indexOf(ext) > priorityList.indexOf(current) :>> ', priorityList.indexOf(ext) > priorityList.indexOf(current));
         if(priorityList.indexOf(ext) > priorityList.indexOf(current)){
             uniq.set(name, ext)
         }
@@ -154,18 +154,18 @@ const createConversionList = async (settings, files) => {
     const conversionList = [];
     let response = null;
     for (const inputFile of files) {
-        for (const outputFormat of settings.outputFormats) {
+         for (const outputFormat of settings.outputFormats) {
             let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
-            console.log(`${inputFile}`)
-            console.log(`${outputFile}`)
+            //console.log(`${inputFile}`)
+            //console.log(`${outputFile}`)
             let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
             if(outputFile) {
                 const responseActions = {
-                    o: () => {response = null;},
+                    o: () => {return response = null;},
                     oa: () => {/* Nothing to do as default is overwrite */},
-                    r: () => { outputFile = outputFileCopy; response = null;},//copies fail to convert
+                    r: () => { outputFile = outputFileCopy; return response = null;},//copies fail to convert
                     ra: () => { outputFile = outputFileCopy;},
-                    s: () => { outputFile = 'skipped!'; response = null},
+                    s: () => { outputFile = 'skipped!'; return response = null},
                     sa: () => { outputFile = 'skipped!'; }
                 }
                 switch (response) {
@@ -179,18 +179,20 @@ const createConversionList = async (settings, files) => {
                         console.log('OVERWRITE FILE', outputFile);
                         break;
                     default:
-                        console.log(`${response}`)
+                        console.log('response: ',response)
+                        while (true){
                         if (!response){
                             response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (e.g., oa, ra, sa)'\n'${outputFile}? : `);
                             response = response.trim().toLowerCase();
                             if (responseActions[response]) {
                                 responseActions[response]();
+                                break
                             } else {
                                 response = null;
                                 console.log('You did not enter a valid selection, try again.');
                             }
                         }
-                        break;
+                    }
                 }
                 conversionList.push({
                     inputFile,
@@ -247,11 +249,11 @@ array.forEach(files => {
 // };
 
 
-const convertAudio2 = async (settings, files) => {
+const convertAudio2 = (settings, files) => {
     for (const{inputFile, outputFile, outputFormat } of files) {
         try {
 
-            const wtf = await new Promise((resolve, reject) => {
+            const wtf = new Promise((resolve, reject) => {
                 
                 const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
                   '-i',
@@ -266,11 +268,10 @@ const convertAudio2 = async (settings, files) => {
           
                 ffmpegCommand.on('close', (code) => {
                     if (code === 0) {
-                      console.log(`Conversion successful for ${inputFile} to ${outputFile}`);
-                      resolve(outputFile);
+                      resolve(console.log(`Conversion successful for ${inputFile} to ${outputFile}`));
                     } else {
                       console.error(`Conversion failed for ${inputFile} to ${outputFile}. Exit code: ${code}`);
-                      resolve(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
+                      reject(new Error(`Conversion failed for111 ${inputFile}. Exit code: ${code}`));
                     }
                   });
           
@@ -322,7 +323,9 @@ const convertAudio = (settings, files) => {
       });
     });
   };
-
+  finalize = (files) => {
+    console.log('Have a nice day: ',files)
+  }
 UserInputInitSettings()
     // find all files of specified type in provided folder and all subfolders
     .then((settings) => searchFiles(settings))
@@ -337,15 +340,17 @@ UserInputInitSettings()
     //Had problems with output
     /////////////////.then((files) => checkFileCodec(files))
     // this is used to convert audio to m4a
-    .then(async (files) => await convertAudio2(settings, files))
+    .then((files) => convertAudio2(settings, files))
     // this is used to convert audio to ogg
     ///////////////////.then(async (files) => await convertAudio(settings, files))
     // .then(async (files) => await Promise.all([...convertAudio(settings, files)]))
+    .then((files) => finalize(files))
+
     .catch((error) => {
         handleError(error);
     })
     .finally(() => {
-        console.log('Have a nice day');
+        console.log('.finally');
         rl.close();
     });
 
