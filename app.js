@@ -202,6 +202,7 @@ const createConversionList = async (settings, files) => {
             }else{console.error("file does not exist")}
         }
     }
+
     console.log('Pending conversion:', conversionList);
     const accept_answer = await getAnswer('This is the list of files to be converted. Accept? Type yes or no: ');
     if(/^no$/i.test(accept_answer)) throw new Error('Conversion cancelled');
@@ -247,6 +248,28 @@ array.forEach(files => {
 //     })
 // })
 // };
+const checkFileNames = async (files, conversionList) => {
+    try {
+        for (const { inputFile, outputFile, outputFormat } of files) {
+            try {
+                if (outputFile) {
+                    const sanitizedOutputFile = outputFile.replace(/ /g, '_');
+                    const index = conversionList.findIndex(item => item.outputFile === outputFile);
+                    if (index !== -1) {
+                        conversionList[index].outputFile = sanitizedOutputFile;
+                    }
+                } else {
+                    throw new Error(`outputFile is undefined or null for an entry: ${outputFile}`);
+                }
+            } catch (error) {
+                console.error(error.message);
+            }
+        }
+    } catch (error) {
+        throw error;
+    }
+};
+
 const convertAudio2 = async (settings, files) => {
     const maxRetries = 3;
     const failedFiles = [];
@@ -260,13 +283,13 @@ const convertAudio2 = async (settings, files) => {
                 await new Promise((resolve, reject) => {
                     const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
                         '-i',
-                        inputFile,
+                        `"${inputFile}"`,
                         '-c:a',
                         outputFormat === 'ogg' ? 'libopus' : 'aac',
                         '-b:a',
                         `${settings.bitrate.toString()}k`,
                         '-y',
-                        outputFile
+                        `"${outputFile}"`
                     ], { shell: true });
 
                     ffmpegCommand.on('close', (code) => {
@@ -316,47 +339,6 @@ const getFilename = (filePath) => {
     return match ? match[0] : 'unknown';
 };
 
-
-
-const convertAudio = (settings, files) => {
-    console.info('settings', settings);
-    console.info('files', files);
-
-    return files.map(file => {
-      return new Promise((resolve, reject) => {
-        const { inputFile, outputFile, outputFormat } = file;
-
-        // const cmd = `${path.join(__dirname, 'ffmpeg.exe')} -i ${inputFile} -c:a ${outputFormat === 'ogg' ? 'libvorbis' : 'aac'} -b:a ${settings.bitrate.toString()} -y ${outputFile}`;
-
-        // const conversion = spawn(cmd);
-
-        // conversion.on('close', () => {
-        //     console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
-        //     resolve(outputFile);
-        //   });
-    
-        //   conversion.on('error', (err) => reject(err));
-  
-        const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
-          '-i',
-          inputFile,
-          '-c:a',
-          outputFormat === 'ogg' ? 'libvorbis' : 'aac',
-          '-b:a',
-          `${settings.bitrate.toString()}k`,
-          '-y',
-          outputFile
-        ], {shell: true});
-  
-        ffmpegCommand.on('close', () => {
-          console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
-          resolve(outputFile);
-        });
-  
-        ffmpegCommand.on('error', (err) => reject(err));
-      });
-    });
-  };
   finalize = (files) => {
     console.log('Have a nice day: ',files)
   }
@@ -369,15 +351,14 @@ UserInputInitSettings()
     //go through lis of input files and make output list.
     //there can be multiple outputs and user input is needed here for output files
     // that already exist.
+    //.then((files) => checkFileNames(files))
     .then((files) => createConversionList(settings, files))
     //This is needed to decided what codec to use for the conversion.
-    //Had problems with output
     /////////////////.then((files) => checkFileCodec(files))
+    
     // this is used to convert audio to m4a
     .then((files) => convertAudio2(settings, files))
-    // this is used to convert audio to ogg
-    ///////////////////.then(async (files) => await convertAudio(settings, files))
-    // .then(async (files) => await Promise.all([...convertAudio(settings, files)]))
+
     .then((files) => finalize(files))
 
     .catch((error) => {
