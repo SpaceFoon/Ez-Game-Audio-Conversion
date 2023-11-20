@@ -1,4 +1,10 @@
 {
+  "name": "EZ Game Audio Converter",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
   "dependencies": {
     "ffmpeg": "^0.0.4",
     "ffmpeg-static": "^5.2.0",
@@ -6,5 +12,13 @@
     "fs": "^0.0.1-security",
     "path": "^0.12.7",
     "redline": "^1.0.1"
+  },
+  "pkg": {
+    "scripts": "app.js",
+    "targets": [
+      "node14-win-x64",
+      "node14-linux-x64",
+      "node14-macos-x64"
+    ]
   }
 }
