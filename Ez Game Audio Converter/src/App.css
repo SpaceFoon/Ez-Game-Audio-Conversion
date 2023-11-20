@@ -1,7 +1,10 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
+.logo-container {
+  background-image: url('./assets/logoPlain.png'); /* Replace with the actual path to your logo */
+  background-size: auto;
+  background-position: center;
+  width: 100vw;
+  height: 100vh;
+  display:flex;
+  justify-content: center;
+  align-items: center;
 }
