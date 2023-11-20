@@ -1,10 +1,8 @@
 /*
 EZ GAME AUDIO CONVERSION
 
-
-
 https://rpgmaker.net/articles/2633/
-RMMV uses m4a as well but not really needed
+RMMV uses m4a as well but not really needed in 2023
 
 Features	        MP3	Ogg	WAV	MIDI
 Loop OK	NO	        YES	YES	YES
@@ -228,47 +226,27 @@ array.forEach(files => {
     })
 };
 
-// const convertAudio = (settings, files) => {
-//     console.info('settings', settings);
-//     console.info('files', files);
-//     return files.map(file => { 
-//         return new Promise((resolve, reject) => {
-//             const {inputFile, outputFile, outputFormat} = file;
-
-//             const ffmpegCommand = ffmpeg(inputFile)
-//                 .audioCodec(outputFormat === 'ogg' ? 'libvorbis' : 'aac')
-//                 .audioBitrate(settings.bitrate)
-//                 .toFormat(outputFormat)
-//                 .on('end', () => {
-//                     console.log(`Converted ${inputFile} to ${outputFormat} with bitrate ${settings.bitrate}`);
-//                     resolve(outputFile);
-//                 })
-//                 .on('error', (err) => reject(err))
-//                 .save(outputFile);
-//     })
-// })
+// const checkFileNames = async (files, conversionList) => {
+//     try {
+//         for (const { inputFile, outputFile, outputFormat } of files) {
+//             try {
+//                 if (outputFile) {
+//                     const sanitizedOutputFile = outputFile.replace(/ /g, '_');
+//                     const index = conversionList.findIndex(item => item.outputFile === outputFile);
+//                     if (index !== -1) {
+//                         conversionList[index].outputFile = sanitizedOutputFile;
+//                     }
+//                 } else {
+//                     throw new Error(`outputFile is undefined or null for an entry: ${outputFile}`);
+//                 }
+//             } catch (error) {
+//                 console.error(error.message);
+//             }
+//         }
+//     } catch (error) {
+//         throw error;
+//     }
 // };
-const checkFileNames = async (files, conversionList) => {
-    try {
-        for (const { inputFile, outputFile, outputFormat } of files) {
-            try {
-                if (outputFile) {
-                    const sanitizedOutputFile = outputFile.replace(/ /g, '_');
-                    const index = conversionList.findIndex(item => item.outputFile === outputFile);
-                    if (index !== -1) {
-                        conversionList[index].outputFile = sanitizedOutputFile;
-                    }
-                } else {
-                    throw new Error(`outputFile is undefined or null for an entry: ${outputFile}`);
-                }
-            } catch (error) {
-                console.error(error.message);
-            }
-        }
-    } catch (error) {
-        throw error;
-    }
-};
 
 const convertAudio2 = async (settings, files) => {
     const maxRetries = 3;
@@ -351,6 +329,7 @@ UserInputInitSettings()
     //go through lis of input files and make output list.
     //there can be multiple outputs and user input is needed here for output files
     // that already exist.
+    // find and replace spaces in files names
     //.then((files) => checkFileNames(files))
     .then((files) => createConversionList(settings, files))
     //This is needed to decided what codec to use for the conversion.
