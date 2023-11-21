@@ -2,21 +2,27 @@ import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
 import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
+import { Midi } from "@tonejs/midi";
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("testname");
 
   async function greet() {
+    const midiData = await fetch("Ez Game Audio Converter/src/tintin-on-the-moon.mid").then(response => response.arrayBuffer());
+    const midiFilePath = "path/to/your/midi/file.mid";
+
+    // Invoke a Tauri command to play the MIDI file using the system's default player
+    await invoke("playMidiFile", { path: midiFilePath });
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
     setGreetMsg(await invoke("greet", { name }));
   }
 
   useEffect(() => { greet() }, []);
 
-  const [filePath, setFilePath] = useState("");
+  let [filePath, setFilePath] = useState("");
   const [fileType, setFileType] = useState([]);
-  const [bitrate, setBitrate] = useState('192');
+  let [bitrate, setBitrate] = useState('192');
   const [outputType, setOutputType] = useState("");
   const [logs, setLogs] = useState([]);
 
@@ -26,6 +32,7 @@ function App() {
     // For now, just log the selected options
     if (confirmed2){
       if(!bitrate)bitrate = 192;
+      if(!filePath)filePath = await audioDir();
     const newLogs = [
       `File Path: ${filePath}`,
       `File Type: ${fileType}`,
