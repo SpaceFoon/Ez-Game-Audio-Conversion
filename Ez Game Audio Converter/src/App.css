@@ -30,3 +30,7 @@ input,
   margin-right: -.4em;
   
 }
+.checkbox-input:checked + .checkbox-label {
+  font-weight: bold;
+  color: green;
+}

@@ -15,7 +15,7 @@ function App() {
   useEffect(() => {greet()}, []);
 
   const [filePath, setFilePath] = useState("");
-  const [fileType, setFileType] = useState("");
+  const [fileType, setFileType] = useState(`[...]`);
   const [bitrate, setBitrate] = useState("");
   const [outputType, setOutputType] = useState("");
   const [logs, setLogs] = useState([]);
@@ -34,10 +34,11 @@ function App() {
     setLogs([...logs, ...newLogs]);
     }
   };
+  
   const handleSelectFolder = async () => {
     try {
-      const dir = audioDir()
-      const fPath = await open({
+      let dir = audioDir()
+      const [fPath] = await open({
         //multiple: true, one day
         defaultPath: `${dir}`,
         multiple: false,
@@ -80,26 +81,24 @@ function App() {
             type="checkbox"
             name="fileType"
             value="mp3"
-            checked={fileType === "mp3"}
-            onChange={() => handleOutputTypeChange("mp3")}
+            checked={fileType.includes("mp3")}
+            onChange={() => handleFileTypeChange("mp3")}
           />{" "}
           MP3
           <input
             type="checkbox"
             name="fileType"
             value="wav"
-            checked={fileType 
-              === "wav"}
-            onChange={() => handleOutputTypeChange("wav")}
+            checked={fileType.includes("wav")}
+            onChange={() => handleFileTypeChange("wav")}
           />{" "}
           WAV
           <input
             type="checkbox"
             name="fileType"
             value="flac"
-            checked={fileType 
-              === "flac"}
-            onChange={() => handleOutputTypeChange("flac")}
+            checked={fileType.includes("flac")}
+            onChange={() => handleFileTypeChange("flac")}
           />{" "}
           FLAC
         </label>
@@ -112,16 +111,16 @@ function App() {
             type="checkbox"
             name="outputType"
             value="ogg"
-            checked={outputType === "ogg"}
-            onChange={() => handleFileTypeChange("ogg")}
+            checked={outputType.includes("ogg")}
+            onChange={() => handleOutputTypeChange("ogg")}
           />{" "}
           OGG
           <input
             type="checkbox"
             name="outputType"
             value="m4a"
-            checked={outputType === "m4a"}
-            onChange={() => handleFileTypeChange("m4a")}
+            checked={outputType.includes("m4a")}
+            onChange={() => handleOutputTypeChange("m4a")}
           />{" "}
           M4A
         </label>
