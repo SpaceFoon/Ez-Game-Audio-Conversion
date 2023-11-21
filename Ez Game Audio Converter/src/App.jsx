@@ -1,7 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
-import { open } from '@tauri-apps/api/dialog';
-import { appDataDir } from '@tauri-apps/api/path';
+import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
+import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
@@ -11,33 +11,42 @@ function App() {
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
     setGreetMsg(await invoke("greet", { name }));
   }
+  let filePath;
+  let [fileType, setFileType] = useState("");
+  let [bitrate, setBitrate] = useState("");
+  let [outputType, setOutputType] = useState("");
+  let [logs, setLogs] = useState([]);
 
-  const [filePath, setFilePath] = useState("");
-  const [fileType, setFileType] = useState("");
-  const [outputType, setOutputType] = useState("");
-  const [logs, setLogs] = useState([]);
-
-  const handleStart = () => {
+  const handleStart = async () => {
+    const confirmed2 = await ask('This action cannot be reverted. Are you sure?', { title: 'Think about it', type: 'warning' });
     // Perform any necessary actions with the selected options
     // For now, just log the selected options
+    if (confirmed2){
     const newLogs = [
       `File Path: ${filePath}`,
       `File Type: ${fileType}`,
+      `Bitrate: ${bitrate}`,
       `Output Type: ${outputType}`,
     ];
     setLogs([...logs, ...newLogs]);
+    }
   };
   const handleSelectFolder = async () => {
     try {
-      const response = await window.__TAURI__.tauri.shell.open("openDirectoryDialog");
-      if (response && response.payload) {
-        // Tauri's `openDirectoryDialog` returns an object; we'll use the dialog property
-        setFilePath(response.payload.dialog);
-      }
+      const dir = audioDir()
+      filePath = await open({
+        //multiple: true, one day
+        defaultPath: `${dir}`,
+        multiple: false,
+        recursive: true,
+        directory: true,
+      });
     } catch (error) {
       console.error("Error selecting folder:", error);
     }
+
   };
+ 
   const handleFileTypeChange = (value) => {
     setFileType(value);
   };
@@ -54,14 +63,13 @@ function App() {
       <div>
         <label>
           Source File Path:
-          
-          <button onClick={open}>Select Folder</button>
+          <button onClick={handleSelectFolder}>Select Folder</button>
         </label>
       </div>
 
       <div>
         <label>
-          File Type:
+          Source Formats:
           <input
             type="checkbox"
             name="fileType"
@@ -93,8 +101,8 @@ function App() {
 
       <div >
         <label>
-          Output Type:
-          <input className="radio button"
+          Output Formats:
+          <input className="checkbox"
             type="checkbox"
             name="outputType"
             value="ogg"
@@ -111,6 +119,20 @@ function App() {
           />{" "}
           M4A
         </label>
+        <div className="enterBitrate"> 
+          <label className="enterBitrate">
+          Bitrate:
+          <input
+            type="text"
+            name="setBitrate"
+            value="192"
+            onChange={() => setBitrate("192")}
+          />{" "}
+          
+       
+        </label>
+        </div>
+       
       </div>
       </form>
       <div>

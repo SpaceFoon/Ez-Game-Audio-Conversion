@@ -1,14 +1,3 @@
-.logo-container {
-  background-image: url('./assets/logoPlain.png'); /* Replace with the actual path to your logo */
-  background-size: auto;
-  background-position: center;
-  width: 100vw;
-  height: 100vh;
-  display:flex;
-  justify-content: center;
-  align-items: center;
-}
-
 button {
   padding: 0.5em .8em;
   border-radius: 6px;
@@ -23,27 +12,21 @@ button {
 
 /* Add some margin to create spacing between buttons */
 button + button {
-  margin-left: 10px; /* Adjust the margin as needed */
+  margin: 10px;
 }
 
-/* Style changes on hover */
 button:hover {
   background-color: darkgreen;
 }
-
-
 input,
-button {
-
-  border: 1px solid transparent;
-
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  transition: border-color 0.25s;
+.enterBitrate{
+  padding: 0.3em .3em;
+  border-radius: 6px;
+  margin: .2em;
+}
+input,
+.checkbox {
+  margin: .6em;
+  margin-right: -.4em;
   
 }
-
-
-
-

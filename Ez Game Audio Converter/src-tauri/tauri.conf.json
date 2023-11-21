@@ -6,12 +6,24 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "Ez Game Audio Converter",
+    "productName": "EZ Game Audio Converter",
     "version": "0.0.0"
   },
   "tauri": {
     "allowlist": {
       "all": true,
+      "os": {
+        "all": true
+
+      },
+      "dialog": {
+        "all": true, 
+        "ask": true, 
+        "confirm": true, 
+        "message": true, 
+        "open": true, 
+        "save": true 
+      },
       "shell": {
         "all": false,
         "open": true
@@ -38,7 +50,7 @@
         "resizable": true,
         "title": "ez-game-audio-converter",
         "width": 600,
-        "height": 800
+        "height": 1000
       }
     ]
   }
