@@ -1,13 +1,14 @@
-# Ez-Game-Audio-Conversion
-Convert all your mp3's and wav's to ogg in just a few clicks.
+# EZ-Game-Audio-Conversion
+Convert all your mp3's and wav's to ogg and or m4a in just a few clicks.
 
 This is a command-line application that allows you to search for audio files in a specified directory and its subdirectories, then convert them to different output formats.
 
 ## Prerequisites
 
+- Windows PC
 - Node.js (version ?.?.? or higher)
 - npm (version ?.?.? or higher)
-- a terminal 
+
 ## Installation
 
 1. Clone or download the repository.

@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^1.5.1",
+    "@tonejs/midi": "^2.0.28",
+    "ffmpeg": "^0.0.4",
+    "ffmpeg-static": "^5.2.0",
+    "fluent-ffmpeg": "^2.1.2",
     "node-sass": "^9.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -19,7 +23,6 @@
   "devDependencies": {
     "@tauri-apps/cli": "^1.5.6",
     "@vitejs/plugin-react": "^4.0.3",
-    "sass": "^1.69.5",
-    "vite": "^4.4.4"
+    "sass": "^1.69.5"
   }
 }

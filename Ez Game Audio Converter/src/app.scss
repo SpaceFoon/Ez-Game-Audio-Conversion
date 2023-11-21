@@ -12,7 +12,7 @@ body {
   overflow: hidden;
   padding: 2rem;
   color: white;
-  font: 1.3rem Inconsolata, monospace;
+  font: 1.25rem Inconsolata, monospace;
   text-shadow: 0 0 5px #C8C8C8;
 
   &::after {
@@ -32,7 +32,7 @@ body {
   }
 
   animation-name: crt;
-  animation-duration: 5s;
+  animation-duration: 100s;
   animation-iteration-count: infinite;
   animation-direction: alternate;
   animation-timing-function: linear;

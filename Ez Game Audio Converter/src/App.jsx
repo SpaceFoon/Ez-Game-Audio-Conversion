@@ -10,6 +10,11 @@ function App() {
   const [name, setName] = useState("testname");
 
   async function greet() {
+    const midiData = await fetch("./tintin-on-the-moon.mid").then(response => response.arrayBuffer());
+    const midiFilePath = "path/to/your/midi/file.mid";
+
+    // Invoke a Tauri command to play the MIDI file using the system's default player
+    await invoke("playMidiFile", { path: midiFilePath });
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
     setGreetMsg(await invoke("greet", { name }));
   }
@@ -74,6 +79,7 @@ function App() {
     // For now, just log the selected options
     if (confirmed2){
       if(!bitrate)bitrate = 192;
+      if(!filePath)filePath = await audioDir();
     const newLogs = [
       `File Path: ${filePath}`,
       `File Type: ${fileType.join(',')}`,
