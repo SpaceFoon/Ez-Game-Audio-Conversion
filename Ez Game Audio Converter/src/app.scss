@@ -1,39 +1,48 @@
+@keyframes crt {
+  from {background-position-y: -1000vh}
+  to { background-position-y: 1000vh }
+}
 
 body {
-    background-color: black;
-    background-image: radial-gradient(
-      rgba(0, 123, 0, 0.75), black 130%
-    );
+  background-color: black;
+  background-image: radial-gradient(rgba(0, 123, 0, 0.75), black 130%);
+  background-repeat: repeat-y;
+  height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  padding: 2rem;
+  color: white;
+  font: 1.3rem Inconsolata, monospace;
+  text-shadow: 0 0 5px #C8C8C8;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
     height: 100vh;
-    margin: 0;
-    overflow:hidden;
-    padding: 2rem;
-    color: white;
-    font: 1.3rem Inconsolata, monospace;
-    text-shadow: 0 0 5px #C8C8C8;
-    &::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: repeating-linear-gradient(
-        0deg,
+    background: repeating-linear-gradient(0deg,
         rgba(black, 0.15),
         rgba(black, 0.15) 1px,
         transparent 1px,
-        transparent 2px
-      );
-      pointer-events: none;
-    }
-  }
-  ::selection {
-    background: #90c786;
-    text-shadow: 4px;
-  }
-  pre {
-    margin: 0;
+        transparent 2px);
+    pointer-events: none;
+    background-repeat: repeat-y;
   }
 
+  animation-name: crt;
+  animation-duration: 5s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-timing-function: linear;
+}
 
+::selection {
+  background: #90c786;
+  text-shadow: 4px;
+}
+
+pre {
+  margin: 0;
+}

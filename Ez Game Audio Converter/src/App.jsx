@@ -14,11 +14,11 @@ function App() {
 
   useEffect(() => {greet()}, []);
 
-  let filePath;
-  let [fileType, setFileType] = useState("");
-  let [bitrate, setBitrate] = useState("");
-  let [outputType, setOutputType] = useState("");
-  let [logs, setLogs] = useState([]);
+  const [filePath, setFilePath] = useState("");
+  const [fileType, setFileType] = useState("");
+  const [bitrate, setBitrate] = useState("");
+  const [outputType, setOutputType] = useState("");
+  const [logs, setLogs] = useState([]);
 
   const handleStart = async () => {
     const confirmed2 = await ask('This action cannot be reverted. Are you sure?', { title: 'Think about it', type: 'warning' });
@@ -37,13 +37,15 @@ function App() {
   const handleSelectFolder = async () => {
     try {
       const dir = audioDir()
-      filePath = await open({
+      const fPath = await open({
         //multiple: true, one day
         defaultPath: `${dir}`,
         multiple: false,
         recursive: true,
         directory: true,
       });
+      console.log('fPath', fPath);
+      setFilePath(fPath);
     } catch (error) {
       console.error("Error selecting folder:", error);
     }
