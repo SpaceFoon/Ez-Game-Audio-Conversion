@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
-import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
+import { audioDir, basename, join } from '@tauri-apps/api/path';
 import { Midi } from "@tonejs/midi";
 
 function App() {
@@ -9,7 +9,7 @@ function App() {
   const [name, setName] = useState("testname");
 
   async function greet() {
-    const midiData = await fetch("Ez Game Audio Converter/src/tintin-on-the-moon.mid").then(response => response.arrayBuffer());
+    const midiData = await fetch("./tintin-on-the-moon.mid").then(response => response.arrayBuffer());
     const midiFilePath = "path/to/your/midi/file.mid";
 
     // Invoke a Tauri command to play the MIDI file using the system's default player
