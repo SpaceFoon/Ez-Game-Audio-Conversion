@@ -224,7 +224,7 @@ export const createConversionList = async (outputTypes, files) => {
 //     }
 // };
 
-const convertAudio2 = async (settings, files) => {
+export const convertAudio2 = async (settings, files) => {
     const maxRetries = 3;
     const failedFiles = [];
 

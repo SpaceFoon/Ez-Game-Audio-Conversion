@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
 import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
-import { createConversionList, searchFiles } from "./converter";
+import { convertAudio2, createConversionList, searchFiles } from "./converter";
 
 
 function App() {
@@ -87,6 +87,11 @@ function App() {
       `Output Type: ${outputType.join(',')}`,
     ];
     setLogs([...logs, ...newLogs]);
+
+    // await convertAudio2({bitrate}, files).then(response => {
+    //   console.info('convertAudio2 results:', response);
+    // })
+
     }
   };
 
