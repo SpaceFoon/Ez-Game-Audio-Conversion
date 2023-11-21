@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
 import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
+import { createConversionList, searchFiles } from "./converter";
+
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
@@ -15,10 +17,56 @@ function App() {
   useEffect(() => { greet() }, []);
 
   const [filePath, setFilePath] = useState("");
-  const [fileType, setFileType] = useState([]);
+  const [fileType, setFileType] = useState(['mp3', 'wav', 'flac']);
   const [bitrate, setBitrate] = useState('192');
-  const [outputType, setOutputType] = useState("");
+  const [outputType, setOutputType] = useState(['ogg', 'm4a']);
   const [logs, setLogs] = useState([]);
+  const [files, setFiles] = useState([]);
+
+  const [question, setQuestion] = useState('');
+  const dialog = useRef(null);
+
+
+  useEffect(() => {
+    const doit = async () => await searchFiles(filePath, fileType);
+    doit().then(files => createConversionList(outputType, files))
+    .then(async conList => {
+      
+      let didpickall = '';
+      for(let f of conList) {
+        const responseActions = {
+          o: () => {},
+          oa: () => { didpickall = 'oa' },
+          r: () => { f.outputFile = f.outputFileCopy;},//copies fail to convert
+          ra: () => { f.outputFile = f.outputFileCopy; didpickall = 'ra';},
+          s: () => { f.outputFile = 'skipped!';},
+          sa: () => { f.outputFile = 'skipped!'; didpickall = 'sa'; }
+        };
+        if(didpickall) {
+          responseActions[didpickall]();
+          continue;
+        }
+        const response = await new Promise((res, rej) => {
+          setQuestion(`what to do with file ${f.inputFile}?`)
+          dialog.current.addEventListener('close', () => res(dialog.current.returnValue))
+          dialog.current.showModal();
+        });
+        console.log('response', response);
+        responseActions[response]();
+      }
+      return conList
+    })
+    .then(list => setFiles(list));
+  }, [filePath, fileType, outputType])
+
+  // useEffect(() => {
+  //   const doit = async () => await createConversionList(outputType, files);
+  //   doit().then(async conList => {
+
+      
+  //   });
+  // }, [outputType])
+
 
   const handleStart = async () => {
     const confirmed2 = await ask('This action cannot be reverted. Are you sure?', { title: 'Think about it', type: 'warning' });
@@ -28,9 +76,9 @@ function App() {
       if(!bitrate)bitrate = 192;
     const newLogs = [
       `File Path: ${filePath}`,
-      `File Type: ${fileType}`,
+      `File Type: ${fileType.join(',')}`,
       `Bitrate: ${bitrate}`,
-      `Output Type: ${outputType}`,
+      `Output Type: ${outputType.join(',')}`,
     ];
     setLogs([...logs, ...newLogs]);
     }
@@ -63,9 +111,27 @@ function App() {
     console.log('output type change:', value);
     setOutputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
+
+  const handleDialogOption = (e) => {
+    e.preventDefault();
+    dialog.current.close(e.target.value);
+  }
+
   return (
 
+
     <div className="container">
+    <dialog ref={dialog}>
+      <form>
+        <p>{question}</p>
+        <button value='o' onClick={handleDialogOption}>overwrite</button>
+        <button value='oa' onClick={handleDialogOption}>overwrite all</button>
+        <button value='r' onClick={handleDialogOption}>rename</button>
+        <button value='ra' onClick={handleDialogOption}>rename all</button>
+        <button value='s' onClick={handleDialogOption}>skip</button>
+        <button value='sa' onClick={handleDialogOption}>skip all</button>
+      </form>
+    </dialog>
       <div><h1>EZ Game Audio Converter</h1></div>
       {greetMsg}
       <div className="container"></div>
