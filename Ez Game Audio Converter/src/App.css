@@ -8,3 +8,42 @@
   justify-content: center;
   align-items: center;
 }
+
+button {
+  padding: 0.5em .8em;
+  border-radius: 6px;
+  background-color: green;
+  color: white;
+  border:chartreuse;
+  cursor: pointer;
+  transition: background-color .3s;
+  margin: .8em;
+  box-shadow: 0 4px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Add some margin to create spacing between buttons */
+button + button {
+  margin-left: 10px; /* Adjust the margin as needed */
+}
+
+/* Style changes on hover */
+button:hover {
+  background-color: darkgreen;
+}
+
+
+input,
+button {
+
+  border: 1px solid transparent;
+
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  transition: border-color 0.25s;
+  
+}
+
+
+
+

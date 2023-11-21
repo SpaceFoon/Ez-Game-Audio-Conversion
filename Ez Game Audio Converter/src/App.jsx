@@ -1,7 +1,7 @@
 import { useState } from "react";
-import logo from "./assets/logoplain.png";
 import { invoke } from "@tauri-apps/api/tauri";
-import "./App.scss";
+import { open } from '@tauri-apps/api/dialog';
+import { appDataDir } from '@tauri-apps/api/path';
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
@@ -46,19 +46,16 @@ function App() {
     setOutputType(value);
   };
   return (
-    <div className="logo-container">
+    
     <div className="container">
       <div><h1>EZ Game Audio Converter</h1></div>
+      <div className="container"></div>
     <form>
       <div>
         <label>
-          File Path:
-          <input
-            type="text"
-            value={filePath}
-            onChange={(e) => setFilePath(e.target.value)}
-          />
-          <button onClick={handleSelectFolder}>Select Folder</button>
+          Source File Path:
+          
+          <button onClick={open}>Select Folder</button>
         </label>
       </div>
 
@@ -66,7 +63,7 @@ function App() {
         <label>
           File Type:
           <input
-            type="radio"
+            type="checkbox"
             name="fileType"
             value="mp3"
             checked={fileType === "mp3"}
@@ -74,21 +71,31 @@ function App() {
           />{" "}
           MP3
           <input
-            type="radio"
+            type="checkbox"
             name="fileType"
             value="wav"
-            checked={fileType === "wav"}
+            checked={fileType 
+              === "wav"}
             onChange={() => handleOutputTypeChange("wav")}
           />{" "}
           WAV
+          <input
+            type="checkbox"
+            name="fileType"
+            value="flac"
+            checked={fileType 
+              === "flac"}
+            onChange={() => handleOutputTypeChange("flac")}
+          />{" "}
+          FLAC
         </label>
       </div>
 
-      <div>
+      <div >
         <label>
           Output Type:
           <input className="radio button"
-            type="radio"
+            type="checkbox"
             name="outputType"
             value="ogg"
             checked={outputType === "ogg"}
@@ -96,7 +103,7 @@ function App() {
           />{" "}
           OGG
           <input
-            type="radio"
+            type="checkbox"
             name="outputType"
             value="m4a"
             checked={outputType === "m4a"}
@@ -119,7 +126,7 @@ function App() {
         </ul>
       </div>
     </div>
-    </div>
+    
   );
 };
 
