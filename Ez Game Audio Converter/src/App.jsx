@@ -16,7 +16,7 @@ function App() {
 
   const [filePath, setFilePath] = useState("");
   const [fileType, setFileType] = useState(`[...]`);
-  const [bitrate, setBitrate] = useState("");
+  let [bitrate, setBitrate] = useState("");
   const [outputType, setOutputType] = useState("");
   const [logs, setLogs] = useState([]);
 
@@ -25,6 +25,7 @@ function App() {
     // Perform any necessary actions with the selected options
     // For now, just log the selected options
     if (confirmed2){
+      if(!bitrate)bitrate = 192;
     const newLogs = [
       `File Path: ${filePath}`,
       `File Type: ${fileType}`,
@@ -128,10 +129,10 @@ function App() {
           <label className="enterBitrate">
           Bitrate:
           <input
-            type="text"
+            type="number"
             name="setBitrate"
-            value="192"
-            onChange={() => setBitrate("192")}
+            defaultValue="192"
+            onChange={(e) => setBitrate(e.target.value)}
           />{" "}
           
        
