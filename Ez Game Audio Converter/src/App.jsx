@@ -24,14 +24,15 @@ function App() {
     const confirmed2 = await ask('This action cannot be reverted. Are you sure?', { title: 'Think about it', type: 'warning' });
     // Perform any necessary actions with the selected options
     // For now, just log the selected options
-    if (confirmed2) {
-      const newLogs = [
-        `File Path: ${filePath}`,
-        `File Type: ${fileType}`,
-        `Bitrate: ${bitrate}`,
-        `Output Type: ${outputType}`,
-      ];
-      setLogs([...logs, ...newLogs]);
+    if (confirmed2){
+      if(!bitrate)bitrate = 192;
+    const newLogs = [
+      `File Path: ${filePath}`,
+      `File Type: ${fileType}`,
+      `Bitrate: ${bitrate}`,
+      `Output Type: ${outputType}`,
+    ];
+    setLogs([...logs, ...newLogs]);
     }
   };
 
