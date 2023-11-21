@@ -71,7 +71,7 @@ function App() {
       <div>
         <label>
           Source File Path:
-          <button onClick={handleSelectFolder}>Select Folder</button>
+          <button type="button" onClick={handleSelectFolder}>Select Folder</button>
         </label>
       </div>
 
