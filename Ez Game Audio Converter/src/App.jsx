@@ -12,11 +12,11 @@ function App() {
     setGreetMsg(await invoke("greet", { name }));
   }
 
-  useEffect(() => {greet()}, []);
+  useEffect(() => { greet() }, []);
 
   const [filePath, setFilePath] = useState("");
-  const [fileType, setFileType] = useState(`[...]`);
-  const [bitrate, setBitrate] = useState("");
+  const [fileType, setFileType] = useState([]);
+  const [bitrate, setBitrate] = useState('192');
   const [outputType, setOutputType] = useState("");
   const [logs, setLogs] = useState([]);
 
@@ -24,23 +24,23 @@ function App() {
     const confirmed2 = await ask('This action cannot be reverted. Are you sure?', { title: 'Think about it', type: 'warning' });
     // Perform any necessary actions with the selected options
     // For now, just log the selected options
-    if (confirmed2){
-    const newLogs = [
-      `File Path: ${filePath}`,
-      `File Type: ${fileType}`,
-      `Bitrate: ${bitrate}`,
-      `Output Type: ${outputType}`,
-    ];
-    setLogs([...logs, ...newLogs]);
+    if (confirmed2) {
+      const newLogs = [
+        `File Path: ${filePath}`,
+        `File Type: ${fileType}`,
+        `Bitrate: ${bitrate}`,
+        `Output Type: ${outputType}`,
+      ];
+      setLogs([...logs, ...newLogs]);
     }
   };
-  
+
   const handleSelectFolder = async () => {
     try {
-      let dir = audioDir()
-      const [fPath] = await open({
+      // let dir = audioDir()
+      const fPath = await open({
         //multiple: true, one day
-        defaultPath: `${dir}`,
+        // defaultPath: `${dir}`,
         multiple: false,
         recursive: true,
         directory: true,
@@ -52,93 +52,119 @@ function App() {
     }
 
   };
- 
+
   const handleFileTypeChange = (value) => {
-    setFileType(value);
+    console.log('file type change:', value);
+    setFileType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
 
   const handleOutputTypeChange = (value) => {
-    setOutputType(value);
+    console.log('output type change:', value);
+    setOutputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
   return (
-    
+
     <div className="container">
       <div><h1>EZ Game Audio Converter</h1></div>
       {greetMsg}
       <div className="container"></div>
-    <form>
-      <div>
-        <label>
-          Source File Path:
-          <button onClick={handleSelectFolder}>Select Folder</button>
-        </label>
-      </div>
+      <form>
+        <fieldset>
+          <legend>
+            Source File Path:
+          </legend>
+          <input type="text" readOnly value={filePath} placeholder="select file path" />
+          <br />
+          <button type="button" onClick={handleSelectFolder}>Select Folder</button>
+        </fieldset>
 
-      <div>
-        <label>
-          Source Formats:
-          <input
-            type="checkbox"
-            name="fileType"
-            value="mp3"
-            checked={fileType.includes("mp3")}
-            onChange={() => handleFileTypeChange("mp3")}
-          />{" "}
-          MP3
-          <input
-            type="checkbox"
-            name="fileType"
-            value="wav"
-            checked={fileType.includes("wav")}
-            onChange={() => handleFileTypeChange("wav")}
-          />{" "}
-          WAV
-          <input
-            type="checkbox"
-            name="fileType"
-            value="flac"
-            checked={fileType.includes("flac")}
-            onChange={() => handleFileTypeChange("flac")}
-          />{" "}
-          FLAC
-        </label>
-      </div>
 
-      <div >
-        <label>
-          Output Formats:
+        <fieldset>
+          <legend>Source Formats:</legend>
+
+          <label htmlFor="mp3">
+            <input
+              id="mp3"
+              type="checkbox"
+              name="fileType"
+              value="mp3"
+              checked={fileType.includes("mp3")}
+              onChange={() => handleFileTypeChange("mp3")}
+            />
+            MP3
+
+          </label>
+          <label htmlFor="wav">
+            <input
+            id="wav"
+              type="checkbox"
+              name="fileType"
+              value="wav"
+              checked={fileType.includes("wav")}
+              onChange={() => handleFileTypeChange("wav")}
+            />
+            WAV
+          </label>
+
+          <label htmlFor="flac">
+            <input
+              id="flac"
+              type="checkbox"
+              name="fileType"
+              value="flac"
+              checked={fileType.includes("flac")}
+              onChange={() => handleFileTypeChange("flac")}
+            />
+            FLAC
+
+          </label>
+
+
+        </fieldset>
+
+        <fieldset>
+          <legend>
+            Output Formats:
+          </legend>
+          <label htmlFor="ogg">
           <input className="checkbox"
+            id="ogg"
             type="checkbox"
             name="outputType"
             value="ogg"
             checked={outputType.includes("ogg")}
             onChange={() => handleOutputTypeChange("ogg")}
-          />{" "}
-          OGG
+          />
+            
+            OGG</label>
+          <label htmlFor="m4a">
           <input
+            id="m4a"
             type="checkbox"
             name="outputType"
             value="m4a"
             checked={outputType.includes("m4a")}
             onChange={() => handleOutputTypeChange("m4a")}
-          />{" "}
-          M4A
-        </label>
-        <div className="enterBitrate"> 
-          <label className="enterBitrate">
-          Bitrate:
-          <input
-            type="text"
-            name="setBitrate"
-            value="192"
-            onChange={() => setBitrate("192")}
-          />{" "}
-          
-       
-        </label>
-        </div>
-       
-      </div>
+          />
+            
+            M4A</label>
+
+        </fieldset>
+        <fieldset>
+          <legend>
+            Advanced Options:
+          </legend>
+        <label htmlFor="bitrate">Bitrate:</label>
+        <input
+          id="bitrate"
+          type="text"
+          name="setBitrate"
+          value={bitrate}
+          onChange={(e) => setBitrate(e.target.value)}
+        />
+        </fieldset>
+
+
       </form>
       <div>
         <button onClick={handleStart}>Start</button>
@@ -153,7 +179,7 @@ function App() {
         </ul>
       </div>
     </div>
-    
+
   );
 };
 
