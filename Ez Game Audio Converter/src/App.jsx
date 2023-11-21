@@ -1,16 +1,19 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
 import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [name, setName] = useState("testname");
 
   async function greet() {
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
     setGreetMsg(await invoke("greet", { name }));
   }
+
+  useEffect(() => {greet()}, []);
+
   let filePath;
   let [fileType, setFileType] = useState("");
   let [bitrate, setBitrate] = useState("");
@@ -58,6 +61,7 @@ function App() {
     
     <div className="container">
       <div><h1>EZ Game Audio Converter</h1></div>
+      {greetMsg}
       <div className="container"></div>
     <form>
       <div>
