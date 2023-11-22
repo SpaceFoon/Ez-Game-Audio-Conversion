@@ -6,7 +6,7 @@ import '@mantine/core/styles.css';
 // import '@mantine/hooks/styles.css';
 // import '@mantine/form/styles.css';
 // import '@mantine/dates/styles.css';
- import '@mantine/notifications/styles.css';
+// import '@mantine/notifications/styles.css';
 // import '@mantine/code-highlight/styles.css';
 // import '@mantine/tiptap/styles.css';
 // import '@mantine/dropzone/styles.css';
@@ -16,13 +16,13 @@ import '@mantine/core/styles.css';
 // import '@mantine/nprogress/styles.css';
 
 import App from "./App";
-import "./styles.css";
-import "./App.css";
-import "./App.scss";
+// import "./styles.css";
+// import "./App.css";
+// import "./App.scss";
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+      <App />
   </React.StrictMode>,
 );
