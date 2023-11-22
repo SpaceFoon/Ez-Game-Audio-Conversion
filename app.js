@@ -304,7 +304,7 @@ const getFilename = (filePath) => {
 };
 
   finalize = (files) => {
-    console.log('Have a nice day: ',files)
+    console.log('Have a nice day: ')
   }
 UserInputInitSettings()
     // find all files of specified type in provided folder and all subfolders
@@ -324,7 +324,7 @@ UserInputInitSettings()
     // this is used to convert audio to m4a
     .then((files) => convertAudio2(settings, files))
 
-    .then((files) => finalize(files))
+    .then((files) => finalize())
 
     .catch((error) => {
         handleError(error);
