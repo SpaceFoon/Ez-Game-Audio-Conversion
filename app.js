@@ -18,15 +18,11 @@ M4A files are compressed using the 'AAC' lossy
 
 */
 
-const ffmpeg = require('fluent-ffmpeg');
-// const ffmpeg = require('ffmpeg');
-const fs = require('fs');
 const readline = require('readline');
 const path = require('path');
-const { readdirSync, statSync } = require('fs');
+const { readdirSync, statSync, existsSync } = require('fs');
 const { join, basename, extname } = require('path');
 const { spawn } = require('child_process');
-// const pathToFfmpeg = require('.')
 
 //setup object and functions.
 let settings = {
@@ -47,23 +43,25 @@ const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
 });
+
+//Starts with user input
 const UserInputInitSettings = () => {
     return new Promise((resolve, reject) => {
         rl.question('Enter the full file path to start search. WILL SEARCH ALL SUB FOLDERS: ', async (filePath) => {
             if (filePath === '') handleError('Must specify file path!');
             settings.filePath = filePath;
             console.log(`File path: ${settings.filePath}`);
-            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav flac): ', (inputFormatString) => {
-                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav', 'flac'];
-                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav', 'flac'].includes(format))) {
-                    reject('Invalid output format. Only mp3, wav and flac are allowed.');
+            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav flac m4a): ', (inputFormatString) => {
+                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav', 'flac', 'm4a'];
+                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav', 'flac', 'm4a'].includes(format))) {
+                    reject('Invalid output format. Only mp3 wav m4a and flac are allowed.');
                 }
                 console.log(`Input formats: ${settings.inputFormats}`);
 
-                rl.question('Enter the output formats. Leave blank for all (e.g., ogg m4a): ', (outputFormatString) => {
-                    settings.outputFormats = outputFormatString ? outputFormatString.toLowerCase().split(' ') : ['ogg', 'm4a'];
-                    if (settings.outputFormats.length === 0 || !settings.outputFormats.every(format => ['ogg', 'm4a'].includes(format))) {
-                        reject('Invalid output format. Only ogg and m4a are allowed.');
+                rl.question('Enter the output formats. Leave blank for all (e.g., ogg m4a wav): ', (outputFormatString) => {
+                    settings.outputFormats = outputFormatString ? outputFormatString.toLowerCase().split(' ') : ['ogg', 'm4a', 'wav'];
+                    if (settings.outputFormats.length === 0 || !settings.outputFormats.every(format => ['ogg', 'm4a', 'wav'].includes(format))) {
+                        reject('Invalid output format. Only ogg wav and m4a are allowed.');
                     }
                     console.log(`Output formats: ${settings.outputFormats}`);
 
@@ -82,6 +80,7 @@ const UserInputInitSettings = () => {
         });
     });
 };
+//Searches for files that meet criteria
 const searchFiles = (settings) => {
     const fileExtensions = settings.inputFormats.map(format => `.${format}`);
     const searchPath = settings.filePath;
@@ -115,12 +114,12 @@ const searchFiles = (settings) => {
 
     console.log('Matching Files:', allFiles);
 
-    // Resolve the promise with the list of matching file paths
     return Promise.resolve(allFiles);
 };
 
+//deletes duplicate files with different extname
 const deleteDuplicateFiles = (files) => {
-    const priorityList = ['.mp3', '.wav', 'flac'];
+    const priorityList = ['.mp3', '.m4a', '.wav', '.flac'];
     //console.log('files', files);
     const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
 
@@ -148,6 +147,7 @@ const deleteDuplicateFiles = (files) => {
 
 };
 
+//Create final list of files to convert and ask user for each file
 const createConversionList = async (settings, files) => {
     const conversionList = [];
     let response = null;
@@ -157,7 +157,7 @@ const createConversionList = async (settings, files) => {
             //console.log(`${inputFile}`)
             //console.log(`${outputFile}`)
             let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
-            if(outputFile) {
+            
                 const responseActions = {
                     o: () => {return response = null;},
                     oa: () => {/* Nothing to do as default is overwrite */},
@@ -167,6 +167,7 @@ const createConversionList = async (settings, files) => {
                     sa: () => { outputFile = 'skipped!'; }
                 }
                 switch (response) {
+                    case '':break;
                     case 'ra':
                         responseActions['ra']();
                         break;
@@ -177,9 +178,9 @@ const createConversionList = async (settings, files) => {
                         console.log('OVERWRITE FILE', outputFile);
                         break;
                     default:
-                        console.log('response: ',response)
                         while (true){
                         if (!response){
+                            if(existsSync(outputFile)) {
                             response = await getAnswer(`[O]verwrite, [R]ename or [S]kip. Add 'a' for all (e.g., oa, ra, sa)'\n'${outputFile}? : `);
                             response = response.trim().toLowerCase();
                             if (responseActions[response]) {
@@ -189,6 +190,7 @@ const createConversionList = async (settings, files) => {
                                 response = null;
                                 console.log('You did not enter a valid selection, try again.');
                             }
+                        }else break;
                         }
                     }
                 }
@@ -197,61 +199,45 @@ const createConversionList = async (settings, files) => {
                     outputFile,
                     outputFormat,
                 });
-            }else{console.error("file does not exist")}
+           
         }
     }
-
+    while(true){
     console.log('Pending conversion:', conversionList);
     const accept_answer = await getAnswer('This is the list of files to be converted. Accept? Type yes or no: ');
     if(/^no$/i.test(accept_answer)) throw new Error('Conversion cancelled');
-    if(!/^yes$/i.test(accept_answer)) throw new Error('invalid input, please use "yes" or "no"');
+    if(!/^yes$/i.test(accept_answer)) {
+        console.warn('invalid input, please use "yes" or "no"');
+        continue;
+    }
     return conversionList.filter(x => x.outputFile !== 'skipped!');
+    }
 };
 
-const checkFileCodec = (files) => {
+// const checkFileCodec = (files) => {
 
-array.forEach(files => {
-    ffmpeg.ffprobe(files[i], (err, metadata) => {
-      if (err) {
-        console.error('Error while probing:', err);
-      } else {
-        // Access the codec information from the metadata object
-        const audioCodec = metadata.streams.find(stream => stream.codec_type === 'audio').codec_name;
-        const videoCodec = metadata.streams.find(stream => stream.codec_type === 'video').codec_name;
+// array.forEach(files => {
+//     ffmpeg.ffprobe(files[i], (err, metadata) => {
+//       if (err) {
+//         console.error('Error while probing:', err);
+//       } else {
+//         // Access the codec information from the metadata object
+//         const audioCodec = metadata.streams.find(stream => stream.codec_type === 'audio').codec_name;
+//         const videoCodec = metadata.streams.find(stream => stream.codec_type === 'video').codec_name;
     
-        console.log('Audio codec:', audioCodec);
-        console.log('Video codec:', videoCodec);
-      }
-    });
-    })
-};
-
-// const checkFileNames = async (files, conversionList) => {
-//     try {
-//         for (const { inputFile, outputFile, outputFormat } of files) {
-//             try {
-//                 if (outputFile) {
-//                     const sanitizedOutputFile = outputFile.replace(/ /g, '_');
-//                     const index = conversionList.findIndex(item => item.outputFile === outputFile);
-//                     if (index !== -1) {
-//                         conversionList[index].outputFile = sanitizedOutputFile;
-//                     }
-//                 } else {
-//                     throw new Error(`outputFile is undefined or null for an entry: ${outputFile}`);
-//                 }
-//             } catch (error) {
-//                 console.error(error.message);
-//             }
-//         }
-//     } catch (error) {
-//         throw error;
-//     }
+//         console.log('Audio codec:', audioCodec);
+//         console.log('Video codec:', videoCodec);
+//       }
+//     });
+//     })
 // };
 
+//Use ffmpeg to convert files
 const convertAudio2 = async (settings, files) => {
     const maxRetries = 3;
     const failedFiles = [];
 
+    //This retry is useless and counts wrong
     const convertWithRetry = async (inputFile, outputFile, outputFormat) => {
         let retryCount = 0;
         let success = false;
@@ -344,7 +330,6 @@ UserInputInitSettings()
         handleError(error);
     })
     .finally(() => {
-        console.log('.finally');
         rl.close();
     });
 

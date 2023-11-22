@@ -3,11 +3,11 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
 import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
 import { convertAudio2, createConversionList, searchFiles } from "./converter";
-import { Input, Notification ,rem, Container, Col, Textarea} from '@mantine/core';
+import { Input, Notification ,rem, Container, Grid, MantineProvider} from '@mantine/core';
 import { useElementSize } from '@mantine/hooks';
 
 
-function App() {
+export default function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("testname");
 
@@ -38,7 +38,7 @@ function App() {
   const [question, setQuestion] = useState('');
   const dialog = useRef(null);
   
-      // Function to set initialize some things
+// Function to set initialize some things
   useEffect(() => {
     const setInitialFilePath = async () => {
       try {
@@ -81,7 +81,7 @@ function App() {
         const responseActions = {
           o: () => {},
           oa: () => { didpickall = 'oa' },
-          r: () => { f.outputFile = f.outputFileCopy;},//copies fail to convert
+          r: () => { f.outputFile = f.outputFileCopy;},
           ra: () => { f.outputFile = f.outputFileCopy; didpickall = 'ra';},
           s: () => { f.outputFile = 'skipped!';},
           sa: () => { f.outputFile = 'skipped!'; didpickall = 'sa'; }
@@ -113,7 +113,8 @@ function App() {
 
 
   const handleStart = async () => {
-    const confirmed2 = await ask('This action cannot be reverted. Are you sure?', { title: 'Think about it', type: 'warning' });
+    const confirmed2 = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
+    setStartClicked(true);
     // Perform any necessary actions with the selected options
     // For now, just log the selected options
     if (confirmed2){
@@ -164,6 +165,7 @@ function App() {
   }
 
   return (
+    <MantineProvider>
 
 
     <div className="container">
@@ -284,45 +286,24 @@ function App() {
       <div>
         <button onClick={handleStart}>Start</button>
       </div>
-      <Container>
 
-
-      <Col span={12}>
-        <label>
-          Logs:
-          <div
-            ref={logsContainerRef}
-            style={{
-              width: rem(400),
-              height: rem(120),
-              overflow: 'auto',
-              border: '1px solid #ccc',
-              padding: '8px',
-            }}
-          >
-            {/* Your logs content goes here */}
-          </div>
-        </label>
-        <div>Width: {width}, height: {height}</div>
-      </Col>
-    </Container>
-  );
-}
       <div className="retro-terminal-logs">
       <h2>Logs:</h2>
-          
+      {/* <Container size="responsive"> */}
+      <Grid>
+      <Grid.Col span={12}>
         <ul >
           {logs.map((log, index) => (
             <li key={index}>{log}</li>
           ))}
-          
         </ul>
+        </Grid.Col>
+        </Grid>
+        {/* </Container> */}
         <div>Width: {width}, height: {height}</div>
       </div>
     </div>
+    </MantineProvider>
 
   );
 };
-
-
-export default App;
