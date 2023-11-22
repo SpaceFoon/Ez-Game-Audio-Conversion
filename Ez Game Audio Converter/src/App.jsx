@@ -10,20 +10,19 @@ function App() {
   const [name, setName] = useState("testname");
 
   async function greet() {
-    const midiData = await fetch("./tintin-on-the-moon.mid").then(response => response.arrayBuffer());
-    const midiFilePath = "path/to/your/midi/file.mid";
+    const midiFilePath = "./tintin-on-the-moon.mid";
 
     // Invoke a Tauri command to play the MIDI file using the system's default player
-    await invoke("playMidiFile", { path: midiFilePath });
+    await invoke("play_midi_file", { path: midiFilePath });
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
     setGreetMsg(await invoke("greet", { name }));
   }
 
   useEffect(() => { greet() }, []);
 
-  const [filePath, setFilePath] = useState("");
+  let [filePath, setFilePath] = useState("");
   const [fileType, setFileType] = useState(['mp3', 'wav', 'flac']);
-  const [bitrate, setBitrate] = useState('192');
+  let [bitrate, setBitrate] = useState('192');
   const [outputType, setOutputType] = useState(['ogg', 'm4a']);
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
