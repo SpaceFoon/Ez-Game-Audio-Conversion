@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 // other css files are required only if
 // you are using components from the corresponding package
-// import '@mantine/core/styles.css';
+import '@mantine/core/styles.css';
 // import '@mantine/hooks/styles.css';
 // import '@mantine/form/styles.css';
 // import '@mantine/dates/styles.css';

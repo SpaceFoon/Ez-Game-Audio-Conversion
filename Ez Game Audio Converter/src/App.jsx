@@ -3,32 +3,72 @@ import { invoke } from "@tauri-apps/api/tauri";
 import { message, confirm, open, ask } from '@tauri-apps/api/dialog';
 import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
 import { convertAudio2, createConversionList, searchFiles } from "./converter";
+import { Input, Notification ,rem, Container, Col, Textarea} from '@mantine/core';
+import { useElementSize } from '@mantine/hooks';
 
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("testname");
 
-  async function greet() {
-    const midiFilePath = "./tintin-on-the-moon.mid";
+  // async function greet() {
+  //   const midiFilePath = "./tintin-on-the-moon.mid";
 
-    // Invoke a Tauri command to play the MIDI file using the system's default player
-    await invoke("play_midi_file", { path: midiFilePath });
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    setGreetMsg(await invoke("greet", { name }));
+  //   // Invoke a Tauri command to play the MIDI file using the system's default player
+  //   await invoke("play_midi_file", { path: midiFilePath });
+  //   // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+  //   setGreetMsg(await invoke("greet", { name }));
+  // }
+
+  function Demo() {
+    return (
+      <Button component={Link} to="/react-router"></Button>
+    );
   }
-
-  useEffect(() => { greet() }, []);
-
-  let [filePath, setFilePath] = useState("");
+  const { ref, width, height } = useElementSize();
+  // useEffect(() => { greet() }, []);
+  let initialPath = null;
+  let [filePath, setFilePath] = useState(`${initialPath}`);
   const [fileType, setFileType] = useState(['mp3', 'wav', 'flac']);
-  let [bitrate, setBitrate] = useState('192');
-  const [outputType, setOutputType] = useState(['ogg', 'm4a']);
+  let [bitrate, setBitrate] = useState(192);
+  const [outputType, setOutputType] = useState(['ogg']);
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
 
   const [question, setQuestion] = useState('');
   const dialog = useRef(null);
+  
+      // Function to set initialize some things
+  useEffect(() => {
+    const setInitialFilePath = async () => {
+      try {
+      initialPath = await audioDir();
+      setFilePath(initialPath);
+      } catch (error) {
+        console.error('Error getting initial path:', error);
+      };
+    }
+    setInitialFilePath();
+  }, []);
+
+  const handleSelectFolder = async () => {
+    try {
+        if(!filePath)filePath = audioDir();
+      // let dir = audioDir()
+      const fPath = await open({
+        //multiple: true, one day
+        // defaultPath: `${dir}`,
+        multiple: false,
+        recursive: true,
+        directory: true,
+      });
+      console.log('fPath', fPath);
+      setFilePath(fPath);
+    } catch (error) {
+      console.error("Error selecting folder:", error);
+    }
+
+  };
 
 
   useEffect(() => {
@@ -78,39 +118,21 @@ function App() {
     // For now, just log the selected options
     if (confirmed2){
       if(!bitrate)bitrate = 192;
-      if(!filePath)filePath = await audioDir();
     const newLogs = [
       `File Path: ${filePath}`,
-      `File Type: ${fileType.join(',')}`,
+      `File Type: ${fileType.join(', ')}`,
       `Bitrate: ${bitrate}`,
-      `Output Type: ${outputType.join(',')}`,
+      `Output Type: ${outputType.join(', ')}`,
     ];
     setLogs([...logs, ...newLogs]);
 
-    // await convertAudio2({bitrate}, files).then(response => {
-    //   console.info('convertAudio2 results:', response);
-    // })
+    await convertAudio2({bitrate}, files).then(response => {
+      console.info('convertAudio2 results:', response);
+    })
 
     }
   };
 
-  const handleSelectFolder = async () => {
-    try {
-      // let dir = audioDir()
-      const fPath = await open({
-        //multiple: true, one day
-        // defaultPath: `${dir}`,
-        multiple: false,
-        recursive: true,
-        directory: true,
-      });
-      console.log('fPath', fPath);
-      setFilePath(fPath);
-    } catch (error) {
-      console.error("Error selecting folder:", error);
-    }
-
-  };
 
   const handleFileTypeChange = (value) => {
     console.log('file type change:', value);
@@ -122,6 +144,20 @@ function App() {
     setOutputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
 
+  //   const handleBitrateChange = (value) => {
+  //   const newBitrate = value;
+
+  //   if (newBitrate < 32 || newBitrate > 512) {
+  //       // You can trigger a blinking effect or show a notification here
+  //       // For simplicity, I'm using console.log
+  //     console.log('Bitrate out of range!');
+  //     newBitrate = 192;
+  //     // You can also set a state variable to control the blinking effect
+  //     // Example: setBitrateOutOfRange(true);
+  //   }
+
+  //   setBitrate(newBitrate);
+  // };
   const handleDialogOption = (e) => {
     e.preventDefault();
     dialog.current.close(e.target.value);
@@ -239,6 +275,8 @@ function App() {
           value={bitrate}
           onChange={(e) => setBitrate(e.target.value)}
         />
+       
+        <button onClick={Demo}>Demo</button>
         </fieldset>
 
 
@@ -246,14 +284,40 @@ function App() {
       <div>
         <button onClick={handleStart}>Start</button>
       </div>
+      <Container>
 
+
+      <Col span={12}>
+        <label>
+          Logs:
+          <div
+            ref={logsContainerRef}
+            style={{
+              width: rem(400),
+              height: rem(120),
+              overflow: 'auto',
+              border: '1px solid #ccc',
+              padding: '8px',
+            }}
+          >
+            {/* Your logs content goes here */}
+          </div>
+        </label>
+        <div>Width: {width}, height: {height}</div>
+      </Col>
+    </Container>
+  );
+}
       <div className="retro-terminal-logs">
-        <h2>Logs:</h2>
-        <ul>
+      <h2>Logs:</h2>
+          
+        <ul >
           {logs.map((log, index) => (
             <li key={index}>{log}</li>
           ))}
+          
         </ul>
+        <div>Width: {width}, height: {height}</div>
       </div>
     </div>
 
