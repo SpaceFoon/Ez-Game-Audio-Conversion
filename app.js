@@ -53,10 +53,10 @@ const UserInputInitSettings = () => {
             if (filePath === '') handleError('Must specify file path!');
             settings.filePath = filePath;
             console.log(`File path: ${settings.filePath}`);
-            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav): ', (inputFormatString) => {
-                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav'];
-                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav'].includes(format))) {
-                    reject('Invalid output format. Only mp3 and wav are allowed.');
+            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav flac): ', (inputFormatString) => {
+                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav', 'flac'];
+                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav', 'flac'].includes(format))) {
+                    reject('Invalid output format. Only mp3, wav and flac are allowed.');
                 }
                 console.log(`Input formats: ${settings.inputFormats}`);
 
@@ -120,7 +120,7 @@ const searchFiles = (settings) => {
 };
 
 const deleteDuplicateFiles = (files) => {
-    const priorityList = ['.mp3', '.wav'];
+    const priorityList = ['.mp3', '.wav', 'flac'];
     //console.log('files', files);
     const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
 

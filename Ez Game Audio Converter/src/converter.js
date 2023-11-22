@@ -75,7 +75,7 @@ export const searchFiles = async (filePath, inputFormats) => {
 };
 
 const deleteDuplicateFiles = async (files) => {
-    const priorityList = ['.mp3', '.wav'];
+    const priorityList = ['.mp3', '.wav', 'flac'];
     console.log('files', files);
 
     const fileobjs = [];
