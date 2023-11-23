@@ -6,10 +6,12 @@ import {
   RouterProvider,
 } from "react-router-dom";
 import React, { Suspense } from "react";
-import { AppShell, Loader, MantineProvider, Title } from "@mantine/core";
+import { AppShell, Loader, MantineProvider, Title, } from "@mantine/core";
+//import { Router } from './Router';
+import { theme } from './theme';
 
 // const StartPage = React.lazy(() => import('./pages/StartPage'));
-
+import HomePage from ".pages/HomePage";
 import StartPage from "./pages/StartPage";
 import NextPage from "./pages/NextPage";
 
@@ -23,6 +25,7 @@ const MyRoute = ({page:Page}) => {
 
 
 const router = createBrowserRouter([
+  { path: 'home', element: <MyRoute page={HomePage}/> },
   { path: '/start', element: <MyRoute page={StartPage}/> },
   { path: '/next', element: <MyRoute page={NextPage}/> },
   {path: '*', element: <Navigate to='/start' replace /> }
@@ -32,7 +35,7 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-    <MantineProvider>
+    <MantineProvider theme={theme}>
 
  <AppShell>
   <AppShell.Header>
