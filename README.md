@@ -42,3 +42,21 @@ This is a command-line application that allows you to search for audio files in 
 ## License
 
 This project is licensed under the [GNU AFFERO GENERAL PUBLIC LICENSE](https://www.gnu.org/licenses/agpl-3.0.txt).
+
+## More info:
+
+https://rpgmaker.net/articles/2633/
+RMMV uses m4a as well but not really needed in 2023
+
+Features	        MP3	Ogg	WAV	MIDI
+Loop OK	            NO	YES	YES	YES
+Loop Inside (Tags)	NO	YES	NO	YES
+File Size Optimize.	YES	YES	NO	OMG YES
+Realistic Sound	    YES	YES	YES	NO
+RMMV Compatible	    NO	YES	NO	NO
+RMVX/Ace Compatible	YES	YES	YES	YES
+RMXP Compatible	    YES	YES	YES	YES
+RM2003 Compatible	YES	NO	YES	YES
+
+M4A files are compressed using the 'AAC' lossy
+

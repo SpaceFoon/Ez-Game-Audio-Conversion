@@ -1,22 +1,4 @@
-/*
-EZ GAME AUDIO CONVERSION
-
-https://rpgmaker.net/articles/2633/
-RMMV uses m4a as well but not really needed in 2023
-
-Features	        MP3	Ogg	WAV	MIDI
-Loop OK	NO	        YES	YES	YES
-Loop Inside (Tags)	NO	YES	NO	YES
-File Size Optimize.	YES	YES	NO	OMG YES
-Realistic Sound	    YES	YES	YES	NO
-RMMV Compatible	    NO	YES	NO	NO
-RMVX/Ace Compatible	YES	YES	YES	YES
-RMXP Compatible	    YES	YES	YES	YES
-RM2003 Compatible	YES	NO	YES	YES
-
-M4A files are compressed using the 'AAC' lossy
-
-*/
+/*EZ GAME AUDIO CONVERSION*/
 
 const readline = require('readline');
 const path = require('path');
@@ -30,6 +12,7 @@ let settings = {
     inputFormats: [],
     outputFormats: [],
     bitrate: 0,
+    quality: 2,
 };
 
 const handleError = (errorMessage) => {
@@ -51,30 +34,43 @@ const UserInputInitSettings = () => {
             if (filePath === '') handleError('Must specify file path!');
             settings.filePath = filePath;
             console.log(`File path: ${settings.filePath}`);
-            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav flac m4a): ', (inputFormatString) => {
-                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['mp3', 'wav', 'flac', 'm4a'];
-                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['mp3', 'wav', 'flac', 'm4a'].includes(format))) {
+            rl.question('Enter the file extensions to look for. Leave blank for all (e.g., flac wav mp3 m4a ogg): ', (inputFormatString) => {
+                settings.inputFormats = inputFormatString ? inputFormatString.toLowerCase().split(' ') : ['flac', 'wav', 'mp3', 'm4a', 'ogg'];
+                if (settings.inputFormats.length === 0 || !settings.inputFormats.every(format => ['flac', 'wav', 'mp3', 'm4a', 'ogg'].includes(format))) {
                     reject('Invalid output format. Only mp3 wav m4a and flac are allowed.');
                 }
                 console.log(`Input formats: ${settings.inputFormats}`);
 
-                rl.question('Enter the output formats. Leave blank for all (e.g., ogg m4a wav): ', (outputFormatString) => {
-                    settings.outputFormats = outputFormatString ? outputFormatString.toLowerCase().split(' ') : ['ogg', 'm4a', 'wav'];
-                    if (settings.outputFormats.length === 0 || !settings.outputFormats.every(format => ['ogg', 'm4a', 'wav'].includes(format))) {
-                        reject('Invalid output format. Only ogg wav and m4a are allowed.');
+                rl.question('Enter the output formats. Leave blank for ogg (e.g., flac ogg mp3 m4a wav): ', (outputFormatString) => {
+                    settings.outputFormats = outputFormatString ? outputFormatString.toLowerCase().split(' ') : ['flac', 'wav', 'mp3', 'm4a', 'ogg'];
+                    if (settings.outputFormats.length === 0 || !settings.outputFormats.every(format => ['flac', 'wav', 'mp3', 'm4a', 'ogg'].includes(format))) {
+                        reject('Invalid output format. Only flac ogg wav mp3 and m4a are allowed.');
                     }
                     console.log(`Output formats: ${settings.outputFormats}`);
 
-                    rl.question('Enter the audio bitrate from 32 to 320. Leave blank for 192 (e.g., 128): ', (bitrateString) => {
-                        const defaultBitrate = 192;
-                        const bitrateStringFinal = bitrateString || defaultBitrate;
-                        settings.bitrate = parseInt(bitrateStringFinal);
-                        if (isNaN(settings.bitrate) || settings.bitrate < 32 || settings.bitrate > 320) {
-                            reject('Invalid bitrate. Bitrate must be 32-320.');
-                        }
-                        console.log(`Bitrate: ${settings.bitrate}`);
-                        resolve(settings);
-                    });
+                    // rl.question('Enter the audio quality for CBR from 32 to 320. Leave blank for 192 (e.g., 128): ', (bitrateNum) => {
+                    //     const defaultBitrate = 192;
+                    //     const bitrateNumFinal = bitrateNum || defaultBitrate;
+                    //     settings.bitrate = parseInt(bitrateNumFinal);
+                    //     if (isNaN(settings.bitrate) || settings.bitrate < 32 || settings.bitrate > 320) {
+                    //         reject('Invalid bitrate. Must be 32-320.');
+                    //     }
+                    //     console.log(`Bitrate: ${settings.bitrate}`);
+
+                    //     rl.question('Enter the audio quality for CBR from 0 to 9 for lowest. Leave blank for 2 (e.g., 2): ', (quality) => {
+                    //         const defaultQuality = 2;
+                    //         const qualityFinal = quality || defaultQuality;
+                    //         settings.quality = parseInt(qualityFinal);
+                    //         if (isNaN(settings.quality) || settings.quality < 0 || settings.quality > 9) {
+                    //             reject('Invalid quality. quality must be 0-9.');
+                    //         }
+                    //         console.log(`quality: ${settings.quality}`);
+                    //         console.log(settings)
+                    //         resolve(settings);
+                    //     })
+                    // });
+                console.log(settings)
+                resolve(settings);
                 });
             });
         });
@@ -82,6 +78,7 @@ const UserInputInitSettings = () => {
 };
 //Searches for files that meet criteria
 const searchFiles = (settings) => {
+    console.log('Settings:', settings);
     const fileExtensions = settings.inputFormats.map(format => `.${format}`);
     const searchPath = settings.filePath;
 
@@ -119,7 +116,7 @@ const searchFiles = (settings) => {
 
 //deletes duplicate files with different extname
 const deleteDuplicateFiles = (files) => {
-    const priorityList = ['.mp3', '.m4a', '.wav', '.flac'];
+    const priorityList = ['ogg', '.mp3', '.m4a', '.wav', '.flac'];
     //console.log('files', files);
     const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
 
@@ -161,7 +158,7 @@ const createConversionList = async (settings, files) => {
                 const responseActions = {
                     o: () => {return response = null;},
                     oa: () => {/* Nothing to do as default is overwrite */},
-                    r: () => { outputFile = outputFileCopy; return response = null;},//copies fail to convert
+                    r: () => { outputFile = outputFileCopy; return response = null;},
                     ra: () => { outputFile = outputFileCopy;},
                     s: () => { outputFile = 'skipped!'; return response = null},
                     sa: () => { outputFile = 'skipped!'; }
@@ -234,24 +231,41 @@ const createConversionList = async (settings, files) => {
 
 //Use ffmpeg to convert files
 const convertAudio2 = async (settings, files) => {
-    const maxRetries = 3;
     const failedFiles = [];
 
-    //This retry is useless and counts wrong
     const convertWithRetry = async (inputFile, outputFile, outputFormat) => {
-        let retryCount = 0;
-        let success = false;
-
-        while (!success && retryCount < maxRetries) {
+        //let retryCount = 0;
             try {
                 await new Promise((resolve, reject) => {
+                    const formatConfig = {
+                        
+                        'ogg': { codec: 'libopus' , additionalOptions: ['-b:a', '192k'] },
+                        //https://slhck.info/video/2017/02/24/vbr-settings.html
+                        //libopus 	-b:a 	6–8K (mono) 	– 	96K (for stereo) 	– 	-vbr on is default, -b:a just sets the target, see 
+                        'mp3': { codec: 'libmp3lame', additionalOptions: ['-q:a', '3'] },
+                        //libmp3lame 	-q:a 	9 	0 	4 	2 (~190kbps) 	Corresponds to lame -V.
+                        'wav': { codec: 'pcm_s16le' },
+                        'm4a': { codec: 'aac', additionalOptions: ['-q:a', `1.0`]},
+                        //aac 	-q:a 	0.1 	2 	? 	1.3 (~128kbps) 	Is "experimental and [likely gives] worse results than CBR" according to FFmpeg Wiki. Ranges from 18 to 190kbps.
+                        'flac': { codec: 'flac', additionalOptions: ['-compression_level', '8'] },
+                    };
+                    
+                    const formatInfo = formatConfig[outputFormat];
+                    
+                    if (!formatInfo) {
+                        console.error('Unsupported output format:', outputFormat);
+                        return; // or handle the error in a way that suits your application
+                    }
+                    
+                    const { codec, additionalOptions = [] } = formatInfo;
+                    
                     const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
+                        //'-loglevel', 'debug',
                         '-i',
                         `"${inputFile}"`,
                         '-c:a',
-                        outputFormat === 'ogg' ? 'libopus' : 'aac',
-                        '-b:a',
-                        `${settings.bitrate.toString()}k`,
+                        codec,
+                        ...additionalOptions,
                         '-y',
                         `"${outputFile}"`
                     ], { shell: true });
@@ -259,38 +273,21 @@ const convertAudio2 = async (settings, files) => {
                     ffmpegCommand.on('close', (code) => {
                         if (code === 0) {
                             console.log(`Conversion successful for ${getFilename(inputFile)} to ${getFilename(outputFile)}`);
-                            success = true;
                             resolve();
-                        } else {
-                            console.error(`Conversion failed for ${getFilename(inputFile)} to ${getFilename(outputFile)}. Exit code: ${code}`);
-                            retryCount++;
-                            console.log(`Retrying... (Attempt ${retryCount}/${maxRetries})`);
-                            reject(new Error(`Conversion failed for ${inputFile}. Exit code: ${code}`));
                         }
                     });
 
                     ffmpegCommand.on('error', (err) => {
-                        console.error(`Error during conversion for ${getFilename(inputFile)} to ${getFilename(outputFile)}. Retrying...`);
-                        retryCount++;
-                        console.log(`Retrying... (Attempt ${retryCount}/${maxRetries})`);
+                        console.error(`Error during conversion for ${getFilename(inputFile)} to ${getFilename(outputFile)}.`);
                         reject(err);
                     });
                 });
                 await new Promise(resolve => setTimeout(resolve, 1000));
             } catch (error) {
                 console.error(`Failed to convert ${getFilename(inputFile)} to ${getFilename(outputFile)}. Retrying...`);
-                retryCount++;
-                console.log(`Retrying... (Attempt ${retryCount}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
-
-        if (!success) {
-            console.error(`Failed to convert ${getFilename(inputFile)} to ${getFilename(outputFile)} after ${maxRetries} retries.`);
-            failedFiles.push({ inputFile, outputFile, outputFormat });
-        }
-    };
-
     for (const { inputFile, outputFile, outputFormat } of files) {
         await convertWithRetry(inputFile, outputFile, outputFormat);
     }
