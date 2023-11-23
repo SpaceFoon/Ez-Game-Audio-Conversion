@@ -1,9 +1,8 @@
 /*EZ GAME AUDIO CONVERSION*/
 
 const readline = require('readline');
-const path = require('path');
 const { readdirSync, statSync, existsSync } = require('fs');
-const { join, basename, extname } = require('path');
+const { join, basename, extname, dirname} = require('path');
 const { spawn } = require('child_process');
 
 //setup object and functions.
@@ -99,7 +98,7 @@ const searchFiles = (settings) => {
                 walk(filePath);
             } else {
                 // Check if the file has a matching extension
-                const fileExtension = path.extname(file).toLowerCase();
+                const fileExtension = extname(file).toLowerCase();
                 if (fileExtensions.includes(fileExtension)) {
                     allFiles.push(filePath);
                 }
@@ -118,7 +117,7 @@ const searchFiles = (settings) => {
 const deleteDuplicateFiles = (files) => {
     const priorityList = ['ogg', '.mp3', '.m4a', '.wav', '.flac'];
     //console.log('files', files);
-    const fileobjs = files.map(file => [path.join(path.dirname(file), path.basename(file, path.extname(file))), path.extname(file)]);
+    const fileobjs = files.map(file => [join(dirname(file), basename(file, extname(file))), extname(file)]);
 
     const uniq = new Map();
 
@@ -150,10 +149,10 @@ const createConversionList = async (settings, files) => {
     let response = null;
     for (const inputFile of files) {
         for (const outputFormat of settings.outputFormats) {
-            let outputFile = `${path.join(path.dirname(inputFile), path.basename(inputFile, path.extname(inputFile)))}.${outputFormat}`;
+            let outputFile = `${join(dirname(inputFile), basename(inputFile, extname(inputFile)))}.${outputFormat}`;
             //console.log(`${inputFile}`)
             //console.log(`${outputFile}`)
-            let outputFileCopy = `${path.join(path.dirname(inputFile), `${path.basename(inputFile, path.extname(inputFile))} copy (1)`)}.${outputFormat}`;
+            let outputFileCopy = `${join(dirname(inputFile), `${basename(inputFile, extname(inputFile))} copy (1)`)}.${outputFormat}`;
             
                 const responseActions = {
                     o: () => {return response = null;},
@@ -211,30 +210,11 @@ const createConversionList = async (settings, files) => {
     }
 };
 
-// const checkFileCodec = (files) => {
-
-// array.forEach(files => {
-//     ffmpeg.ffprobe(files[i], (err, metadata) => {
-//       if (err) {
-//         console.error('Error while probing:', err);
-//       } else {
-//         // Access the codec information from the metadata object
-//         const audioCodec = metadata.streams.find(stream => stream.codec_type === 'audio').codec_name;
-//         const videoCodec = metadata.streams.find(stream => stream.codec_type === 'video').codec_name;
-    
-//         console.log('Audio codec:', audioCodec);
-//         console.log('Video codec:', videoCodec);
-//       }
-//     });
-//     })
-// };
-
 //Use ffmpeg to convert files
 const convertAudio2 = async (settings, files) => {
     const failedFiles = [];
 
     const convertWithRetry = async (inputFile, outputFile, outputFormat) => {
-        //let retryCount = 0;
             try {
                 await new Promise((resolve, reject) => {
                     const formatConfig = {
@@ -259,7 +239,7 @@ const convertAudio2 = async (settings, files) => {
                     
                     const { codec, additionalOptions = [] } = formatInfo;
                     
-                    const ffmpegCommand = spawn(path.join(__dirname, 'ffmpeg.exe'), [
+                    const ffmpegCommand = spawn(join(__dirname, 'ffmpeg.exe'), [
                         //'-loglevel', 'debug',
                         '-i',
                         `"${inputFile}"`,
@@ -273,12 +253,14 @@ const convertAudio2 = async (settings, files) => {
                     ffmpegCommand.on('close', (code) => {
                         if (code === 0) {
                             console.log(`Conversion successful for ${getFilename(inputFile)} to ${getFilename(outputFile)}`);
+                            failedFiles.push({ inputFile, outputFile, outputFormat });
                             resolve();
                         }
                     });
 
                     ffmpegCommand.on('error', (err) => {
                         console.error(`Error during conversion for ${getFilename(inputFile)} to ${getFilename(outputFile)}.`);
+                        failedFiles.push({ inputFile, outputFile, outputFormat });
                         reject(err);
                     });
                 });
@@ -315,9 +297,6 @@ UserInputInitSettings()
     // find and replace spaces in files names
     //.then((files) => checkFileNames(files))
     .then((files) => createConversionList(settings, files))
-    //This is needed to decided what codec to use for the conversion.
-    /////////////////.then((files) => checkFileCodec(files))
-    
     // this is used to convert audio to m4a
     .then((files) => convertAudio2(settings, files))
 
