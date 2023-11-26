@@ -11,7 +11,7 @@ import { AppShell, Loader, MantineProvider, Title, } from "@mantine/core";
 import { theme } from './theme';
 
 // const StartPage = React.lazy(() => import('./pages/StartPage'));
-import HomePage from ".pages/HomePage";
+import HomePage from "./pages/HomePage";
 import StartPage from "./pages/StartPage";
 import NextPage from "./pages/NextPage";
 
@@ -25,12 +25,12 @@ const MyRoute = ({page:Page}) => {
 
 
 const router = createBrowserRouter([
-  { path: 'home', element: <MyRoute page={HomePage}/> },
+  { path: '/home', element: <MyRoute page={HomePage}/> },
   { path: '/start', element: <MyRoute page={StartPage}/> },
   { path: '/next', element: <MyRoute page={NextPage}/> },
-  {path: '*', element: <Navigate to='/start' replace /> }
+  {path: '*', element: <Navigate to='/home' replace /> }
 ], 
-// {initialEntries: ['/'], initialIndex:0}
+ {initialEntries: ['/'], initialIndex:0}
 )
 
 function App() {
