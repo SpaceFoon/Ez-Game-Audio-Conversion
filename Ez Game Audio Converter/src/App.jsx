@@ -5,12 +5,14 @@ import { appDataDir, audioDir, basename, join } from '@tauri-apps/api/path';
 import { convertAudio2, createConversionList, searchFiles } from "./converter";
 import { Input, Notification ,rem, Container, Grid, MantineProvider} from '@mantine/core';
 import { useElementSize } from '@mantine/hooks';
-
+import FilePathComponent from './Components/BackendComponents/FilePathComponent.jsx';
+import FormatCheckboxComponent from './Components/BackendComponents/FormatCheckboxComponent';
+import OutputFormatComponent from './Components/BackendComponents/OutputFormatComponent';
+import LogsComponent from './Components/FrontendComponents/LogsComponent';
 
 export default function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("testname");
-
   // async function greet() {
   //   const midiFilePath = "./tintin-on-the-moon.mid";
 
@@ -19,27 +21,27 @@ export default function App() {
   //   // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
   //   setGreetMsg(await invoke("greet", { name }));
   // }
-
-  function Demo() {
-    return (
-      <Button component={Link} to="/react-router"></Button>
-    );
-  }
+  // function Demo() {
+  //   return (
+  //     <Button component={Link} to="/react-router"></Button>
+  //   );
+  // }
   const { ref, width, height } = useElementSize();
   // useEffect(() => { greet() }, []);
   let initialPath = null;
   let [filePath, setFilePath] = useState(`${initialPath}`);
-  const [fileType, setFileType] = useState(['mp3', 'wav', 'flac']);
+  const [inputType, setinputType] = useState(['mp3', 'wav', 'flac']);
   let [bitrate, setBitrate] = useState(192);
   const [outputType, setOutputType] = useState(['ogg']);
   const [logs, setLogs] = useState([]);
-  const [files, setFiles] = useState([]);
-
+  const [pendingChanges, setPendingChanges] = useState([]);
   const [question, setQuestion] = useState('');
   const dialog = useRef(null);
   
+  
 // Function to set initialize some things
   useEffect(() => {
+    //Sets default filepath to Windows music folder.
     const setInitialFilePath = async () => {
       try {
       initialPath = await audioDir();
@@ -51,96 +53,74 @@ export default function App() {
     setInitialFilePath();
   }, []);
 
-  const handleSelectFolder = async () => {
-    try {
-        if(!filePath)filePath = audioDir();
-      // let dir = audioDir()
-      const fPath = await open({
-        //multiple: true, one day
-        // defaultPath: `${dir}`,
-        multiple: false,
-        recursive: true,
-        directory: true,
+
+  //
+
+ <FilePathComponent filePath={filePath} handleSelectFolder={handleSelectFolder} />
+  const handlePendingChanges = async (pendingChanges) => {
+    let didpickall = '';
+    
+
+    for (let f of pendingChanges) {
+      const responseActions = {
+        o: () => {},
+        oa: () => { didpickall = 'oa'; },
+        r: () => { f.outputFile = f.outputFileCopy; },
+        ra: () => { f.outputFile = f.outputFileCopy; didpickall = 'ra'; },
+        s: () => { f.outputFile = 'skipped!'; },
+        sa: () => { f.outputFile = 'skipped!'; didpickall = 'sa'; }
+      };
+
+      if (didpickall) {
+        responseActions[didpickall]();
+        console.log(responseActions[didpickall])
+        continue;
+      }
+
+      const response =  await new Promise((res, rej) => {
+        setQuestion(`what to do with file ${f.inputFile}?`);
+        dialog.current.addEventListener('close', () => res(dialog.current.returnValue));
+        dialog.current.showModal();
       });
-      console.log('fPath', fPath);
-      setFilePath(fPath);
-    } catch (error) {
-      console.error("Error selecting folder:", error);
+
+      responseActions[response]();
+       setPendingChanges([...pendingChanges, { inputFile: f.inputFile, outputFile: f.outputFile }]); 
+       console.log(pendingChanges) 
+      //pendingChanges.push({ inputFile: f.inputFile, outputFile: f.outputFile });
     }
 
-  };
-
-
-  useEffect(() => {
-    const doit = async () => await searchFiles(filePath, fileType);
-    doit().then(files => createConversionList(outputType, files))
-    .then(async conList => {
-      
-      let didpickall = '';
-      for(let f of conList) {
-        const responseActions = {
-          o: () => {},
-          oa: () => { didpickall = 'oa' },
-          r: () => { f.outputFile = f.outputFileCopy;},
-          ra: () => { f.outputFile = f.outputFileCopy; didpickall = 'ra';},
-          s: () => { f.outputFile = 'skipped!';},
-          sa: () => { f.outputFile = 'skipped!'; didpickall = 'sa'; }
-        };
-        if(didpickall) {
-          responseActions[didpickall]();
-          continue;
-        }
-        const response = await new Promise((res, rej) => {
-          setQuestion(`what to do with file ${f.inputFile}?`)
-          dialog.current.addEventListener('close', () => res(dialog.current.returnValue))
-          dialog.current.showModal();
-        });
-        console.log('response', response);
-        responseActions[response]();
-      }
-      return conList
-    })
-    .then(list => setFiles(list));
-  }, [filePath, fileType, outputType])
-
-  // useEffect(() => {
-  //   const doit = async () => await createConversionList(outputType, files);
-  //   doit().then(async conList => {
-
-      
-  //   });
-  // }, [outputType])
+ 
+};
 
 
   const handleStart = async () => {
     const confirmed2 = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
-    setStartClicked(true);
-    // Perform any necessary actions with the selected options
-    // For now, just log the selected options
-    if (confirmed2){
-      if(!bitrate)bitrate = 192;
-    const newLogs = [
-      `File Path: ${filePath}`,
-      `File Type: ${fileType.join(', ')}`,
-      `Bitrate: ${bitrate}`,
-      `Output Type: ${outputType.join(', ')}`,
-    ];
-    setLogs([...logs, ...newLogs]);
+    if (confirmed2) {
+      if (!bitrate) bitrate = 192;
+      const newLogs = [
+        `File Path: ${filePath}`,
+        `File Type: ${inputType.join(', ')}`,
+        `Bitrate: ${bitrate}`,
+        `Output Type: ${outputType.join(', ')}`,
+      ];
+      setLogs([...logs, ...newLogs]);
+      handlePendingChanges(pendingChanges);
+      
 
-    await convertAudio2({bitrate}, files).then(response => {
-      console.info('convertAudio2 results:', response);
-    })
-
+      // Use the list of pending changes for the conversion
+      //await convertAudio2({ bitrate }, pendingChanges).then(response => {
+      //  console.info('convertAudio2 results:', response);
+      //});
     }
   };
 
 
-  const handleFileTypeChange = (value) => {
+  const handleInputChange = (value) => {
     console.log('file type change:', value);
-    setFileType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
+    setinputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
 
-  const handleOutputTypeChange = (value) => {
+  const handleOutputChange = (value) => {
     console.log('output type change:', value);
     setOutputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
@@ -166,8 +146,6 @@ export default function App() {
 
   return (
     <MantineProvider>
-
-
     <div className="container">
     <dialog ref={dialog}>
       <form>
@@ -182,16 +160,18 @@ export default function App() {
     </dialog>
       <div><h1>EZ Game Audio Converter</h1></div>
       {greetMsg}
-      <div className="container"></div>
+      <div className="container">
       <form>
         <fieldset>
           <legend>
             Source File Path:
           </legend>
-          <input type="text" readOnly value={filePath} placeholder="select file path" />
+          <input type="text" value={filePath} placeholder="select file path" />
           <br />
           <button type="button" onClick={handleSelectFolder}>Select Folder</button>
         </fieldset>
+        </form>
+        </div>
 
 
         <fieldset>
@@ -199,41 +179,73 @@ export default function App() {
 
           <label htmlFor="mp3">
             <input
-              id="mp3"
+              id="imp3"
               type="checkbox"
-              name="fileType"
+              name="inputType"
               value="mp3"
-              checked={fileType.includes("mp3")}
-              onChange={() => handleFileTypeChange("mp3")}
+              checked={inputType.includes("mp3")}
+              onChange={() => handleInputChange("mp3")}
             />
             MP3
 
           </label>
           <label htmlFor="wav">
             <input
-            id="wav"
+            id="iwav"
               type="checkbox"
-              name="fileType"
+              name="inputType"
               value="wav"
-              checked={fileType.includes("wav")}
-              onChange={() => handleFileTypeChange("wav")}
+              checked={inputType.includes("wav")}
+              onChange={() => handleInputChange("wav")}
             />
             WAV
           </label>
 
           <label htmlFor="flac">
             <input
-              id="flac"
+              id="iflac"
               type="checkbox"
-              name="fileType"
+              name="inputType"
               value="flac"
-              checked={fileType.includes("flac")}
-              onChange={() => handleFileTypeChange("flac")}
+              checked={inputType.includes("flac")}
+              onChange={() => handleInputChange("flac")}
             />
             FLAC
 
           </label>
-
+    <label htmlFor="m4a">
+            <input
+            id="im4a"
+              type="checkbox"
+              name="inputType"
+              value="m4a"
+              checked={inputType.includes("m4a")}
+              onChange={() => handleInputChange("m4a")}
+            />
+            M4A
+          </label>
+              <label htmlFor="ogg">
+            <input
+            id="iogg"
+              type="checkbox"
+              name="inputType"
+              value="ogg"
+              checked={inputType.includes("ogg")}
+              onChange={() => handleInputChange("ogg")}
+            />
+            OGG
+          </label>
+              <label htmlFor="midi">
+            <input
+            id="imidi"
+              type="checkbox"
+              name="inputType"
+              value="midi"
+              checked={inputType.includes("midi")}
+              onChange={() => handleInputChange("midi")}
+            />
+            MIDI
+          </label>
 
         </fieldset>
 
@@ -243,27 +255,58 @@ export default function App() {
           </legend>
           <label htmlFor="ogg">
           <input className="checkbox"
-            id="ogg"
+            id="oogg"
             type="checkbox"
             name="outputType"
             value="ogg"
             checked={outputType.includes("ogg")}
-            onChange={() => handleOutputTypeChange("ogg")}
+            onChange={() => handleOutputChange("ogg")}
           />
             
             OGG</label>
           <label htmlFor="m4a">
           <input
-            id="m4a"
+            id="om4a"
             type="checkbox"
             name="outputType"
             value="m4a"
             checked={outputType.includes("m4a")}
-            onChange={() => handleOutputTypeChange("m4a")}
+            onChange={() => handleOutputChange("m4a")}
           />
             
             M4A</label>
-
+                 <label htmlFor="wav">
+          <input
+            id="owav"
+            type="checkbox"
+            name="outputType"
+            value="wav"
+            checked={outputType.includes("wav")}
+            onChange={() => handleOutputChange("wav")}
+          />
+            
+            WAV</label>
+                 <label htmlFor="flac">
+          <input
+            id="oflac"
+            type="checkbox"
+            name="outputType"
+            value="flac"
+            checked={outputType.includes("flac")}
+            onChange={() => handleOutputChange("flac")}
+          />
+            
+            FLAC</label>
+                 <label htmlFor="mp3">
+          <input
+            id="omp3"
+            type="checkbox"
+            name="outputType"
+            value="mp3"
+            checked={outputType.includes("mp3")}
+            onChange={() => handleOutputChange("mp3")}
+          />
+            MP3</label>
         </fieldset>
         <fieldset>
           <legend>
@@ -278,14 +321,14 @@ export default function App() {
           onChange={(e) => setBitrate(e.target.value)}
         />
        
-        <button onClick={Demo}>Demo</button>
+        {/* <button onClick={Demo}>Demo</button> */}
         </fieldset>
 
 
-      </form>
+      
       <div>
-        <button onClick={handleStart}>Start</button>
-      </div>
+ <button onClick={() => handleStart(pendingChanges)}>Start</button>     
+  </div>
 
       <div className="retro-terminal-logs">
       <h2>Logs:</h2>
@@ -304,6 +347,5 @@ export default function App() {
       </div>
     </div>
     </MantineProvider>
-
   );
 };
