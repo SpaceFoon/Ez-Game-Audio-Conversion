@@ -1,3 +1,4 @@
+//FilePathComponent,jsx
 const FilePathComponent = ({ filePath, handleSelectFolder }) => (
   <div>
     <fieldset>

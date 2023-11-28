@@ -1,3 +1,4 @@
+// LogsComponent.jsx
 import React from 'react';
 
 const LogsComponent = ({ logs, width, height }) => (
