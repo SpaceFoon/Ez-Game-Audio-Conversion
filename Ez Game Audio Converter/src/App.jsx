@@ -1,33 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
-import { open, ask } from '@tauri-apps/api/dialog';
+import { ask } from '@tauri-apps/api/dialog';
 import { audioDir } from '@tauri-apps/api/path';
 import { MantineProvider } from '@mantine/core';
 import { useElementSize } from '@mantine/hooks';
+
 import FilePathComponent from './Components/FrontendComponents/FilePathComponent.jsx';
-import InputFormatCheckboxComponent from './Components/BackendComponents/InputFormatCheckboxComponent.jsx';
+import InputFormatCheckboxComponent from './Components/BackendComponents/InputFormatComponent.jsx';
 import OutputFormatComponent from './Components/BackendComponents/OutputFormatComponent.jsx';
 import LogsComponent from './Components/FrontendComponents/LogsComponent.jsx';
-import {handleSelectFolder, initFilePath} from './Components/BackendComponents/FileSelect.jsx'
+import {handleSelectFolder} from './Components/BackendComponents/FolderSelect.jsx'
+import {handlePendingChanges} from './Components/BackendComponents/PendingChangesComponent.jsx'
 
 export default function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("testname");
-  // async function greet() {
   //   const midiFilePath = "./tintin-on-the-moon.mid";
   //   // Invoke a Tauri command to play the MIDI file using the system's default player
   //   await invoke("play_midi_file", { path: midiFilePath });
   //   // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
   //   setGreetMsg(await invoke("greet", { name }));
   // }
-  // function Demo() {
-  //   return (
-  //     <Button component={Link} to="/react-router"></Button>
-  //   );
-  // }
   const { ref, width, height } = useElementSize();
-  // useEffect(() => { greet() }, []);
-  // let initialPath = null;
+
+   let initialPath = null;
   // let [filePath, setFilePath] = useState(`${initialPath}`);
+
   const [inputType, setinputType] = useState(['mp3', 'wav', 'flac']);
   let [bitrate, setBitrate] = useState(192);
   const [outputType, setOutputType] = useState(['ogg']);
@@ -36,75 +31,25 @@ export default function App() {
   const [question, setQuestion] = useState('');
   const dialog = useRef(null);
 
+  const [filePath, setFilePath] = useState('');
 
-  // // Function to set initialize some things
-  // useEffect(() => {
-  //   //Sets default filepath to Windows music folder.
-  //   const setInitialFilePath = async () => {
-  //     try {
-  //       initialPath = await audioDir();
-  //       setFilePath(initialPath);
-  //     } catch (error) {
-  //       console.error('Error getting initial path:', error);
-  //     };
-  //   };
-  //   setInitialFilePath();
-  // }, []);
+  const handleSelect = async () => {
+     await handleSelectFolder(filePath, setFilePath);
+   };
 
-
-  //
-  // const handleSelectFolder = async () => {
-  //   try {
-  //     if (!filePath) filePath = audioDir();
-  //     // let dir = audioDir()
-  //     const fPath = await open({
-  //       //multiple: true, one day
-  //       // defaultPath: `${dir}`,
-  //       multiple: false,
-  //       recursive: true,
-  //       directory: true,
-  //     });
-  //     console.log('fPath', fPath);
-  //     setFilePath(fPath);
-  //   } catch (error) {
-  //     console.error("Error selecting folder:", error);
-  //   }
-  // };
-initFilePath()
-  const handlePendingChanges = async (pendingChanges) => {
-    let didpickall = '';
-
-
-    for (let f of pendingChanges) {
-      const responseActions = {
-        o: () => { },
-        oa: () => { didpickall = 'oa'; },
-        r: () => { f.outputFile = f.outputFileCopy; },
-        ra: () => { f.outputFile = f.outputFileCopy; didpickall = 'ra'; },
-        s: () => { f.outputFile = 'skipped!'; },
-        sa: () => { f.outputFile = 'skipped!'; didpickall = 'sa'; }
+// Function to set initialize file path
+  useEffect(() => {
+    //Sets default filepath to Windows music folder.
+    const setInitialFilePath = async () => {
+      try {
+        initialPath = await audioDir();
+        setFilePath(initialPath);
+      } catch (error) {
+        console.error('Error getting initial path:', error);
       };
-
-      if (didpickall) {
-        responseActions[didpickall]();
-        console.log(responseActions[didpickall]);
-        continue;
-      }
-
-      const response = await new Promise((res, rej) => {
-        setQuestion(`what to do with file ${f.inputFile}?`);
-        dialog.current.addEventListener('close', () => res(dialog.current.returnValue));
-        dialog.current.showModal();
-      });
-
-      responseActions[response]();
-      setPendingChanges([...pendingChanges, { inputFile: f.inputFile, outputFile: f.outputFile }]);
-      console.log(pendingChanges);
-      //pendingChanges.push({ inputFile: f.inputFile, outputFile: f.outputFile });
-    }
-
-
-  };
+    };
+    setInitialFilePath();
+  }, []);
 
   const handleStart = async () => {
     const confirmed2 = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
@@ -119,14 +64,12 @@ initFilePath()
       setLogs([...logs, ...newLogs]);
       handlePendingChanges(pendingChanges);
 
-
       // Use the list of pending changes for the conversion
       //await convertAudio2({ bitrate }, pendingChanges).then(response => {
       //  console.info('convertAudio2 results:', response);
       //});
     }
   };
-
 
   const handleInputChange = (value) => {
     console.log('file type change:', value);
@@ -138,6 +81,10 @@ initFilePath()
     setOutputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
 
+    const handleDialogOption = (e) => {
+    e.preventDefault();
+    dialog.current.close(e.target.value);
+  };
   //   const handleBitrateChange = (value) => {
   //   const newBitrate = value;
   //   if (newBitrate < 32 || newBitrate > 512) {
@@ -150,10 +97,7 @@ initFilePath()
   //   }
   //   setBitrate(newBitrate);
   // };
-  const handleDialogOption = (e) => {
-    e.preventDefault();
-    dialog.current.close(e.target.value);
-  };
+
 
   return (
     <MantineProvider>
@@ -161,18 +105,19 @@ initFilePath()
         <dialog ref={dialog}>
           <form>
             <p>{question}</p>
-            <button value='o' onClick={handleDialogOption}>overwrite</button>
-            <button value='oa' onClick={handleDialogOption}>overwrite all</button>
-            <button value='r' onClick={handleDialogOption}>rename</button>
-            <button value='ra' onClick={handleDialogOption}>rename all</button>
-            <button value='s' onClick={handleDialogOption}>skip</button>
-            <button value='sa' onClick={handleDialogOption}>skip all</button>
+            <button value='o' onClick={handleDialogOption}>Overwrite</button>
+            <button value='oa' onClick={handleDialogOption}>Overwrite All</button>
+            <button value='r' onClick={handleDialogOption}>Rename</button>
+            <button value='ra' onClick={handleDialogOption}>Rename All</button>
+            <button value='s' onClick={handleDialogOption}>Skip</button>
+            <button value='sa' onClick={handleDialogOption}>Skip All</button>
           </form>
         </dialog>
-        <div><h1>EZ Game Audio Converter</h1></div>
-        <div className="container">
 
-          <FilePathComponent filePath={filePath} handleSelectFolder={handleSelectFolder} />
+        <div><h1>EZ Game Audio Converter</h1></div>
+
+        <div className="container">
+          <FilePathComponent filePath={filePath} handleSelectFolder={handleSelect} />
         </div>
         <fieldset>
           <legend>Source Formats:</legend>
@@ -252,8 +197,6 @@ initFilePath()
             />
            
             </fieldset> */}
-
-
 
         <div>
           <button onClick={() => handleStart(pendingChanges)}>Start</button>
