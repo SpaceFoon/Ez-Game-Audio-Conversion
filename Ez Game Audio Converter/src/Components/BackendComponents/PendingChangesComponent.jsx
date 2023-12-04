@@ -1,6 +1,5 @@
 // PendingChangesComponent.jsx
-import {}
-const HandlePendingChanges = async (pendingChanges) => {
+export async function HandlePendingChanges(pendingChanges, setPendingChanges){
     let didpickall = '';
 
     for (let f of pendingChanges) {
@@ -31,4 +30,4 @@ const HandlePendingChanges = async (pendingChanges) => {
       //pendingChanges.push({ inputFile: f.inputFile, outputFile: f.outputFile });
     }
   };
-export default HandlePendingChanges;
+//export default HandlePendingChanges;

@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ask } from '@tauri-apps/api/dialog';
 import { audioDir } from '@tauri-apps/api/path';
 import { MantineProvider } from '@mantine/core';
 import { useElementSize } from '@mantine/hooks';
@@ -9,8 +8,8 @@ import InputFormatCheckboxComponent from './Components/BackendComponents/InputFo
 import OutputFormatComponent from './Components/BackendComponents/OutputFormatComponent.jsx';
 import LogsComponent from './Components/FrontendComponents/LogsComponent.jsx';
 import {handleSelectFolder} from './Components/BackendComponents/FolderSelect.jsx'
-import {handlePendingChanges} from './Components/BackendComponents/PendingChangesComponent.jsx'
-
+//import HandlePendingChanges from './Components/BackendComponents/PendingChangesComponent.jsx'
+import { handleStart } from "./Components/BackendComponents/HandleStart.jsx";
 export default function App() {
   //   const midiFilePath = "./tintin-on-the-moon.mid";
   //   // Invoke a Tauri command to play the MIDI file using the system's default player
@@ -51,25 +50,25 @@ export default function App() {
     setInitialFilePath();
   }, []);
 
-  const handleStart = async () => {
-    const confirmed2 = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
-    if (confirmed2) {
-      if (!bitrate) bitrate = 192;
-      const newLogs = [
-        `File Path: ${filePath}`,
-        `File Type: ${inputType.join(', ')}`,
-        `Bitrate: ${bitrate}`,
-        `Output Type: ${outputType.join(', ')}`,
-      ];
-      setLogs([...logs, ...newLogs]);
-      handlePendingChanges(pendingChanges);
+  // const handleStart = async () => {
+  //   const confirmed2 = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
+  //   if (confirmed2) {
+  //     if (!bitrate) bitrate = 192;
+  //     const newLogs = [
+  //       `File Path: ${filePath}`,
+  //       `File Type: ${inputType.join(', ')}`,
+  //       `Bitrate: ${bitrate}`,
+  //       `Output Type: ${outputType.join(', ')}`,
+  //     ];
+  //     setLogs([...logs, ...newLogs]);
+  //     HandlePendingChanges(pendingChanges);
 
-      // Use the list of pending changes for the conversion
-      //await convertAudio2({ bitrate }, pendingChanges).then(response => {
-      //  console.info('convertAudio2 results:', response);
-      //});
-    }
-  };
+  //     // Use the list of pending changes for the conversion
+  //     //await convertAudio2({ bitrate }, pendingChanges).then(response => {
+  //     //  console.info('convertAudio2 results:', response);
+  //     //});
+  //   }
+  // };
 
   const handleInputChange = (value) => {
     console.log('file type change:', value);
@@ -85,19 +84,6 @@ export default function App() {
     e.preventDefault();
     dialog.current.close(e.target.value);
   };
-  //   const handleBitrateChange = (value) => {
-  //   const newBitrate = value;
-  //   if (newBitrate < 32 || newBitrate > 512) {
-  //       // You can trigger a blinking effect or show a notification here
-  //       // For simplicity, I'm using console.log
-  //     console.log('Bitrate out of range!');
-  //     newBitrate = 192;
-  //     // You can also set a state variable to control the blinking effect
-  //     // Example: setBitrateOutOfRange(true);
-  //   }
-  //   setBitrate(newBitrate);
-  // };
-
 
   return (
     <MantineProvider>
@@ -183,26 +169,14 @@ export default function App() {
             checked={outputType.includes('mp3')}
             onChange={handleOutputChange} />
         </fieldset>
-        {/* <fieldset>
-              <legend>
-                Advanced Options:
-              </legend>
-            <label htmlFor="bitrate">Bitrate:</label>
-            <input
-              id="bitrate"
-              type="text"
-              name="setBitrate"
-              value={bitrate}
-              onChange={(e) => setBitrate(e.target.value)}
-            />
-           
-            </fieldset> */}
-
         <div>
-          <button onClick={() => handleStart(pendingChanges)}>Start</button>
+          {/* <button onClick={() => handleStart(pendingChanges, logs)}>Start</button> */}
+          
         </div>
+        <div><progress value={null} /></div>
 
-        <LogsComponent logs={logs} width={width} height={height} />
+          <LogsComponent logs={logs} width={width} height={height} />
+
       </div>
     </MantineProvider>
   );
