@@ -1,3 +1,3 @@
-export async function SaveLogs(settings) {
+export async function SaveLogs(logs) {
   //save logs
 }

@@ -1,6 +1,4 @@
 // InputFormatCheckboxComponent.jsx
-import React from 'react';
-
 const  InputFormatCheckboxComponent = ({ label, value, checked, onChange }) => (
   <label htmlFor={value}>
     <input

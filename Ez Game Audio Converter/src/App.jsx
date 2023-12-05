@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from "react";
-import { audioDir } from '@tauri-apps/api/path';
+import { useEffect,
+   //useRef, 
+   useState } from "react";
+import { audioDir} from '@tauri-apps/api/path';
 import { MantineProvider } from '@mantine/core';
-import { useElementSize } from '@mantine/hooks';
+//import { useElementSize } from '@mantine/hooks';
 
 import FilePathComponent from './Components/FrontendComponents/FilePathComponent.jsx';
 import InputFormatCheckboxComponent from './Components/BackendComponents/InputFormatComponent.jsx';
 import OutputFormatComponent from './Components/BackendComponents/OutputFormatComponent.jsx';
-import LogsComponent from './Components/FrontendComponents/LogsComponent.jsx';
+//import LogsComponent from './Components/FrontendComponents/LogsComponent.jsx';
 import {handleSelectFolder} from './Components/BackendComponents/FolderSelect.jsx'
-//import HandlePendingChanges from './Components/BackendComponents/PendingChangesComponent.jsx'
-import { handleStart } from "./Components/BackendComponents/HandleStart.jsx";
+import HandleStart from "./Components/BackendComponents/HandleStart.jsx"
+import StartButton from "./Components/FrontendComponents/StartButton.jsx";
+
 export default function App() {
   //   const midiFilePath = "./tintin-on-the-moon.mid";
   //   // Invoke a Tauri command to play the MIDI file using the system's default player
@@ -17,18 +20,16 @@ export default function App() {
   //   // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
   //   setGreetMsg(await invoke("greet", { name }));
   // }
-  const { ref, width, height } = useElementSize();
-
-   let initialPath = null;
-  // let [filePath, setFilePath] = useState(`${initialPath}`);
+  //const {
+    //ref,
+     //width, height } = useElementSize();
 
   const [inputType, setinputType] = useState(['mp3', 'wav', 'flac']);
-  let [bitrate, setBitrate] = useState(192);
+  //let [bitrate, setBitrate] = useState(192);
   const [outputType, setOutputType] = useState(['ogg']);
-  const [logs, setLogs] = useState([]);
-  const [pendingChanges, setPendingChanges] = useState([]);
-  const [question, setQuestion] = useState('');
-  const dialog = useRef(null);
+
+  
+  //const dialog = useRef(null);
 
   const [filePath, setFilePath] = useState('');
 
@@ -41,14 +42,14 @@ export default function App() {
     //Sets default filepath to Windows music folder.
     const setInitialFilePath = async () => {
       try {
-        initialPath = await audioDir();
+        let initialPath = await audioDir();
         setFilePath(initialPath);
       } catch (error) {
         console.error('Error getting initial path:', error);
-      };
+      }
     };
     setInitialFilePath();
-  }, []);
+  }, [])
 
   // const handleStart = async () => {
   //   const confirmed2 = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
@@ -80,15 +81,15 @@ export default function App() {
     setOutputType((current) => current.includes(value) ? current.filter(x => x !== value) : [...current, value]);
   };
 
-    const handleDialogOption = (e) => {
-    e.preventDefault();
-    dialog.current.close(e.target.value);
-  };
+  //   const handleDialogOption = (e) => {
+  //   e.preventDefault();
+  //   dialog.current.close(e.target.value);
+  // };
 
   return (
     <MantineProvider>
       <div className="container">
-        <dialog ref={dialog}>
+        {/* <dialog ref={dialog}>
           <form>
             <p>{question}</p>
             <button value='o' onClick={handleDialogOption}>Overwrite</button>
@@ -98,13 +99,16 @@ export default function App() {
             <button value='s' onClick={handleDialogOption}>Skip</button>
             <button value='sa' onClick={handleDialogOption}>Skip All</button>
           </form>
-        </dialog>
+        </dialog> */}
 
         <div><h1>EZ Game Audio Converter</h1></div>
+
 
         <div className="container">
           <FilePathComponent filePath={filePath} handleSelectFolder={handleSelect} />
         </div>
+
+
         <fieldset>
           <legend>Source Formats:</legend>
           <InputFormatCheckboxComponent
@@ -170,12 +174,15 @@ export default function App() {
             onChange={handleOutputChange} />
         </fieldset>
         <div>
-          {/* <button onClick={() => handleStart(pendingChanges, logs)}>Start</button> */}
-          
-        </div>
+          {/* <button onClick={() => HandleStart(
+            filePath, inputType, outputType,)}
+            >Start
+            </button> */}
+<StartButton filePath={filePath} inputType={inputType} outputType={outputType} HandleStart={HandleStart}/>
+      </div>
         <div><progress value={null} /></div>
 
-          <LogsComponent logs={logs} width={width} height={height} />
+          {/* <LogsComponent logs={logs} width={width} height={height} /> */}
 
       </div>
     </MantineProvider>

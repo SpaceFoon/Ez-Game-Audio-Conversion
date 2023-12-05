@@ -1,10 +1,13 @@
+ import { useState } from 'react'
  import { join, } from '@tauri-apps/api/path';
  import { ask } from '@tauri-apps/api/dialog'
- export async function handleStart(filePath, inputType, outputType,
-    pendingChanges, bitrate, setLogs, HandlePendingChanges, logs){
+ 
+ const HandleStart = async (filePath, inputType, outputType,
+    pendingChanges, bitrate, HandlePendingChanges) => {
+         const [logs, setLogs] = useState([]);
+
     const confirmed = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
     if (confirmed) {
-        if(!logs) logs = ""
       if (!bitrate) bitrate = 192;
       const newLogs = [
         `Source Path: ${filePath}`,
@@ -15,6 +18,8 @@
       ];
       setLogs([...logs, ...newLogs]);
       HandlePendingChanges(pendingChanges);
+      console.log(pendingChanges, "Pending Changes")
+      return pendingChanges;
 
       // Use the list of pending changes for the conversion
       //await convertAudio2({ bitrate }, pendingChanges).then(response => {
@@ -22,3 +27,4 @@
       //});
     }
   }
+  export default HandleStart

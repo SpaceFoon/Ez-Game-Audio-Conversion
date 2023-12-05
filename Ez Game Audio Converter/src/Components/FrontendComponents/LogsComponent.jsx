@@ -1,6 +1,6 @@
 // LogsComponent.jsx
-import React from 'react';
 
+import PropTypes from 'prop-types';
 const LogsComponent = ({ logs, width, height }) => (
   <div className="retro-terminal-logs">
     <h2>Logs:</h2>
@@ -13,6 +13,11 @@ const LogsComponent = ({ logs, width, height }) => (
       Width: {width}, height: {height}
     </div>
   </div>
+  
 );
-
+LogsComponent.propTypes = {
+  logs: PropTypes.arrayOf(PropTypes.string).isRequired,
+  width: PropTypes.number.isRequired,
+  height: PropTypes.number.isRequired,
+};
 export default LogsComponent;
