@@ -1,30 +1,38 @@
- import { useState } from 'react'
+ //HandleStart.jsx
  import { join, } from '@tauri-apps/api/path';
  import { ask } from '@tauri-apps/api/dialog'
- 
- const HandleStart = async (filePath, inputType, outputType,
-    pendingChanges, bitrate, HandlePendingChanges) => {
-         const [logs, setLogs] = useState([]);
+ import HandlePendingChanges from './PendingChangesComponent'
+const HandleStart = async ({
+  filePath,
+  inputType,
+  outputType,
+  pendingChanges,
+  bitrate,
+  logs,
+  setLogs,
+  
+}) => {
+  const confirmed = await ask('Proceed with the conversion? Are you sure?', {
+    title: 'Think about it',
+    type: 'warning'
+  });
 
-    const confirmed = await ask('Proceed with the conversion? Are you sure?', { title: 'Think about it', type: 'warning' });
-    if (confirmed) {
-      if (!bitrate) bitrate = 192;
-      const newLogs = [
-        `Source Path: ${filePath}`,
-        `Input Type: ${inputType = join(inputType)}`,
-        `Output Type: ${outputType = join(outputType)}`,
-        `Bitrate: ${bitrate}`,
-        
-      ];
-      setLogs([...logs, ...newLogs]);
-      HandlePendingChanges(pendingChanges);
-      console.log(pendingChanges, "Pending Changes")
-      return pendingChanges;
+  if (confirmed) {
+    if (!bitrate) bitrate = 192;
+    const newLogs = [
+      `Source Path: ${filePath}`,
+      `Input Type: ${inputType = join(inputType)}`,
+      `Output Type: ${outputType = join(outputType)}`,
+      `Bitrate: ${bitrate}`,
+    ];
 
-      // Use the list of pending changes for the conversion
-      //await convertAudio2({ bitrate }, pendingChanges).then(response => {
-      //  console.info('convertAudio2 results:', response);
-      //});
-    }
+    setLogs(logs ? [...logs, ...newLogs] : newLogs);
+
+    HandlePendingChanges(pendingChanges);
+    console.log(pendingChanges, "Pending Changes");
+
+    return { pendingChanges, logs };
   }
-  export default HandleStart
+};
+
+export default HandleStart;

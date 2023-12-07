@@ -3,12 +3,12 @@ import { useEffect,
    useState } from "react";
 import { audioDir} from '@tauri-apps/api/path';
 import { MantineProvider } from '@mantine/core';
-//import { useElementSize } from '@mantine/hooks';
+import { useElementSize } from '@mantine/hooks';
 
 import FilePathComponent from './Components/FrontendComponents/FilePathComponent.jsx';
 import InputFormatCheckboxComponent from './Components/BackendComponents/InputFormatComponent.jsx';
 import OutputFormatComponent from './Components/BackendComponents/OutputFormatComponent.jsx';
-//import LogsComponent from './Components/FrontendComponents/LogsComponent.jsx';
+import LogsComponent from './Components/FrontendComponents/LogsComponent.jsx';
 import {handleSelectFolder} from './Components/BackendComponents/FolderSelect.jsx'
 import HandleStart from "./Components/BackendComponents/HandleStart.jsx"
 import StartButton from "./Components/FrontendComponents/StartButton.jsx";
@@ -20,14 +20,13 @@ export default function App() {
   //   // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
   //   setGreetMsg(await invoke("greet", { name }));
   // }
-  //const {
+  const {
     //ref,
-     //width, height } = useElementSize();
+     width, height } = useElementSize();
 
   const [inputType, setinputType] = useState(['mp3', 'wav', 'flac']);
+   const [outputType, setOutputType] = useState(['ogg']);
   //let [bitrate, setBitrate] = useState(192);
-  const [outputType, setOutputType] = useState(['ogg']);
-
   
   //const dialog = useRef(null);
 
@@ -178,8 +177,13 @@ export default function App() {
             filePath, inputType, outputType,)}
             >Start
             </button> */}
-<StartButton filePath={filePath} inputType={inputType} outputType={outputType} HandleStart={HandleStart}/>
-      </div>
+{/* <StartButton filePath={filePath} inputType={inputType} outputType={outputType} HandleStart={HandleStart}/> */}
+      </div><StartButton
+  filePath="yourFilePath"
+  inputType={["your", "input", "types"]}
+  outputType={["your", "output", "types"]}
+  HandleStart={HandleStart}
+/>
         <div><progress value={null} /></div>
 
           {/* <LogsComponent logs={logs} width={width} height={height} /> */}

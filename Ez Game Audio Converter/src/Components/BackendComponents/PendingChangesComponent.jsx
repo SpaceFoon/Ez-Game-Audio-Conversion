@@ -1,7 +1,7 @@
 // PendingChangesComponent.jsx
 import { useState } from 'react'
-import dialog from '@tauri-apps/api/dialog';
-export async function HandlePendingChanges(pendingChanges, setPendingChanges){
+import { ask } from '@tauri-apps/api/dialog';
+const HandlePendingChanges = (pendingChanges, setPendingChanges) => {
   const [question, setQuestion] = useState('');
     let didpickall = '';
 
@@ -21,10 +21,10 @@ export async function HandlePendingChanges(pendingChanges, setPendingChanges){
         continue;
       }
 
-      const response = await new Promise((res, rej) => {
+      const response = new Promise((res, rej) => {
         setQuestion(`what to do with file ${f.inputFile}?`);
-        dialog.current.addEventListener('close', () => res(dialog.current.returnValue));
-        dialog.current.showModal();
+        ask.current.addEventListener('close', () => res(ask.current.returnValue));
+        ask.current.showModal();
         if (rej) return console.error("Broke at const response")
       });
 
@@ -36,4 +36,4 @@ export async function HandlePendingChanges(pendingChanges, setPendingChanges){
       //pendingChanges.push({ inputFile: f.inputFile, outputFile: f.outputFile });
     }
   }
-//export default HandlePendingChanges;
+export default HandlePendingChanges;
