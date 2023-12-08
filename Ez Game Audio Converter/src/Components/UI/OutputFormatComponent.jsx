@@ -1,6 +1,5 @@
 // OutputFormatComponent.jsx
-import React from 'react';
-
+import propTypes from 'prop-types';
 const OutputFormatComponent = ({ label, value, checked, onChange }) => (
   <label htmlFor={value}>
     <input
@@ -14,5 +13,10 @@ const OutputFormatComponent = ({ label, value, checked, onChange }) => (
     {label}
   </label>
 );
-
+OutputFormatComponent.propTypes = {
+  label: propTypes.string,
+  value: propTypes.string,
+  checked: propTypes.bool,
+  onChange: propTypes.func,
+}
 export default OutputFormatComponent;

@@ -1,4 +1,6 @@
 // InputFormatCheckboxComponent.jsx
+
+import propTypes from 'prop-types';
 const  InputFormatCheckboxComponent = ({ label, value, checked, onChange }) => (
   <label htmlFor={value}>
     <input
@@ -12,5 +14,10 @@ const  InputFormatCheckboxComponent = ({ label, value, checked, onChange }) => (
     {label}
   </label>
 );
-
+InputFormatCheckboxComponent.propTypes = {
+  label: propTypes.string,
+  value: propTypes.string,
+  checked: propTypes.bool,
+  onChange: propTypes.func,
+}
 export default InputFormatCheckboxComponent;

@@ -1,3 +1,6 @@
+export async function SaveLogs(logs) {
+  //save logs
+}
 
 import { appCacheDir } from '@tauri-apps/api/path'
     //import { save } from '@tauri-apps/api/dialog';
