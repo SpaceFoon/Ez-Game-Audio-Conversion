@@ -6,7 +6,7 @@ import { audioDir } from "@tauri-apps/api/path";
 // import { readText } from '@tauri-apps/api/clipboard'; Gets the clipboard content as plain text.
 // const clipboardText = await readText();
 
-export async function handleSelectFolder(currentFilePath, { setFilePath }) {
+export async function handleSelectFolder({ currentFilePath, setFilePath }) {
   try {
     const defaultPath = currentFilePath || (await audioDir());
     const selectedPath = await open({

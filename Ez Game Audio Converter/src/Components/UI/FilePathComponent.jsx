@@ -1,13 +1,13 @@
 //FilePathComponent,jsx
 
 import propTypes from 'prop-types';
-import {handleSelectFolder} from '../Backend/FolderSelect'
+import {handleSelectFolder} from '../Backend/folderSelect'
 
 
 
 const FilePathComponent = ({ filePath, setFilePath}) => {
     const handleSelect = async () => {
-      await handleSelectFolder(filePath, setFilePath);
+      await handleSelectFolder({filePath, setFilePath});
     };
     return(
   <div>
@@ -15,7 +15,7 @@ const FilePathComponent = ({ filePath, setFilePath}) => {
       <legend>Source File Path:</legend>
       <input type="text" value={filePath} placeholder="Select file path" readOnly />
       <br />
-      <button type="button" onClick={() => handleSelect(filePath)}>
+      <button type="button" onClick={() => handleSelect({filePath, setFilePath})}>
         Select Folder
       </button>
     </fieldset>

@@ -1,39 +1,45 @@
- //HandleStart.jsx
- import { useState } from 'react';
- import { join, } from '@tauri-apps/api/path';
- import { ask } from '@tauri-apps/api/dialog'
- import HandlePendingChanges from './PendingChangesComponent'
-const HandleStart = async ({
-  
-      filePath,
-      inputType,
-      outputType,
-      
-  
+//handleStart.jsx
+import { join } from "@tauri-apps/api/path";
+import { ask } from "@tauri-apps/api/dialog";
+import handlePendingChanges from "./handlePendingChanges";
+const arrayToString = (array) => {
+  return array
+    ? array.reduce((acc, value) => acc + (acc.length ? ", " : "") + value, "")
+    : "";
+};
+const handleStart = async ({
+  filePath,
+  inputType,
+  outputType,
+  logs,
+  setLogs,
+  pendingChanges,
+  setPendingChanges,
 }) => {
-  const [logs, setLogs] = useState([]);
-  const [pendingChanges, setPendingChanges] = useState([])
-  const confirmed = await ask('Proceed with the conversion? Are you sure?', {
-    title: 'Think about it',
-    type: 'warning'
+  const confirmed = await ask("Proceed with the conversion? Are you sure?", {
+    title: "Think about it",
+    type: "warning",
   });
 
   if (confirmed) {
     // if (!bitrate) bitrate = 192;
+    const inputTypeString = arrayToString(inputType);
+    const outputTypeString = arrayToString(outputType);
+
     const newLogs = [
       `Source Path: ${filePath}`,
-      `Input Type: ${inputType = join(inputType)}`,
-      `Output Type: ${outputType = join(outputType)}`,
+      `Input Type: ${inputTypeString}`,
+      `Output Type: ${outputTypeString}`,
       // `Bitrate: ${bitrate}`,
     ];
 
     setLogs(logs ? [...logs, ...newLogs] : newLogs);
 
-    HandlePendingChanges(pendingChanges, setPendingChanges );
+    handlePendingChanges(pendingChanges, setPendingChanges);
     console.log(pendingChanges, "Pending Changes");
 
     return { pendingChanges, logs };
   }
 };
 
-export default HandleStart;
+export default handleStart;

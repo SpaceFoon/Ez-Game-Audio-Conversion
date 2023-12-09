@@ -1,23 +1,27 @@
-// PendingChangesComponent.jsx
-import { useState } from 'react'
-import { ask } from '@tauri-apps/api/dialog';
+// handlePendingChanges.js
+import { ask } from "@tauri-apps/api/dialog";
 
-const HandlePendingChanges = ({ pendingChanges, setPendingChanges }) => {
-  const [question, setQuestion] = useState('');
-  let didpickall = '';
+const handlePendingChanges = ({ pendingChanges, setPendingChanges }) => {
+  let didpickall = "";
   const handleResponse = (response, f) => {
     const responseActions = {
       o: () => {},
-      oa: () => {didpickall = 'oa';},
-      r: () => {f.outputFile = f.outputFileCopy;},
+      oa: () => {
+        didpickall = "oa";
+      },
+      r: () => {
+        f.outputFile = f.outputFileCopy;
+      },
       ra: () => {
         f.outputFile = f.outputFileCopy;
-        didpickall = 'ra';
+        didpickall = "ra";
       },
-      s: () => {f.outputFile = 'skipped!';},
+      s: () => {
+        f.outputFile = "skipped!";
+      },
       sa: () => {
-        f.outputFile = 'skipped!';
-        didpickall = 'sa';
+        f.outputFile = "skipped!";
+        didpickall = "sa";
       },
     };
 
@@ -35,15 +39,15 @@ const HandlePendingChanges = ({ pendingChanges, setPendingChanges }) => {
   };
 
   const handleChanges = async () => {
-    
-
     for (let f of pendingChanges) {
       setQuestion(`what to do with file ${f.inputFile}?`);
 
       const response = new Promise((res, rej) => {
-        ask.current.addEventListener('close', () => res(ask.current.returnValue));
+        ask.current.addEventListener("close", () =>
+          res(ask.current.returnValue)
+        );
         ask.current.showModal();
-        if (rej) return console.error('Broke at const response');
+        if (rej) return console.error("Broke at const response");
       });
 
       const result = await response;
@@ -53,7 +57,8 @@ const HandlePendingChanges = ({ pendingChanges, setPendingChanges }) => {
       return question;
     }
   };
-    {/* <dialog ref={dialog}>
+  {
+    /* <dialog ref={dialog}>
           <form>
             <p>{question}</p>
             <button value='o' onClick={handleDialogOption}>Overwrite</button>
@@ -63,7 +68,8 @@ const HandlePendingChanges = ({ pendingChanges, setPendingChanges }) => {
             <button value='s' onClick={handleDialogOption}>Skip</button>
             <button value='sa' onClick={handleDialogOption}>Skip All</button>
           </form>
-        </dialog> */}
+        </dialog> */
+  }
   // Call the handleChanges function
   handleChanges();
 
@@ -71,4 +77,4 @@ const HandlePendingChanges = ({ pendingChanges, setPendingChanges }) => {
   return null;
 };
 
-export default HandlePendingChanges;
+export default handlePendingChanges;
