@@ -16,6 +16,7 @@ export async function handleSelectFolder({ currentFilePath, setFilePath }) {
       defaultPath: defaultPath,
     });
     console.log("Selected Path:", selectedPath);
+    if (!selectedPath) return;
     setFilePath(selectedPath);
   } catch (error) {
     console.error("Error selecting folder:", error);

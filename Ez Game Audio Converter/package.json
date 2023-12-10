@@ -47,6 +47,7 @@
     "postcss": "^8.4.31",
     "postcss-preset-mantine": "^1.11.0",
     "postcss-simple-vars": "^7.0.1",
+    "react-router-dom": "^6.20.1",
     "sass": "^1.69.5"
   }
 }

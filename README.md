@@ -1,7 +1,31 @@
 # EZ-Game-Audio-Conversion
-Convert all your mp3's and wav's to ogg and or m4a in just a few clicks.
+Convert ALL your audio files to other formats in just a few clicks.  
 
-This is a command-line application that allows you to search for audio files in a specified directory and its subdirectories, then convert them to different output formats.
+This is a command-line application that allows you to search for audio files in a specified directory and its subdirectories, then convert them to different output formats.  
+
+## What
+- For the conversion of large numbers of audio files that may be buried in folders.
+- For the simplest interface with unattended batch jobs.
+- Supports conversion to and from FLAC, WAV, MP3, OGG, M4A. MIDI as an input only.
+
+## Why
+- Searches recursively in location to find all files that fit your criteria.
+- Unattended batches, click it and forget it.
+- Privacy and reliability, internet is never used!
+- Uses FFMPEG for the highest quality sound with the best codecs.
+- Automatically selects codec and bitrate for each file.
+
+## Additional Info
+- If duplicate file names with different extensions, automatically selects the file with the best format. ie FLAC over MP3.
+- Automatically selects bitrate about 192kbs or lower for the output. This is a balance between great sound quality and small file size.
+- Uses Variable Bitrate (VBR) when possible for smaller file size.
+- M4A files are compressed using the 'AAC' lossy. Use WAV or FLAC for lossless.
+- FLAC and WAV are not compressed as outputs. This means no quality is lost.
+
+## Planned
+- Add output location option.
+- An Advanced option set for setting bit rate. Not priory as a higher bitrate won't be noticeable 99.9% of the time.
+- Sister apps that do the same thing for pictures and videos!
 
 ## Prerequisites
 
@@ -48,15 +72,16 @@ This project is licensed under the [GNU AFFERO GENERAL PUBLIC LICENSE](https://w
 https://rpgmaker.net/articles/2633/
 RMMV uses m4a as well but not really needed in 2023
 
-Features	        MP3	Ogg	WAV	MIDI
-Loop OK	            NO	YES	YES	YES
-Loop Inside (Tags)	NO	YES	NO	YES
-File Size Optimize.	YES	YES	NO	OMG YES
-Realistic Sound	    YES	YES	YES	NO
-RMMV Compatible	    NO	YES	NO	NO
-RMVX/Ace Compatible	YES	YES	YES	YES
-RMXP Compatible	    YES	YES	YES	YES
-RM2003 Compatible	YES	NO	YES	YES
+Features	            MP3	Ogg	WAV	MIDI  
+Loop OK	            NO	   YES	YES	YES  
+Loop Inside (Tags)	NO	   YES	NO	   YES  
+File Size Optimize.	YES	YES	NO	   OMG YES  
+Realistic Sound	   YES	YES	YES	NO  
+RMMV Compatible	   NO	   YES	NO	   NO  
+RMVX/Ace Compatible	YES	YES	YES	YES  
+RMXP Compatible	   YES	YES	YES	YES  
+RM2003 Compatible	   YES	NO	   YES	YES  
 
-M4A files are compressed using the 'AAC' lossy
+M4A files are compressed using the 'AAC' lossy.
+Use WAV for Flac for lossless.
 
