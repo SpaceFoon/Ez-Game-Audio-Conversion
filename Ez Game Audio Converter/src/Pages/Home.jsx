@@ -8,14 +8,11 @@ import CheckBoxes from '../Components/UI/CheckBoxes';
 import StartButton from "../Components/UI/StartButton";
 
 const Home = () =>{
-     const [inputType, setInputType] = useState(['mp3', 'wav', 'flac']);
-  console.log(inputType)
+  const [inputType, setInputType] = useState(['mp3', 'wav', 'flac']);
   const [outputType, setOutputType] = useState(['ogg']);
-  console.log(outputType)
-  //let [bitrate, setBitrate] = useState(192);
   const [filePath, setFilePath] = useState('');
-  const [logs, setLogs] = useState([]);
-  const [pendingChanges, setPendingChanges] = useState([]);
+
+
       // Function to set initialize file path
   useEffect(() => {
     //Sets default filepath to Windows music folder.
@@ -31,32 +28,31 @@ const Home = () =>{
   }, [])
 
 return (
-    <MantineProvider>
-      <div className="container">
+  <MantineProvider>
+    <div className="container">
     
-        <div className="container">
-          <FilePathComponent filePath={filePath} setFilePath = {setFilePath}/>
-        </div>
+    <div className="container">
+      <FilePathComponent filePath={filePath} setFilePath = {setFilePath}/>
+    </div>
 
-        <CheckBoxes
-        inputType={inputType}
-        outputType={outputType}
-        setInputType={setInputType}
-        setOutputType={setOutputType}
-      />
-        <div>
-  <StartButton
-  filePath={filePath}
-  inputType={inputType}
-  outputType={outputType}
-  logs={logs}
-  setLogs={setLogs}
-  pendingChanges={pendingChanges}
-  setPendingChanges={setPendingChanges}
-/>
-      </div>
-       </div>
-       <Link to="/Working">Go to Working</Link>
-    </MantineProvider>
+    <CheckBoxes
+      inputType={inputType}
+      outputType={outputType}
+      setInputType={setInputType}
+      setOutputType={setOutputType}
+    />
+
+    <div>
+    <StartButton
+      // settings={settings}
+      // setSettings={setSettings}
+      filePath={filePath}
+      inputType={inputType}
+      outputType={outputType}
+    />
+    </div>
+    </div>
+    <Link to="/Working">Go to Working</Link>
+  </MantineProvider>
 )}
 export default Home

@@ -1,23 +1,16 @@
-// LogsComponent.jsx
-
-import PropTypes from 'prop-types';
-const LogsComponent = ({ logs, width, height }) => (
-  <div className="retro-terminal-logs">
-    <h2>Logs:</h2>
-    <ul>
-      {logs.map((log, index) => (
-        <li key={index}>{log}</li>
-      ))}
-    </ul>
-    <div>
-      Width: {width}, height: {height}
+//LogsComponent.jsx
+const LogsComponent = ({ settings }) => {
+    return (
+    <div className="retro-terminal-logs">
+      <h2>User Settings:</h2>
+      <ul>
+        {settings.map((setting, index) => (
+          <li key={index}>{settings}</li>
+        ))}
+      </ul>
+      <div>{/* Width: {width}, height: {height} */}</div>
     </div>
-  </div>
-  
-);
-LogsComponent.propTypes = {
-  logs: PropTypes.arrayOf(PropTypes.string).isRequired,
-  width: PropTypes.number.isRequired,
-  height: PropTypes.number.isRequired,
+  );
 };
+
 export default LogsComponent;
