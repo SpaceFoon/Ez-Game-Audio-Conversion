@@ -1,5 +1,4 @@
 //FilesToConvert.jsx
-import searchFiles from "../../Backend/searchFiles";
 import PropTypes from 'prop-types';
 
 const FilesToConvert = ({deduped}) => {

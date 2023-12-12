@@ -4,7 +4,7 @@ import { Link, useLocation  } from 'react-router-dom';
 import Settings from '../Components/UI/Working/Settings';
 import FilesToConvert from '../Components/UI/Working/FilesToConvert';
 import RemovedFiles from '../Components/UI/Working/RemovedFiles';
-//import PropTypes from 'prop-types';
+import ConvertButton from '../Components/UI/Working/ConvertButton';
 
 const WorkingPage = () => {
   const { state } = useLocation();
@@ -28,23 +28,22 @@ const WorkingPage = () => {
   console.log("outputType:", outputType);
 
 //console.log("Files", files); // log the files array
-   return(
-   <MantineProvider>
+
+
+  return (
+    <MantineProvider>
       <div className="container">
         <h2>Step 2</h2>
       </div>
-          <Settings settings={settings}/>
-          <RemovedFiles removed={removed} />
-          <FilesToConvert deduped={deduped}/>
+      <Settings settings={settings} />
+      <RemovedFiles removed={removed} />
+      <FilesToConvert deduped={deduped} />
+      <ConvertButton deduped={deduped} />
       <div className="container"><progress value={progress} /></div>
       <div className="container"><Link to="/Home">Go to Home</Link></div>
       <div className="container"><Link to="/Finished">Go to Finished</Link></div>
-   </MantineProvider>
-   )
+    </MantineProvider>
+  )
 }
-
-// WorkingPage.propTypes = {
-//   files: PropTypes.array.isRequired
-// };
 
 export default WorkingPage

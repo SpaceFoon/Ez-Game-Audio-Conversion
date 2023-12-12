@@ -23,7 +23,7 @@ StartButton.propTypes = {
   filePath: PropTypes.string.isRequired,
   inputType: PropTypes.arrayOf(PropTypes.string).isRequired,
   outputType: PropTypes.arrayOf(PropTypes.string).isRequired,
-  //searchFiles: PropTypes.func.isRequired, // Add searchFiles to propTypes
+  searchFiles: PropTypes.func,
 };
 
 export default StartButton;

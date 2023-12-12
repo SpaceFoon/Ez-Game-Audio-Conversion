@@ -5,7 +5,7 @@ import { join } from "@tauri-apps/api/path";
 export async function convertAudio2(settings, files) {
   const failedFiles = [];
 
-  const convertWithRetry = async (inputFile, outputFile, outputFormat) => {
+  const convertFiles = async (inputFile, outputFile, outputFormat) => {
     try {
       await new Promise((resolve, reject) => {
         const formatConfig = {
@@ -80,7 +80,7 @@ export async function convertAudio2(settings, files) {
     }
   };
   for (const { inputFile, outputFile, outputFormat } of files) {
-    await convertWithRetry(inputFile, outputFile, outputFormat);
+    await convertFiles(inputFile, outputFile, outputFormat);
   }
 
   console.log("Failed files:", failedFiles);

@@ -1,11 +1,5 @@
 //Create final list of files to convert and ask user for each file
-import {
-  join,
-  dirname,
-  basename,
-  extname,
-  existsSync,
-} from "@tauri-apps/api/path";
+import { join, dirname, basename, extname, exists } from "@tauri-apps/api/path";
 import { getAwnser } from "./convert";
 
 export async function createConversionList(settings, files) {
@@ -61,7 +55,7 @@ export async function createConversionList(settings, files) {
         default:
           while (true) {
             if (!response) {
-              if (existsSync(outputFile)) {
+              if (exists(outputFile)) {
                 response = await getAnswer(
                   `[O]verwrite, [R]ename or [S]kip. Add 'a' for all (e.g., oa, ra, sa)'\n'${outputFile}? : `
                 );
