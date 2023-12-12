@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import { audioDir } from '@tauri-apps/api/path';
 import { MantineProvider } from '@mantine/core';
-import FilePathComponent from '../Components/UI/FilePathComponent';
-import CheckBoxes from '../Components/UI/CheckBoxes';
-import StartButton from "../Components/UI/StartButton";
+import FilePathComponent from '../Components/UI/Home/FilePathComponent';
+import CheckBoxes from '../Components/UI/Home/CheckBoxes';
+import StartButton from "../Components/UI/Home/StartButton";
 
 const Home = () =>{
   //Set buttons to most common audio formats.

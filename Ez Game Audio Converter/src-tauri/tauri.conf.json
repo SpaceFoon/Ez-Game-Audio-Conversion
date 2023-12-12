@@ -16,6 +16,19 @@
         "all": true
 
       },
+       "fs": {
+        "all": true,
+        "scope": ["**"],
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "copyFile": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "renameFile": true,
+        "exists": true
+      },
       "dialog": {
         "all": true, 
         "ask": true, 
@@ -42,13 +55,14 @@
       ]
     },
     "security": {
-      "csp": null
+      "csp": "default-src blob: data: filesystem: ws: http: https: 'unsafe-eval' 'unsafe-inline'"
+   
     },
     "windows": [
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "ez-game-audio-converter",
+        "title": "EZ Game Audio Converter",
         "width": 600,
         "height": 1000
       }

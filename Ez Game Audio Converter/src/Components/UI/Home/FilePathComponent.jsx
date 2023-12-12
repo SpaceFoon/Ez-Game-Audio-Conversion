@@ -1,7 +1,7 @@
 //FilePathComponent,jsx
 
 import propTypes from 'prop-types';
-import {handleSelectFolder} from '../Backend/folderSelect'
+import {handleSelectFolder} from '../../Backend/folderSelect'
 
 
 

@@ -143,7 +143,7 @@ const searchFiles = (settings) => {
 
 //deletes duplicate files with different extname
 const deleteDuplicateFiles = (files) => {
-  const priorityList = ["ogg", ".mp3", ".m4a", ".wav", ".flac"];
+  const priorityList = [".ogg", ".mp3", ".m4a", ".wav", ".flac"];
   //console.log('files', files);
   const fileobjs = files.map((file) => [
     join(dirname(file), basename(file, extname(file))),

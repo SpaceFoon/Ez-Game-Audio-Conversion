@@ -1,6 +1,6 @@
-//LogsComponent.jsx
+//Settings.jsx
 import PropTypes from 'prop-types';
-const LogsComponent = ({ settings }) => {
+const Settings = ({ settings }) => {
   
     let { filePath, inputType, outputType } = settings;
 
@@ -16,11 +16,11 @@ const LogsComponent = ({ settings }) => {
     </div>
   );
 };
-LogsComponent.propTypes = {
+Settings.propTypes = {
   settings: PropTypes.shape({
     filePath: PropTypes.string.isRequired,
     inputType: PropTypes.string.isRequired,
     outputType: PropTypes.string.isRequired,
   }).isRequired,
 };
-export default LogsComponent;
+export default Settings;
