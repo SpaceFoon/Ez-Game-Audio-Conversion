@@ -10,10 +10,10 @@ const FilePathComponent = ({ filePath, setFilePath}) => {
       await handleSelectFolder({filePath, setFilePath});
     };
     return(
-  <div>
+  <div >
     <fieldset>
       <legend>Source File Path:</legend>
-      <input type="text" value={filePath} placeholder="Select file path" readOnly />
+      <input type="text" value={filePath} placeholder="Select Source File Path" readOnly />
       <br />
       <button type="button" onClick={() => handleSelect({filePath, setFilePath})}>
         Select Folder

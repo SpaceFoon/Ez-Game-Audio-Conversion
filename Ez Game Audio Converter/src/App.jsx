@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from './Pages/Home'
 import Working from './Pages/Working'
 import Finished from './Pages/Finished'
-
 export default function App() {
    return (
 <BrowserRouter>
@@ -11,7 +10,7 @@ export default function App() {
     <Routes>
         <Route path ='/' element={<Home />} />
         <Route path ='Home' element={<Home />}/>
-        <Route path="/Working" element={<Working/>} />
+        <Route path="/Working" element={<Working />} />
         <Route path="/Finished" element={<Finished/>} />
       </Routes>
     </BrowserRouter>
