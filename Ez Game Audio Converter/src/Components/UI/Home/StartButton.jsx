@@ -7,10 +7,9 @@ const StartButton = ({filePath, inputType, outputType}) => {
   console.log('filePath:', filePath);
   const navigate = useNavigate();
   const startConversion = async () => {
-    // Call searchFiles before navigating
     console.log("Start Button", filePath, inputType, outputType)
-    await searchFiles(filePath, inputType);
-    navigate("/Working", { state:  {filePath, inputType, outputType} });
+     const { deduped, removed } = await searchFiles(filePath, inputType);
+    navigate("/Working", { state:  {filePath, inputType, outputType, deduped, removed} });
   };
 
   return (
