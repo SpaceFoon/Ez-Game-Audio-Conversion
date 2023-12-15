@@ -125,33 +125,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
-ffmpeg.exe
-ffplay.exe
-ffprobe.exe
-testaudio2/Battle4-bensound-epic.m4a
-testaudio2/me/POL-unbeatable-guild-short.ogg
-testaudio2/me/POL-no-way-out-short.wav
-testaudio2/me/POL-no-way-out-short.m4a
-testaudio2/me/comic5-25269.ogg
-testaudio2/me/POL-no-way-out-short.ogg
-testaudio2/me/comic5-25269.m4a
-testaudio2/me/cinematic-impact-climax-intro-sfx-6072.ogg
-testaudio2/me/cinematic-impact-climax-intro-sfx-6072.m4a
-testaudio2/me/402656__inspectorj__orchestral-strings-warm-a.wav
-testaudio/file1.ogg
-testaudio/file1.ogg
-testaudio/file2.ogg
-testaudio2/Battle4-bensound-epic.mp3
-testaudio2/me/31135__erh__scream-43.m4a
-testaudio2/me/31135__erh__scream-43.wav
-testaudio2/me/402656__inspectorj__orchestral-strings-warm-a.m4a
-testaudio2/me/402656__inspectorj__orchestral-strings-warm-a.ogg
-testaudio2/Battle4-bensound-epic.ogg
-testaudio2/me/31135__erh__scream-43.ogg
-testaudio2/me/cinematic-impact-climax-intro-sfx-6072.mp3
-testaudio2/me/POL-unbeatable-guild-short.m4a
-testaudio2/me/comic5-25269.mp3
-testaudio2/me/POL-unbeatable-guild-short.wav
+
 .vscode/
 
 .history/
+Ez Game Audio Converter/src/bin/ffmpeg.exe
+ffmpeg.exe
