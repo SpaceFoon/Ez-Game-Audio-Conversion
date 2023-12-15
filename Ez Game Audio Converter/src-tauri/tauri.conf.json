@@ -39,15 +39,19 @@
       },
       "shell": {
         "all": true,
+        "scope": [{"name": "src/bin/ffmpeg", "sidecar": true}],
+        "execute": true,
+        "sidecar": true,
         "open": true
       }
     },
     "bundle": {
       "active": true,
+      "category": "Batch Audio Tool",
       "targets": "all",
       "identifier": "com.fugsdev.dev",
       "externalBin": [
-          "src/bin/ffmpeg.exe"
+          "src/bin/ffmpeg"
         ],
       "icon": [
         "icons/32x32.png",

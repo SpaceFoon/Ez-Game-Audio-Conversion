@@ -131,3 +131,4 @@ dist
 .history/
 Ez Game Audio Converter/src/bin/ffmpeg.exe
 ffmpeg.exe
+Ez Game Audio Converter/src-tauri/src/bin/ffmpeg-x86_64-pc-windows-msvc.exe
