@@ -1,16 +1,18 @@
 //App.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from './Pages/Home'
-import Working from './Pages/Working'
+import HomePage from './Pages/HomePage'
+import Input from './Pages/Input'
+import Output from './Pages/Output'
 import Finished from './Pages/Finished'
 export default function App() {
    return (
 <BrowserRouter>
         <><h1>EZ Game Audio Converter</h1></>
     <Routes>
-        <Route path ='/' element={<Home />} />
-        <Route path ='Home' element={<Home />}/>
-        <Route path="/Working" element={<Working />} />
+        <Route path ='/' element={<HomePage />} />
+        <Route path ='HomePage' element={<HomePage />} />
+        <Route path="/Input" element={<Input />} />
+        <Route path="/Output" element={<Output />} />
         <Route path="/Finished" element={<Finished/>} />
       </Routes>
     </BrowserRouter>

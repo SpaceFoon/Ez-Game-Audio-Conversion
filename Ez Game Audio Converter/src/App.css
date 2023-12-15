@@ -1,13 +1,17 @@
 button {
-  padding: 0.5em .8em;
+  padding: 0.5em 0.8em;
   border-radius: 6px;
   background-color: green;
   color: white;
-  border:chartreuse;
+  border: 1px solid chartreuse;
   cursor: pointer;
-  transition: background-color .3s;
-  margin: .8em;
+  transition: background-color 0.1s;
+  margin: 0.8em;
   box-shadow: 0 4px 4px rgba(0, 0, 0, 0.2);
+
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
 }
 
 /* Add some margin to create spacing between buttons */
@@ -34,3 +38,16 @@ input,
   font-weight: bold;
   color: green;
 } */
+.inputPageContainer {
+  justify-content: center;
+  align-items: center;
+  display: ;
+  /* height: 100vh; or any specific height */
+  /* overflow: scroll; or 'scroll' */
+}
+.titles {
+  font-size: 1 em;
+  font-weight: bold;
+  margin: 0.25em;
+  text-align: centered;
+}

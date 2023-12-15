@@ -5,14 +5,15 @@ const Settings = ({ settings }) => {
     let { filePath, inputType, outputType } = settings;
 
     return (
-    <div className="retro-terminal-logs">
-      <h2>User Settings:</h2>
+    <div className="titles">
+      <fieldset>
+      <legend>Batch Settings:</legend>
       <ul>
         <li>File Path: {filePath}</li>
         <li>Input Type: {inputType}</li>
         <li>Output Type: {outputType}</li>
       </ul>
-      <div>{/* Width: {width}, height: {height} */}</div>
+      </fieldset>
     </div>
   );
 };

@@ -3,14 +3,17 @@
 import PropTypes from 'prop-types';
 
 const RemovedFiles = ({ removed }) => {
+    const amountOfFiles = removed.length;
     return (
-        <div>
-            <h2>Removed Files</h2>
+        <div className='titles'>
+            <fieldset>
+                <legend>Duplicate Files not converting: {amountOfFiles} files</legend>
             <ul>
                 {removed.map((file, index) => (
                     <li key={index}>{file}</li>
                 ))}
             </ul>
+            </fieldset>
         </div>
     );
 };

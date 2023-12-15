@@ -1,14 +1,15 @@
 // Finished.jsx
 
-import { MantineProvider } from '@mantine/core';
 import { Link } from 'react-router-dom';
-
+import FinishedReport from '../Components/UI/Finished/FinishedReport';
 const Finished = () => {
   return (
-  <MantineProvider>
+  <>
+  {/* list of finished files as they are completed */}
     <div className="container"><h2>Finished Screen</h2></div>
-    <Link to="/Home">Go to Home</Link>
-  </MantineProvider>
+    <Link to="/HomePage">Go to HomePage</Link>
+    <FinishedReport />
+  </>
   );
 };
 

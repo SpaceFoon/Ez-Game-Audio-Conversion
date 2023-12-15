@@ -1,12 +1,11 @@
-//Home.jsx
+//HomePage.jsx
 import { useEffect, useState } from "react";
 import { audioDir } from '@tauri-apps/api/path';
-import { MantineProvider } from '@mantine/core';
 import FilePathComponent from '../Components/UI/Home/FilePathComponent';
 import CheckBoxes from '../Components/UI/Home/CheckBoxes';
 import StartButton from "../Components/UI/Home/StartButton";
 
-const Home = () =>{
+const HomePage = () =>{
   //Set buttons to most common audio formats.
   const [inputType, setInputType] = useState(['mp3', 'wav', 'flac']);
   const [outputType, setOutputType] = useState(['ogg']);
@@ -28,7 +27,7 @@ const Home = () =>{
   }, [])
 
 return (
-  <MantineProvider>
+  <>
     <div className="container">
     <div className="container">
       <FilePathComponent filePath={filePath} setFilePath = {setFilePath}/>
@@ -49,6 +48,6 @@ return (
     />
     </div>
     </div>
-  </MantineProvider>
+  </>
 )}
-export default Home
+export default HomePage

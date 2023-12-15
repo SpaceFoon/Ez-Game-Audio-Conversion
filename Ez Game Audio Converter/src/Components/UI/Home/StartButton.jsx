@@ -6,14 +6,14 @@ import searchFiles from '../../Backend/searchFiles';
 const StartButton = ({filePath, inputType, outputType}) => {
   console.log('filePath:', filePath);
   const navigate = useNavigate();
-  const startConversion = async () => {
+  const startSourceSearch = async () => {
     console.log("Start Button", filePath, inputType, outputType)
      const { deduped, removed } = await searchFiles(filePath, inputType);
-    navigate("/Working", { state:  {filePath, inputType, outputType, deduped, removed} });
+    navigate("/Input", { state:  {filePath, inputType, outputType, deduped, removed} });
   };
 
   return (
-    <button onClick={startConversion}>
+    <button onClick={startSourceSearch}>
       Next
     </button>
   );

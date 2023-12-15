@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { MantineProvider, createTheme } from '@mantine/core';
 // other css files are required only if
 // you are using components from the corresponding package
 import '@mantine/core/styles.css';
@@ -19,10 +20,14 @@ import App from "./App";
 import "./styles.css";
 import "./App.css";
 import "./App.scss";
-
+const theme = createTheme({
+  // Your theme override here
+});
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <MantineProvider theme={theme}>
+      <App />
+    </MantineProvider>
   </React.StrictMode>,
 );

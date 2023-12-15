@@ -17,7 +17,7 @@
 .container {
   margin: 0;
   padding-top: 1vh;
-  display: flex;
+
   flex-direction: column;
   justify-content: center;
   text-align: center;
@@ -68,7 +68,7 @@ button {
 }
 
 button {
-  cursor:help;
+  cursor: help;
 }
 
 button:hover {

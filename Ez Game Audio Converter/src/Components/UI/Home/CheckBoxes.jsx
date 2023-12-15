@@ -1,8 +1,19 @@
-       
+//CheckBoxes.jsx
+import { useState } from 'react';
 import InputFormatCheckboxComponent from "./InputFormatComponent"
 import OutputFormatComponent from "./OutputFormatComponent"
 import propTypes from 'prop-types';
 const CheckBoxes = ({inputType, outputType, setInputType, setOutputType}) => {
+
+ const [allInputsChecked, setAllInputsChecked] = useState(false);
+const handleAllInputsChange = () => {
+  if (allInputsChecked) {
+    setInputType([]);
+  } else {
+    setInputType(['mp3', 'wav', 'flac', 'm4a', 'ogg', 'midi']);
+  }
+  setAllInputsChecked(!allInputsChecked);
+};
 
   const handleInputChange = (value) => {
     console.log('file type change:', value);
@@ -22,6 +33,11 @@ return (
     <>   
        <fieldset>
           <legend>Source Formats:</legend>
+     <InputFormatCheckboxComponent
+            label="All"
+            value="all"
+            checked={allInputsChecked}
+            onChange={handleAllInputsChange} />
           <InputFormatCheckboxComponent
             label="MP3"
             value="mp3"

@@ -1,10 +1,10 @@
 //Use ffmpeg to convert files
-import { spawn } from "child_process";
+//import { spawn } from "child_process";
 import { join } from "@tauri-apps/api/path";
-
-export async function convertAudio2(settings, files) {
+//import { path } from "@tauri-apps/api/fs";
+export default async function convertAudio(settings, files) {
   const failedFiles = [];
-
+  const ffmpegPath = await path.resolve("src/binaries/ffmpeg.exe");
   const convertFiles = async (inputFile, outputFile, outputFormat) => {
     try {
       await new Promise((resolve, reject) => {
