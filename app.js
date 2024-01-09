@@ -37,15 +37,15 @@ const UserInputInitSettings = () => {
         settings.filePath = filePath;
         console.log(`File path: ${settings.filePath}`);
         rl.question(
-          "Enter the file extensions to look for. Leave blank for all (e.g., flac wav mp3 m4a ogg): ",
+          "Enter the file extensions to look for. Leave blank for all (e.g., flac wav mp3 m4a ogg midi): ",
           (inputFormatString) => {
             settings.inputFormats = inputFormatString
               ? inputFormatString.toLowerCase().split(" ")
-              : ["flac", "wav", "mp3", "m4a", "ogg"];
+              : ["flac", "wav", "mp3", "m4a", "ogg", "midi"];
             if (
               settings.inputFormats.length === 0 ||
               !settings.inputFormats.every((format) =>
-                ["flac", "wav", "mp3", "m4a", "ogg"].includes(format)
+                ["flac", "wav", "mp3", "m4a", "ogg", "midi"].includes(format)
               )
             ) {
               reject(
@@ -63,7 +63,15 @@ const UserInputInitSettings = () => {
                 if (
                   settings.outputFormats.length === 0 ||
                   !settings.outputFormats.every((format) =>
-                    ["flac", "wav", "mp3", "m4a", "ogg"].includes(format)
+                    [
+                      "flac",
+                      "wav",
+                      "mp3",
+                      "m4a",
+                      "ogg",
+                      "midi",
+                      "mid",
+                    ].includes(format)
                   )
                 ) {
                   reject(
@@ -108,7 +116,9 @@ const searchFiles = (settings) => {
   console.log("Settings:", settings);
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.filePath;
-
+  if (settings.inputFormats.includes("midi")) {
+    fileExtensions.push(".mid");
+  }
   console.log("Search Path:", searchPath);
   console.log("File Extensions:", fileExtensions);
 
