@@ -11,6 +11,7 @@ const {
   parentPort,
   workerData,
 } = require("worker_threads");
+const { all } = require("when");
 
 //setup object and functions.
 let settings = {
@@ -131,8 +132,7 @@ const searchFiles = (settings) => {
   };
 
   walk(searchPath);
-
-  console.log("Matching Files:", allFiles);
+  console.log("Matching ", allFiles.length, "Files:", allFiles);
 
   return Promise.resolve(allFiles);
 };
@@ -254,7 +254,12 @@ const createConversionList = async (settings, files) => {
     }
   }
   while (true) {
-    console.log("Pending conversion:", conversionList);
+    console.log(
+      "Pending conversion:",
+      conversionList.length,
+      "files",
+      conversionList
+    );
     const accept_answer = await getAnswer(
       "This is the list of files to be converted. Accept? Type yes or no: "
     );
@@ -276,9 +281,9 @@ const createConversionList = async (settings, files) => {
 const convert = async (files) => {
   //console.log("files99999", files);
   const promises = files.map(
-    (file) =>
+    (file, index) =>
       new Promise((resolve, reject) => {
-        console.log("file", file);
+        console.log("file", index + 1, file);
 
         const worker = new Worker("./converter.js", { workerData: file });
 
@@ -293,7 +298,7 @@ const convert = async (files) => {
           if (code !== 0) {
             reject(
               new Error(
-                `Worke111r exited with code ${code} at file ${file.outputFile}.`
+                `Worker exited with code ${code} at file ${file.outputFile}.`
               )
             );
           } else {
