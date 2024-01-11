@@ -4,14 +4,21 @@ const readline = require("readline");
 const { readdirSync, statSync, existsSync } = require("fs");
 const { join, basename, extname, dirname } = require("path");
 const { spawn } = require("child_process");
+//const convertAudio = require("./converter.js");
+const {
+  Worker,
+  isMainThread,
+  parentPort,
+  workerData,
+} = require("worker_threads");
 
 //setup object and functions.
 let settings = {
   filePath: "",
   inputFormats: [],
   outputFormats: [],
-  bitrate: 0,
-  quality: 2,
+  //bitrate: 0,
+  //quality: 2,
 };
 
 const handleError = (errorMessage) => {
@@ -79,28 +86,6 @@ const UserInputInitSettings = () => {
                   );
                 }
                 console.log(`Output formats: ${settings.outputFormats}`);
-
-                // rl.question('Enter the audio quality for CBR from 32 to 320. Leave blank for 192 (e.g., 128): ', (bitrateNum) => {
-                //     const defaultBitrate = 192;
-                //     const bitrateNumFinal = bitrateNum || defaultBitrate;
-                //     settings.bitrate = parseInt(bitrateNumFinal);
-                //     if (isNaN(settings.bitrate) || settings.bitrate < 32 || settings.bitrate > 320) {
-                //         reject('Invalid bitrate. Must be 32-320.');
-                //     }
-                //     console.log(`Bitrate: ${settings.bitrate}`);
-
-                //     rl.question('Enter the audio quality for CBR from 0 to 9 for lowest. Leave blank for 2 (e.g., 2): ', (quality) => {
-                //         const defaultQuality = 2;
-                //         const qualityFinal = quality || defaultQuality;
-                //         settings.quality = parseInt(qualityFinal);
-                //         if (isNaN(settings.quality) || settings.quality < 0 || settings.quality > 9) {
-                //             reject('Invalid quality. quality must be 0-9.');
-                //         }
-                //         console.log(`quality: ${settings.quality}`);
-                //         console.log(settings)
-                //         resolve(settings);
-                //     })
-                // });
                 console.log(settings);
                 resolve(settings);
               }
@@ -116,6 +101,7 @@ const searchFiles = (settings) => {
   console.log("Settings:", settings);
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.filePath;
+  //midi can have .mid or .midi extension
   if (settings.inputFormats.includes("midi")) {
     fileExtensions.push(".mid");
   }
@@ -179,7 +165,6 @@ const deleteDuplicateFiles = (files) => {
       uniq.set(name, ext);
     }
   }
-
   return Array.from(uniq.entries()).reduce(
     (p, c) => [...p, `${c[0]}${c[1]}`],
     []
@@ -190,6 +175,7 @@ const deleteDuplicateFiles = (files) => {
 const createConversionList = async (settings, files) => {
   const conversionList = [];
   let response = null;
+  //console.log("files--------", files);
   for (const inputFile of files) {
     for (const outputFormat of settings.outputFormats) {
       let outputFile = `${join(
@@ -202,6 +188,8 @@ const createConversionList = async (settings, files) => {
         dirname(inputFile),
         `${basename(inputFile, extname(inputFile))} copy (1)`
       )}.${outputFormat}`;
+
+      if (inputFile == outputFile) continue;
 
       const responseActions = {
         o: () => {
@@ -280,97 +268,48 @@ const createConversionList = async (settings, files) => {
 };
 
 //Use ffmpeg to convert files
-const convertAudio2 = async (settings, files) => {
-  const failedFiles = [];
+/**
+ * Converts audio files to different formats.
+ * @param {Array<{inputFile: string, outputFile: string, outputFormat: string}>} files - The array of files to convert, each containing the input file path, output file path, and output format.
+ * @returns {Promise<void>} - A promise that resolves when all conversions are complete.
+ */
+const convert = async (files) => {
+  //console.log("files99999", files);
+  const promises = files.map(
+    (file) =>
+      new Promise((resolve, reject) => {
+        console.log("file", file);
 
-  const convertWithRetry = async (inputFile, outputFile, outputFormat) => {
-    try {
-      await new Promise((resolve, reject) => {
-        const formatConfig = {
-          ogg: { codec: "libopus", additionalOptions: ["-b:a", "192k"] },
-          //https://slhck.info/video/2017/02/24/vbr-settings.html
-          //libopus 	-b:a 	6–8K (mono) 	– 	96K (for stereo) 	– 	-vbr on is default, -b:a just sets the target, see
-          mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] },
-          //libmp3lame 	-q:a 	9 	0 	4 	2 (~190kbps) 	Corresponds to lame -V.
-          wav: { codec: "pcm_s16le" },
-          m4a: { codec: "aac", additionalOptions: ["-q:a", `1.0`] },
-          //aac 	-q:a 	0.1 	2 	? 	1.3 (~128kbps) 	Is "experimental and [likely gives] worse results than CBR" according to FFmpeg Wiki. Ranges from 18 to 190kbps.
-          flac: {
-            codec: "flac",
-            additionalOptions: ["-compression_level", "8"],
-          },
-        };
+        const worker = new Worker("./converter.js", { workerData: file });
 
-        const formatInfo = formatConfig[outputFormat];
-
-        if (!formatInfo) {
-          console.error("Unsupported output format:", outputFormat);
-          return; // or handle the error in a way that suits your application
-        }
-
-        const { codec, additionalOptions = [] } = formatInfo;
-
-        const ffmpegCommand = spawn(
-          join(__dirname, "ffmpeg.exe"),
-          [
-            //'-loglevel', 'debug',
-            "-i",
-            `"${inputFile}"`,
-            "-c:a",
-            codec,
-            ...additionalOptions,
-            "-y",
-            `"${outputFile}"`,
-          ],
-          { shell: true }
-        );
-
-        ffmpegCommand.on("close", (code) => {
-          if (code === 0) {
-            console.log(
-              `Conversion successful for ${getFilename(
-                inputFile
-              )} to ${getFilename(outputFile)}`
+        worker.on("message", (msg) => {
+          //console.log(`worker.on("message",: ${msg}`)
+        });
+        worker.on("error", (err) => {
+          console.error(err);
+          reject(err);
+        });
+        worker.on("exit", (code) => {
+          if (code !== 0) {
+            reject(
+              new Error(
+                `Worke111r exited with code ${code} at file ${file.outputFile}.`
+              )
             );
-            failedFiles.push({ inputFile, outputFile, outputFormat });
+          } else {
+            //console.log(`Worke111r exited with code ${code} at file ${file}.`);
             resolve();
           }
         });
+      })
+  );
 
-        ffmpegCommand.on("error", (err) => {
-          console.error(
-            `Error during conversion for ${getFilename(
-              inputFile
-            )} to ${getFilename(outputFile)}.`
-          );
-          failedFiles.push({ inputFile, outputFile, outputFormat });
-          reject(err);
-        });
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error(
-        `Failed to convert ${getFilename(inputFile)} to ${getFilename(
-          outputFile
-        )}. Retrying...`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  };
-  for (const { inputFile, outputFile, outputFormat } of files) {
-    await convertWithRetry(inputFile, outputFile, outputFormat);
-  }
-
-  console.log("Failed files:", failedFiles);
-};
-
-const getFilename = (filePath) => {
-  const match = filePath.match(/[^\\]+$/);
-  return match ? match[0] : "unknown";
+  await Promise.all(promises);
 };
 
 finalize = (files) => {
   console.log("Have a nice day: ");
+  process.exit(0);
 };
 UserInputInitSettings()
   // find all files of specified type in provided folder and all subfolders
@@ -378,16 +317,21 @@ UserInputInitSettings()
   //delete files from the list that have the same name but different file extensions.
   //save the file that has the best format. Flac > wav > m4a > mp3
   .then((files) => deleteDuplicateFiles(files))
-  //go through lis of input files and make output list.
+  // .then((files) => {
+  //   console.log("files after dup", files);
+  // })
+  //go through list of input files and make output list.
   //there can be multiple outputs and user input is needed here for output files
   // that already exist.
   // find and replace spaces in files names
   //.then((files) => checkFileNames(files))
-  .then((files) => createConversionList(settings, files))
+  .then((files) => {
+    return createConversionList(settings, files);
+  })
   // this is used to convert audio to m4a
-  .then((files) => convertAudio2(settings, files))
+  .then((files) => convert(files))
 
-  .then((files) => finalize())
+  .then((files) => finalize(files))
 
   .catch((error) => {
     handleError(error);
