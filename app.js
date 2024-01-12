@@ -1,17 +1,7 @@
-/*EZ GAME AUDIO CONVERSION*/
-
 const readline = require("readline");
 const { readdirSync, statSync, existsSync } = require("fs");
 const { join, basename, extname, dirname } = require("path");
-const { spawn } = require("child_process");
-//const convertAudio = require("./converter.js");
-const {
-  Worker,
-  isMainThread,
-  parentPort,
-  workerData,
-} = require("worker_threads");
-const { all } = require("when");
+const { Worker } = require("worker_threads");
 
 //setup object and functions.
 let settings = {
@@ -254,16 +244,23 @@ const createConversionList = async (settings, files) => {
     }
   }
   while (true) {
+    const numbered = conversionList.map(
+      (x, index) => `${index + 1} ${x.outputFile}`
+    );
     console.log(
       "Pending conversion:",
       conversionList.length,
       "files",
-      conversionList
+      numbered.join("\n")
     );
     const accept_answer = await getAnswer(
       "This is the list of files to be converted. Accept? Type yes or no: "
     );
-    if (/^no$/i.test(accept_answer)) throw new Error("Conversion cancelled");
+
+    if (/^no$/i.test(accept_answer)) {
+      console.log("Conversion cancelled. Exiting program.");
+      process.exit(0);
+    }
     if (!/^yes$/i.test(accept_answer)) {
       console.warn('invalid input, please use "yes" or "no"');
       continue;

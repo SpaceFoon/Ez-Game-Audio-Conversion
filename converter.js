@@ -1,7 +1,7 @@
 const { join } = require("path");
 const { spawn } = require("child_process");
 const { parentPort, workerData } = require("worker_threads");
-const { inputFile, outputFile, outputFormat } = workerData;
+
 const convert = async (inputFile, outputFile, outputFormat) => {
   const formatConfig = {
     ogg: { codec: "libopus", additionalOptions: ["-b:a", "192k"] },
@@ -10,13 +10,8 @@ const convert = async (inputFile, outputFile, outputFormat) => {
     m4a: { codec: "aac", additionalOptions: ["-q:a", `1.0`] },
     flac: { codec: "flac", additionalOptions: ["-compression_level", "8"] },
   };
-
+  ({ inputFile, outputFile, outputFormat } = workerData);
   const failedFiles = [];
-
-  // if (!formatInfo) {
-  //   console.error("Unsupported output format:", outputFormat);
-  //   return; // or handle the error in a way that suits your application
-  // }
 
   return new Promise((resolve, reject) => {
     const { codec, additionalOptions = [] } = formatConfig[outputFormat];
@@ -29,11 +24,8 @@ const convert = async (inputFile, outputFile, outputFormat) => {
         "-c:a",
         codec,
         ...additionalOptions,
-        // The below probably does nothing with audio. Testing backs this up.
-        // There may be more to come? https://ffmpeg.org/pipermail/ffmpeg-devel/2023-November/316552.html
-        // Just use worker threads instead.
-        // set to one thread to avoid ffmpeg crashing with worker threads
-        // Not sure if it matters for audio, but it's a good idea to set it anyway
+        // to ensure only one thread is used per file.
+        // let workers manage the concurrency
         "-threads",
         "1",
         "-y",
@@ -62,7 +54,7 @@ const convert = async (inputFile, outputFile, outputFormat) => {
         )}.`
       );
       failedFiles.push({ inputFile, outputFile, outputFormat });
-      reject(err);
+      reject(error);
     });
   });
 };
@@ -72,7 +64,7 @@ const getFilename = (filePath) => {
 };
 // const { inputFile, outputFile, outputFormat } = workerData;
 
-convert(inputFile, outputFile, outputFormat)
+convert(workerData.inputFile, workerData.outputFile, workerData.outputFormat)
   .then(() => {
     parentPort.postMessage("Conversion completed");
   })
