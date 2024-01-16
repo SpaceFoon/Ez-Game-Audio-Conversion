@@ -27,67 +27,81 @@ const rl = readline.createInterface({
 });
 
 //Starts with user input
-const UserInputInitSettings = ({ filePath, inputFormats, outputFormats }) => {
+const UserInputInitSettings = () => {
   return new Promise((resolve, reject) => {
-    rl.question(
-      "Enter the full file path to start search. WILL SEARCH ALL SUB FOLDERS: ",
-      (filePath) => {
-        if (!readdirSync(filePath)) handleError("File Path does not exist!");
-        settings.filePath = filePath;
-        console.log(`File path: ${settings.filePath}`);
-        rl.question(
-          "Enter the file extensions to look for. Leave blank for all (e.g., flac wav mp3 m4a ogg midi): ",
-          (inputFormatString) => {
-            settings.inputFormats = inputFormatString
-              ? inputFormatString.toLowerCase().split(" ")
-              : ["flac", "wav", "mp3", "m4a", "ogg", "midi"];
-            if (
-              settings.inputFormats.length === 0 ||
-              !settings.inputFormats.every((format) =>
-                ["flac", "wav", "mp3", "m4a", "ogg", "midi"].includes(format)
-              )
-            ) {
-              reject(
-                "Invalid output format. Only mp3 wav m4a and flac are allowed."
-              );
-            }
-            console.log(`Input formats: ${settings.inputFormats}`);
-
-            rl.question(
-              "Enter the output formats. Leave blank for ogg (e.g., flac ogg mp3 m4a wav): ",
-              (outputFormatString) => {
-                settings.outputFormats = outputFormatString
-                  ? outputFormatString.toLowerCase().split(" ")
-                  : ["flac", "wav", "mp3", "m4a", "ogg"];
-                if (
-                  settings.outputFormats.length === 0 ||
-                  !settings.outputFormats.every((format) =>
-                    [
-                      "flac",
-                      "wav",
-                      "mp3",
-                      "m4a",
-                      "ogg",
-                      "midi",
-                      "mid",
-                    ].includes(format)
-                  )
-                ) {
-                  reject(
-                    "Invalid output format. Only flac ogg wav mp3 and m4a are allowed."
-                  );
-                }
-                console.log(`Output formats: ${settings.outputFormats}`);
-                console.log(settings);
-                resolve(settings);
-              }
-            );
+    const askFilePath = () => {
+      rl.question(
+        "Enter the full file path to start the search. WILL SEARCH ALL SUB FOLDERS: ",
+        (filePath) => {
+          if (!existsSync(filePath)) {
+            console.error("File Path does not exist!");
+            askFilePath();
+          } else {
+            settings.filePath = filePath;
+            console.log(`File path: ${settings.filePath}`);
+            askInputFormats();
           }
-        );
-      }
-    );
+        }
+      );
+    };
+
+    const askInputFormats = () => {
+      rl.question(
+        "Enter the file extensions to look for. Leave blank for all (e.g., flac wav mp3 m4a ogg midi): ",
+        (inputFormatString) => {
+          settings.inputFormats = inputFormatString
+            ? inputFormatString.toLowerCase().split(" ")
+            : ["flac", "wav", "mp3", "m4a", "ogg", "midi"];
+          if (
+            settings.inputFormats.length === 0 ||
+            !settings.inputFormats.every((format) =>
+              ["flac", "wav", "mp3", "m4a", "ogg", "midi"].includes(format)
+            )
+          ) {
+            console.error(
+              "Invalid input format. Only flac, wav, mp3, m4a, ogg and midi are allowed."
+            );
+            askInputFormats();
+          } else {
+            console.log(`Input formats: ${settings.inputFormats}`);
+            askOutputFormats();
+          }
+        }
+      );
+    };
+
+    const askOutputFormats = () => {
+      rl.question(
+        "Enter the output formats. Leave blank for ogg (e.g., flac ogg mp3 m4a wav): ",
+        (outputFormatString) => {
+          settings.outputFormats = outputFormatString
+            ? outputFormatString.toLowerCase().split(" ")
+            : ["flac", "wav", "mp3", "m4a", "ogg"];
+          if (
+            settings.outputFormats.length === 0 ||
+            !settings.outputFormats.every((format) =>
+              ["flac", "wav", "mp3", "m4a", "ogg", "midi", "mid"].includes(
+                format
+              )
+            )
+          ) {
+            console.error(
+              "Invalid output format. Only flac, ogg, wav, mp3, and m4a are allowed."
+            );
+            askOutputFormats();
+          } else {
+            console.log(`Output formats: ${settings.outputFormats}`);
+            console.log(settings);
+            resolve(settings);
+          }
+        }
+      );
+    };
+
+    askFilePath();
   });
 };
+
 //Searches for files that meet criteria
 const searchFiles = (settings) => {
   console.log("Settings:", settings);
