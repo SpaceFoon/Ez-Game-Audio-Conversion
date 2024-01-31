@@ -1,14 +1,25 @@
 # EZ-Game-Audio-Conversion
+
 Convert ALL your audio files to other formats in just a few clicks.  
 
 This is a command-line application that allows you to search for audio files in a specified directory and its subdirectories, then convert them to different output formats.  
 
+I made this for myself and other game devs that have run into the problem of of having hundrededs and sometimes thousands of audio files, all in different formats, that needed to be converted to a few other formats depending on the build target of the game. Not all game devs are programmers, audio experts or even "power users".  
+
+Don't use this for audio meant to be used in a video editor!  
+
+There is https://ffmpeg-batch.sourceforge.io/ that does this but it's confusing and slower. In my testing it hungs and crashes and has weird dialogs that don't ask a question but require yes or no to continue.  
+
+My softwares goal is to be as simple and easy as possible and to just work.  
+
 ## What
+
 - For the conversion of large numbers of audio files that may be buried in folders.
 - For the simplest interface with unattended batch jobs.
-- Supports conversion to and from FLAC, WAV, MP3, OGG, M4A. MIDI as an input only.
+- Supports conversion to and from FLAC, WAV, MP3, OGG, M4A and MIDI as an input only.
 
 ## Why
+
 - Searches recursively in location to find all files that fit your criteria.
 - Unattended batches, click it and forget it.
 - Privacy and reliability, internet is never used!
@@ -16,6 +27,7 @@ This is a command-line application that allows you to search for audio files in 
 - Automatically selects codec and bitrate for each file.
 
 ## Additional Info
+
 - If duplicate file names with different extensions, automatically selects the file with the best format. ie FLAC over MP3.
 - Automatically selects bitrate about 192kbs or lower for the output. This is a balance between great sound quality and small file size.
 - Uses Variable Bitrate (VBR) when possible for smaller file size.
@@ -23,6 +35,7 @@ This is a command-line application that allows you to search for audio files in 
 - FLAC and WAV are not compressed as outputs. This means no quality is lost.
 
 ## Planned
+
 - Add output location option.
 - An Advanced option set for setting bit rate. Not priory as a higher bitrate won't be noticeable 99.9% of the time.
 - Sister apps that do the same thing for pictures and videos!
@@ -84,4 +97,3 @@ RM2003 Compatible	   YES	NO	   YES	YES
 
 M4A files are compressed using the 'AAC' lossy.
 Use WAV for Flac for lossless.
-

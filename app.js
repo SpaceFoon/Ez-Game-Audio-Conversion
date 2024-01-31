@@ -1,10 +1,21 @@
 const readline = require("readline");
-const { readdirSync, statSync, existsSync } = require("fs");
+const {
+  openSync,
+  closeSync,
+  readdirSync,
+  statSync,
+  existsSync,
+  appendFileSync,
+  writeFileSync,
+} = require("fs");
 const { join, basename, extname, dirname } = require("path");
 const { Worker } = require("worker_threads");
+const { performance } = require("perf_hooks");
 const { cpus } = require("os");
+const { reject } = require("when");
+const moment = require("moment");
+const { Console } = require("console");
 
-//setup object and functions.
 let settings = {
   filePath: "",
   inputFormats: [],
@@ -25,20 +36,89 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+const isFileBusy = async (file) => {
+  try {
+    // Try opening the file in write mode without blocking the event loop
+    const fd = openSync(file, "w");
+    closeSync(fd);
+    return false; // File is not busy
+  } catch (error) {
+    if (error.code === "EBUSY") {
+      const userInput = await getAnswer(
+        `🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
+      );
+      return isFileBusy(file);
+    } else if (error.code === "ENOENT") {
+    } else {
+      console.error(`🚨🚨⛔ Error writing to CSV file: ${error} ⛔🚨🚨`);
+      throw error;
+    }
+  }
+};
+
+// const writeLogs = async (message) => {
+//   const logPath = settings.filePath;
+//   let fileName = `${logPath}/logs.csv`;
+//   if (message.type === "stderr") {
+//     fileName = `${logPath}/errors.csv`;
+//   }
+//   try {
+//     writeFileSync(fileName, "Timestamp,Data\n"); // Header for the CSV file
+//   } catch (error) {}
+// };
+
+const addToLog = async (log) => {
+  const logPath = settings.filePath;
+  let fileName = `${logPath}/logs.csv`;
+  if (log.type === "stderr") {
+    fileName = `${logPath}/error.csv`;
+    await isFileBusy(fileName);
+    if (!fileName.existsSync) {
+      try {
+        writeFileSync(fileName, "Timestamp,Data\n"); // Header for the CSV file
+      } catch (error) {
+        return addToLog(log);
+      }
+    }
+    const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
+    console.log("message", log);
+    const csvRow = `${timestamp},${log.data}\n`;
+
+    appendFileSync(fileName, csvRow, (err) => {
+      if (err) console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
+    });
+  }
+  if (log.type === "Success") {
+    console.log(`Success`);
+    console.log(`Success`);
+  }
+  if (log.type === "Failure") {
+    console.log(`Failure`);
+  }
+  if (!log.type) {
+    console.log("Type: ", type);
+  }
+  const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
+  //console.log("message2", log);
+  const csvRow = `${timestamp},${log.data}\n`;
+  appendFileSync(fileName, csvRow, (err) => {
+    if (err) console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
+  });
+};
 
 //Starts with user input
 const UserInputInitSettings = () => {
   return new Promise((resolve, reject) => {
     const askFilePath = () => {
       rl.question(
-        "Enter the full file path to start the search. WILL SEARCH ALL SUB FOLDERS: ",
+        "✏️ Enter the full file path to start the search. 🔍 WILL SEARCH ALL SUB FOLDERS 📂: ",
         (filePath) => {
           if (!existsSync(filePath)) {
-            console.error("File Path does not exist!");
+            console.error("⚠️File Path does not exist!🤣😊😂");
             askFilePath();
           } else {
             settings.filePath = filePath;
-            console.log(`File path: ${settings.filePath}`);
+            console.log(`📝 File path: ${settings.filePath} ✅`);
             askInputFormats();
           }
         }
@@ -47,7 +127,7 @@ const UserInputInitSettings = () => {
 
     const askInputFormats = () => {
       rl.question(
-        "Enter the file extensions to look for. Leave blank for all (e.g., flac wav mp3 m4a ogg midi): ",
+        "✏️ Enter the file extensions to look for. Leave blank for all 🚨 (e.g., flac wav mp3 m4a ogg midi): ",
         (inputFormatString) => {
           settings.inputFormats = inputFormatString
             ? inputFormatString.toLowerCase().split(" ")
@@ -59,11 +139,15 @@ const UserInputInitSettings = () => {
             )
           ) {
             console.error(
-              "Invalid input format. Only flac, wav, mp3, m4a, ogg and midi are allowed."
+              "🛑🙊Invalid input format🙈🛑\n⚠️Only flac, wav, mp3, m4a, ogg and midi are allowed"
             );
             askInputFormats();
           } else {
-            console.log(`Input formats: ${settings.inputFormats}`);
+            console.log(
+              `📝 Input formats: ${settings.inputFormats
+                .map((el) => el + "✅ ")
+                .join("")}`
+            );
             askOutputFormats();
           }
         }
@@ -72,7 +156,7 @@ const UserInputInitSettings = () => {
 
     const askOutputFormats = () => {
       rl.question(
-        "Enter the output formats. Leave blank for ogg (e.g., flac ogg mp3 m4a wav): ",
+        "✏️ Enter the output formats. Leave blank for all 🚨 (e.g., flac ogg mp3 m4a wav): ",
         (outputFormatString) => {
           settings.outputFormats = outputFormatString
             ? outputFormatString.toLowerCase().split(" ")
@@ -86,12 +170,16 @@ const UserInputInitSettings = () => {
             )
           ) {
             console.error(
-              "Invalid output format. Only flac, ogg, wav, mp3, and m4a are allowed."
+              "🛑🙊Invalid output format🙈🛑\n⚠️Only flac, ogg, wav, mp3, and m4a are allowed!"
             );
             askOutputFormats();
           } else {
-            console.log(`Output formats: ${settings.outputFormats}`);
-            console.log(settings);
+            console.log(
+              `📝 Output formats: ${settings.outputFormats
+                .map((el) => el + "✅ ")
+                .join("")}`
+            );
+            //console.log(settings);
             resolve(settings);
           }
         }
@@ -104,15 +192,15 @@ const UserInputInitSettings = () => {
 
 //Searches for files that meet criteria
 const searchFiles = (settings) => {
-  console.log("Settings:", settings);
+  //console.log("Settings:", settings);
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.filePath;
   //midi can have .mid or .midi extension
   if (settings.inputFormats.includes("midi")) {
     fileExtensions.push(".mid");
   }
-  console.log("Search Path:", searchPath);
-  console.log("File Extensions:", fileExtensions);
+  //console.log("Search Path:", searchPath);
+  //console.log("File Extensions:", fileExtensions);
 
   const allFiles = [];
 
@@ -137,7 +225,7 @@ const searchFiles = (settings) => {
   };
 
   walk(searchPath);
-  console.log("Matching ", allFiles.length, "Files:", allFiles);
+  console.log("🔍Matched", allFiles.length, "Input Files:", allFiles);
 
   return Promise.resolve(allFiles);
 };
@@ -169,8 +257,8 @@ const deleteDuplicateFiles = (files) => {
   );
 };
 
-//Create final list of files to convert and ask user for each file
-const createConversionList = async (settings, files) => {
+//Create final list of files to convert by asking user for each conflicting file
+const createConversionList = async (files) => {
   const conversionList = [];
   let response = null;
   for (const inputFile of files) {
@@ -201,11 +289,11 @@ const createConversionList = async (settings, files) => {
           outputFile = outputFileCopy;
         },
         s: () => {
-          outputFile = "skipped!";
+          outputFile = "skipped! ⏭️";
           return (response = null);
         },
         sa: () => {
-          outputFile = "skipped!";
+          outputFile = "skipped! ⏭️";
         },
       };
       switch (response) {
@@ -218,14 +306,15 @@ const createConversionList = async (settings, files) => {
           responseActions["sa"]();
           break;
         case "oa":
-          console.log("OVERWRITE FILE", outputFile);
+          console.log("🔺🚩OVERWRITE FILE🚩", outputFile, "🔺");
           break;
         default:
           while (true) {
             if (!response) {
               if (existsSync(outputFile)) {
                 response = await getAnswer(
-                  `[O]verwrite, [R]ename or [S]kip. Add 'a' for all (e.g., oa, ra, sa)'\n'${outputFile}? : `
+                  `${outputFile} already exists!
+                  \n[O]verwrite, [R]ename or [S]kip. 👀 Add 'a' for all (e.g., oa, ra, sa)`
                 );
                 response = response.trim().toLowerCase();
                 if (responseActions[response]) {
@@ -233,9 +322,7 @@ const createConversionList = async (settings, files) => {
                   break;
                 } else {
                   response = null;
-                  console.log(
-                    "You did not enter a valid selection, try again."
-                  );
+                  console.log("⚠️Invalid selection! Try again⚠️");
                 }
               } else break;
             }
@@ -250,84 +337,146 @@ const createConversionList = async (settings, files) => {
   }
   while (true) {
     const numbered = conversionList.map(
-      (x, index) => `${index + 1} ${x.outputFile}`
+      (x, index) => `🔊 ${index + 1} ${x.outputFile}`
     );
     console.log(
-      "Pending conversion:",
+      "🔄 Pending conversion 🔄",
       conversionList.length,
-      "files \n",
+      "files\n",
       numbered.join("\n")
     );
     const accept_answer = await getAnswer(
-      "This is the list of files to be converted. Accept? Type yes or no: "
+      '✏️ This is the list of files to be converted. Accept? Type "yes" ✅ or "no" ❌:  '
     );
 
     if (/^no$/i.test(accept_answer)) {
-      console.log("Conversion cancelled. Exiting program.");
+      console.log("🚫 Conversion cancelled. Exiting program 🚫");
       process.exit(0);
     }
     if (!/^yes$/i.test(accept_answer)) {
-      console.warn('invalid input, please use "yes" or "no"');
+      console.warn('⚠️ Invalid input, please type "yes" or "no" ⚠️');
       continue;
     }
-    return conversionList.filter((x) => x.outputFile !== "skipped!");
+    return conversionList.filter((x) => x.outputFile !== "skipped! ⏭️");
   }
 };
 
 //Creaters workers to conver files
 const convertFiles = async (files) => {
-  const cpuNumber = cpus().length;
-  const maxConcurrentWorkers = Math.round(
-    Math.min(cpuNumber * 2, files.length)
-  );
+  const jobStartTime = performance.now();
+  console.log(`${jobStartTime} jobStartTime`);
+  await isFileBusy(`${settings.filePath}/logs.csv`);
+  await isFileBusy(`${settings.filePath}/error.csv`);
+  try {
+    var cpuNumber = cpus().length;
+  } catch {
+    var cpuNumber = 8;
+    console.warn(
+      "🚨🚨⛔ Could not detect amount of CPU cores!!! Setting to 8 ⛔🚨🚨"
+    );
+  }
+
+  const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, files.length));
   const failedFiles = [];
   const successfulFiles = [];
-  console.info("using", cpuNumber, "CPU Cores");
+  console.info("Detected 🕵️‍♂️", cpuNumber, "CPU Cores 🖥");
+  console.log("Using", cpuNumber, "concurrent 🧵 threads");
 
-  const processFile = async (file) => {
-    console.log(file.outputFile);
+  const processFile = async (file, workerCounter, task, tasksLeft) => {
+    const workerStartTime = performance.now();
+    // await isFileBusy(`${settings.filePath}/logs.csv`);
+    // await isFileBusy(`${settings.filePath}/errors.csv`);
+    console.log(
+      `\n🛠️ 👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} left at outputfile:\n ${file.outputFile}📤`
+    );
+    // const inputFile = file.inputFile;
+    // const outputFile = file.outputFile;
     return new Promise((resolve, reject) => {
+      //const jobStartTime = performance.now();
       const worker = new Worker("./converter.js", {
         workerData: file,
       });
+
       worker.on("message", (message) => {
-        if (message === 0) {
-          successfulFiles.push(file);
-          console.log("Conversion Successfull for ", file);
-          resolve();
-        } else {
-          failedFiles.push(file);
-          console.log(
-            `Worker exited with code`,
-            message,
-            `at file \n ${file.outputFile}.`
+        //console.log("MESSAGE", message);
+        addToLog(message);
+        // if (message.type === "stderr") {
+        //   const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
+        //   console.log("message", message);
+        //   const csvRow = `${timestamp},${message.data}`;
+
+        //   // // Append the CSV row to the file
+
+        //   appendFileSync(logs, csvRow, (err) => {
+        //     if (err)
+        //       console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
+        //   });
+        // }
+      });
+
+      worker.on("error", (code) => {
+        console.error(`🚨🚨⛔ Worker had an error with code:`, code, "⛔🚨🚨");
+        reject();
+      });
+
+      worker.on("exit", (code) => {
+        const workerEndTime = performance.now().toFixed(2);
+        const workerCompTime = workerEndTime - workerStartTime.toFixed(2);
+        console.log(
+          `🛠️👷‍♂️ Worker`,
+          workerCounter,
+          `finished task`,
+          task,
+          `\n   Input"${file.inputFile}\n   Output"${file.outputFile}✅\n   in ${workerCompTime} milliseconds🕖`
+        );
+
+        if (code !== 0) {
+          console.error(
+            "🚨🚨⛔ Worker",
+            i + 1,
+            "did not finish file ⛔🚨🚨\n",
+            file.outputFile,
+            "🔇"
+          );
+          if (!failedFiles[file]) {
+            failedFiles.push(file);
+          }
+          console.error(
+            `🚨🚨⛔ FFMPEG exited with code ⛔🚨🚨`,
+            code,
+            `at file \n   ⛔ ${file.inputFile} \n  ⛔ ${file.outputFile}`
           );
           reject();
+        } else if (code === 0) {
+          successfulFiles.push(file);
+          resolve();
         }
-      });
-      worker.on("error", (err) => {
-        console.error(' worker.on("error,"', err);
-        failedFiles.push(file.outputFile);
-        reject(err);
       });
     });
   };
 
   // Worker Manger
   const workerPromises = [];
+  let workerCounter = 0;
+  let task = 0;
   for (let i = 0; i < maxConcurrentWorkers; i++) {
     workerPromises.push(
       (async () => {
         while (files.length > 0) {
           const file = files.pop();
-          if (file) {
-            try {
-              console.log("worker", i + 1, "started for file");
-              await processFile(file);
-            } catch (error) {
-              console.error("worker", i + 1, "did not finish");
-              reject();
+          try {
+            let tasksLeft = files.length;
+            task++;
+            workerCounter++;
+            if (workerCounter > 8) workerCounter = workerCounter - 8;
+            await processFile(file, workerCounter, task, tasksLeft);
+          } catch (error) {
+            console.error("ERROR", error);
+            if (!failedFiles[file]) {
+              failedFiles.push(file);
             }
+
+            reject(error);
           }
         }
       })()
@@ -335,22 +484,46 @@ const convertFiles = async (files) => {
   }
 
   await Promise.all(workerPromises);
-  return { failedFiles, successfulFiles };
+  return { failedFiles, successfulFiles, jobStartTime };
 };
 
-const finalize = (failedFiles, successfulFiles) => {
+const finalize = (failedFiles, successfulFiles, jobStartTime) => {
+  const jobEndTime = performance.now();
+  // console.log(`Job end time ${jobEndTime}`);
+  // console.log(`jobStartTime ${jobStartTime}`);
+  // console.log(`successfulFiles.length ${successfulFiles.length}`);
+  let totalTime = jobEndTime - jobStartTime;
+  totalTime = Math.ceil(totalTime % 60);
+  let average = totalTime / successfulFiles.length;
+  average = Math.ceil(average % 60);
+  // console.log(`average ${average}`);
+
+  console.log(
+    `\n    📋 Total job duration: ${totalTime.toFixed(
+      0
+    )} seconds\n    ⌛ Average task duration ${average.toFixed(0)} seconds\n`
+  );
   if (successfulFiles && successfulFiles.length > 0) {
-    console.log(successfulFiles.length, "Successful Files", successfulFiles);
+    console.log(
+      "    ",
+      successfulFiles.length,
+      "🚀 Successful Files 🚀",
+      successfulFiles.map((file) => `✅ ${file.outputFile} `)
+    );
   } else {
-    console.log("No successful conversions.");
+    console.log("\n💀😭😢NO SUCCESSFUL CONVERSIONS.😢😭💀\n");
   }
 
   if (failedFiles && failedFiles.length > 0) {
-    console.log(failedFiles.length, "Failed Files", failedFiles);
+    console.log(
+      failedFiles.length,
+      "🛑 Failed Files 🛑",
+      failedFiles.map((file) => `❌ ${file.outputFile}`)
+    );
   } else {
-    console.log("No conversions failed.");
+    console.log("🚀🎉✨No conversions failed✨🎉🚀");
   }
-  console.log("Have a nice day.");
+  console.log("🌞🌈🌼 Have a nice day! 🌼🌈🌞");
   process.exit(0);
 };
 
@@ -364,14 +537,14 @@ UserInputInitSettings(settings)
   //there can be multiple outputs and user input is needed here for output files
   // that already exist.
   .then((files) => {
-    return createConversionList(settings, files);
+    return createConversionList(files);
   })
   // Converts all files with workers threads
   .then((files) => {
     return convertFiles(files);
   })
-  .then(({ failedFiles, successfulFiles }) => {
-    finalize(failedFiles, successfulFiles);
+  .then(({ failedFiles, successfulFiles, jobStartTime }) => {
+    finalize(failedFiles, successfulFiles, jobStartTime);
   })
   .catch((error) => {
     console.log("Fatal Error");

@@ -22,6 +22,7 @@
     "isexe": "^2.0.0",
     "jquery": "^2.2.4",
     "jquery-bridget": "^1.1.0",
+    "moment": "^2.30.1",
     "ms": "^2.1.2",
     "parse-cache-control": "^1.0.1",
     "path": "^0.12.7",
