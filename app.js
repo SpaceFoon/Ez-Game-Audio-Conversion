@@ -15,12 +15,13 @@ const { cpus } = require("os");
 const { reject } = require("when");
 const moment = require("moment");
 const { Console } = require("console");
+const { exitCode } = require("process");
 
 let settings = {
   filePath: "",
   inputFormats: [],
   outputFormats: [],
-  //bitrate: 0,
+  //bitrate: 0, placehold for future options
   //quality: 2,
 };
 
@@ -36,7 +37,9 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
+
 const isFileBusy = async (file) => {
+  if (!existsSync(file)) return false;
   try {
     // Try opening the file in write mode without blocking the event loop
     const fd = openSync(file, "w");
@@ -56,54 +59,52 @@ const isFileBusy = async (file) => {
   }
 };
 
-// const writeLogs = async (message) => {
-//   const logPath = settings.filePath;
-//   let fileName = `${logPath}/logs.csv`;
-//   if (message.type === "stderr") {
-//     fileName = `${logPath}/errors.csv`;
-//   }
-//   try {
-//     writeFileSync(fileName, "Timestamp,Data\n"); // Header for the CSV file
-//   } catch (error) {}
-// };
-
-const addToLog = async (log) => {
+const addToLog = async (log, file) => {
   const logPath = settings.filePath;
   let fileName = `${logPath}/logs.csv`;
+  const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
+  //await isFileBusy(fileName);
   if (log.type === "stderr") {
     fileName = `${logPath}/error.csv`;
-    await isFileBusy(fileName);
-    if (!fileName.existsSync) {
+    //await isFileBusy(fileName);
+
+    if (!existsSync(fileName)) {
       try {
-        writeFileSync(fileName, "Timestamp,Data\n"); // Header for the CSV file
+        console.log("error.csv did not exist");
+        writeFileSync(fileName, "Timestamp,Error, file\n"); // Header for the CSV file
+        return;
       } catch (error) {
-        return addToLog(log);
+        console.error("ADD to LOG ERROR");
+        return addToLog(log, file);
       }
     }
-    const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
-    console.log("message", log);
-    const csvRow = `${timestamp},${log.data}\n`;
-
-    appendFileSync(fileName, csvRow, (err) => {
-      if (err) console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
-    });
+    //replacing returns with commas for csv file
+    log.data = log.data.replace(/\r\n|\r/g, "");
+    //console.log("message", log, "file11 ", file);
+    try {
+      const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
+      appendFileSync(fileName, csvRow);
+    } catch (err) {
+      console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
+    }
+    return;
   }
-  if (log.type === "Success") {
-    console.log(`Success`);
-    console.log(`Success`);
+  if (!existsSync(fileName)) {
+    try {
+      console.log("logs.csv did not exist");
+      writeFileSync(fileName, "Timestamp,Exit Code, Input, Output\n"); // Header for the CSV file
+      return;
+    } catch (error) {
+      return addToLog(log, file);
+    }
   }
-  if (log.type === "Failure") {
-    console.log(`Failure`);
+  try {
+    const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
+    console.log("csvRow: " + csvRow);
+    appendFileSync(fileName, csvRow);
+  } catch (err) {
+    console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
   }
-  if (!log.type) {
-    console.log("Type: ", type);
-  }
-  const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
-  //console.log("message2", log);
-  const csvRow = `${timestamp},${log.data}\n`;
-  appendFileSync(fileName, csvRow, (err) => {
-    if (err) console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
-  });
 };
 
 //Starts with user input
@@ -364,7 +365,7 @@ const createConversionList = async (files) => {
 //Creaters workers to conver files
 const convertFiles = async (files) => {
   const jobStartTime = performance.now();
-  console.log(`${jobStartTime} jobStartTime`);
+  // console.log(`${jobStartTime} jobStartTime`);
   await isFileBusy(`${settings.filePath}/logs.csv`);
   await isFileBusy(`${settings.filePath}/error.csv`);
   try {
@@ -386,70 +387,65 @@ const convertFiles = async (files) => {
     const workerStartTime = performance.now();
     // await isFileBusy(`${settings.filePath}/logs.csv`);
     // await isFileBusy(`${settings.filePath}/errors.csv`);
+    console.log(`\n📋 task ${task} started with ${tasksLeft} tasks left`);
     console.log(
-      `\n🛠️ 👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} left at outputfile:\n ${file.outputFile}📤`
+      `🛠️ 👷‍♂️ Worker ${workerCounter} has started  at outputfile:\n ${file.outputFile}📤`
     );
-    // const inputFile = file.inputFile;
-    // const outputFile = file.outputFile;
+
     return new Promise((resolve, reject) => {
-      //const jobStartTime = performance.now();
       const worker = new Worker("./converter.js", {
         workerData: file,
       });
 
-      worker.on("message", (message) => {
-        //console.log("MESSAGE", message);
-        addToLog(message);
-        // if (message.type === "stderr") {
-        //   const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
-        //   console.log("message", message);
-        //   const csvRow = `${timestamp},${message.data}`;
-
-        //   // // Append the CSV row to the file
-
-        //   appendFileSync(logs, csvRow, (err) => {
-        //     if (err)
-        //       console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
-        //   });
-        // }
+      worker.on("stderr", (message) => {
+        if (worker.exitCode) console.log("Exit code", exitCode);
+        console.log("MESSAGE", message);
+        //console.log("file", file);
+        addToLog(message, file);
       });
 
       worker.on("error", (code) => {
         console.error(`🚨🚨⛔ Worker had an error with code:`, code, "⛔🚨🚨");
-        reject();
+        reject(code);
       });
 
       worker.on("exit", (code) => {
-        const workerEndTime = performance.now().toFixed(2);
-        const workerCompTime = workerEndTime - workerStartTime.toFixed(2);
-        console.log(
-          `🛠️👷‍♂️ Worker`,
-          workerCounter,
-          `finished task`,
-          task,
-          `\n   Input"${file.inputFile}\n   Output"${file.outputFile}✅\n   in ${workerCompTime} milliseconds🕖`
-        );
+        //console.log("EXIT_________________", code);
+        const workerEndTime = performance.now();
+        const workerCompTime = workerEndTime - workerStartTime;
 
         if (code !== 0) {
-          console.error(
-            "🚨🚨⛔ Worker",
-            i + 1,
-            "did not finish file ⛔🚨🚨\n",
-            file.outputFile,
-            "🔇"
-          );
           if (!failedFiles[file]) {
             failedFiles.push(file);
           }
           console.error(
-            `🚨🚨⛔ FFMPEG exited with code ⛔🚨🚨`,
-            code,
-            `at file \n   ⛔ ${file.inputFile} \n  ⛔ ${file.outputFile}`
+            "\n🚨🚨⛔ Worker",
+            workerCounter,
+            "did not finish file ⛔🚨🚨: ",
+            file.outputFile,
+            "🔇"
+          );
+
+          console.error(
+            `\n🚨🚨⛔ FFMPEG exited with code ${code} ⛔🚨🚨`,
+            `at file\n⛔ ${file.inputFile}\n⛔ ${file.outputFile}`
           );
           reject();
         } else if (code === 0) {
+          console.log(
+            `\n🛠️👷‍♂️ Worker`,
+            workerCounter,
+            `finished task`,
+            task,
+
+            `\n   Input"${file.inputFile}\n   Output"${
+              file.outputFile
+            }✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
+          );
           successfulFiles.push(file);
           resolve();
+        } else {
+          console.error("No code in worker exit!!!!!!!!!!");
         }
       });
     });
@@ -471,10 +467,12 @@ const convertFiles = async (files) => {
             if (workerCounter > 8) workerCounter = workerCounter - 8;
             await processFile(file, workerCounter, task, tasksLeft);
           } catch (error) {
-            console.error("ERROR", error);
-            if (!failedFiles[file]) {
-              failedFiles.push(file);
-            }
+            // console.error("ERROR last", error);
+            // console.log(failedFiles);
+            // if (!failedFiles[file]) {
+            //   failedFiles.push(file);
+            //   console.log(failedFiles);
+            // }
 
             reject(error);
           }
@@ -497,7 +495,7 @@ const finalize = (failedFiles, successfulFiles, jobStartTime) => {
   let average = totalTime / successfulFiles.length;
   average = Math.ceil(average % 60);
   // console.log(`average ${average}`);
-
+  //console.log("failedfiles____", failedFiles);
   console.log(
     `\n    📋 Total job duration: ${totalTime.toFixed(
       0

@@ -42,28 +42,36 @@ const convertFile = async ({ inputFile, outputFile, outputFormat }) => {
       { shell: true }
     );
     ffmpegCommand.stderr.on("data", (data) => {
-      console.error(`ERROR: ${data}`);
+      //console.error(`STDERR DATA ${data}`);
       parentPort.postMessage({ type: "stderr", data: data.toString() });
     });
-    ffmpegCommand.on("close", (code) => {
+    ffmpegCommand.on("exit", (code) => {
       //console.log("EXIT CODE IN WORKER", code);
       parentPort.postMessage({ type: "code", data: code });
-      resolve(code);
+      if (code !== 0) {
+        // If the exit code is non-zero, reject the promise
+        // This will trigger the "error" event in the main thread
+        reject(new Error(code));
+        ffmpegCommand.unref();
+      } else {
+        // Resolve the promise if the exit code is 0
+        resolve();
+      }
+      //ffmpegCommand.unref();
     });
-
     ffmpegCommand.on("error", (error) => {
       console.log("ERROR IN WORKER FFMPEGCOMMAND", error);
       reject(error);
     });
   });
 };
-//C:\Music\ALL THAT REMAINS - DISCOGRAPHY (1998-15) [CHANNEL NEO]\[2009] Forever In Your Hands [Single]
+convertFile(workerData);
 const runConversion = async () => {
   try {
     await convertFile(workerData);
   } catch (error) {
     parentPort.postMessage("error", error);
-    console.error("Worker catch: ", error);
+    //console.error("Worker catch: ", error);
   }
 };
 
