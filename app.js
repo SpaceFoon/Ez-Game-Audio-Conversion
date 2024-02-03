@@ -12,10 +12,7 @@ const { join, basename, extname, dirname } = require("path");
 const { Worker } = require("worker_threads");
 const { performance } = require("perf_hooks");
 const { cpus } = require("os");
-const { reject } = require("when");
 const moment = require("moment");
-const { Console } = require("console");
-const { exitCode } = require("process");
 
 let settings = {
   filePath: "",
@@ -30,19 +27,11 @@ const handleError = (errorMessage) => {
   process.exit(1);
 };
 
-const getAnswer = async (question) =>
-  new Promise((res, rej) => rl.question(question, (ans) => res(ans)));
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
 const isFileBusy = async (file) => {
   if (!existsSync(file)) return false;
   try {
     // Try opening the file in write mode without blocking the event loop
-    const fd = openSync(file, "w");
+    const fd = openSync(file);
     closeSync(fd);
     return false; // File is not busy
   } catch (error) {
@@ -100,7 +89,7 @@ const addToLog = async (log, file) => {
   }
   try {
     const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
-    console.log("csvRow: " + csvRow);
+    //console.log("csvRow: " + csvRow);
     appendFileSync(fileName, csvRow);
   } catch (err) {
     console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
@@ -108,6 +97,13 @@ const addToLog = async (log, file) => {
 };
 
 //Starts with user input
+const getAnswer = async (question) =>
+  new Promise((res) => rl.question(question, (ans) => res(ans)));
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 const UserInputInitSettings = () => {
   return new Promise((resolve, reject) => {
     const askFilePath = () => {
@@ -397,57 +393,54 @@ const convertFiles = async (files) => {
         workerData: file,
       });
 
-      worker.on("stderr", (message) => {
-        if (worker.exitCode) console.log("Exit code", exitCode);
-        console.log("MESSAGE", message);
-        //console.log("file", file);
-        addToLog(message, file);
-      });
+      worker.on("message", (message) => {
+        if (message.type === "stderr") {
+          console.log("ERROR MESSAGE FROM FFMPEG", message.data);
+          addToLog(message, file);
+          return;
+        }
+        if (message.type === "code") {
+          const workerEndTime = performance.now();
+          const workerCompTime = workerEndTime - workerStartTime;
+          addToLog(message, file);
+          if (message.data === 0) {
+            // console.log("Worker Message:", message);
+            successfulFiles.push(file);
+            console.log(
+              `\n🛠️👷‍♂️ Worker`,
+              workerCounter,
+              `finished task`,
+              task,
 
+              `\n   Input"${file.inputFile}\n   Output"${
+                file.outputFile
+              }✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
+            );
+            resolve();
+          } else if (message.data !== 0) {
+            //if (!failedFiles[file]) {
+            failedFiles.push(file);
+            //}
+            console.error(
+              chalk.bgRed(
+                "\n🚨🚨⛔ Worker",
+                workerCounter,
+                "did not finish file ⛔🚨🚨: ",
+                file.outputFile,
+                "🔇"
+              )
+            );
+            resolve();
+          }
+        }
+      });
       worker.on("error", (code) => {
         console.error(`🚨🚨⛔ Worker had an error with code:`, code, "⛔🚨🚨");
+        //addToLog(code, file);
         reject(code);
       });
 
-      worker.on("exit", (code) => {
-        //console.log("EXIT_________________", code);
-        const workerEndTime = performance.now();
-        const workerCompTime = workerEndTime - workerStartTime;
-
-        if (code !== 0) {
-          if (!failedFiles[file]) {
-            failedFiles.push(file);
-          }
-          console.error(
-            "\n🚨🚨⛔ Worker",
-            workerCounter,
-            "did not finish file ⛔🚨🚨: ",
-            file.outputFile,
-            "🔇"
-          );
-
-          console.error(
-            `\n🚨🚨⛔ FFMPEG exited with code ${code} ⛔🚨🚨`,
-            `at file\n⛔ ${file.inputFile}\n⛔ ${file.outputFile}`
-          );
-          reject();
-        } else if (code === 0) {
-          console.log(
-            `\n🛠️👷‍♂️ Worker`,
-            workerCounter,
-            `finished task`,
-            task,
-
-            `\n   Input"${file.inputFile}\n   Output"${
-              file.outputFile
-            }✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
-          );
-          successfulFiles.push(file);
-          resolve();
-        } else {
-          console.error("No code in worker exit!!!!!!!!!!");
-        }
-      });
+      worker.on("exit", (code) => {});
     });
   };
 
@@ -467,14 +460,7 @@ const convertFiles = async (files) => {
             if (workerCounter > 8) workerCounter = workerCounter - 8;
             await processFile(file, workerCounter, task, tasksLeft);
           } catch (error) {
-            // console.error("ERROR last", error);
-            // console.log(failedFiles);
-            // if (!failedFiles[file]) {
-            //   failedFiles.push(file);
-            //   console.log(failedFiles);
-            // }
-
-            reject(error);
+            console.error("ERROR", error);
           }
         }
       })()

@@ -20,12 +20,7 @@ const convertFile = async ({ inputFile, outputFile, outputFormat }) => {
       join(__dirname, "ffmpeg.exe"),
       [
         "-loglevel",
-        "error",
-        //"-report",
-        //"FFREPORT=myreport.log", //doesnt work
-        // "warning",
-
-        //"repeat+level+info",
+        "error", // Sends all errors to stdeer
         "-i", //input file
         `"${inputFile}"`,
         "-c:a", // = codec:audio Indicates the codec for the audio stream.
@@ -36,28 +31,16 @@ const convertFile = async ({ inputFile, outputFile, outputFormat }) => {
         // "1",
         "-y", //Disable prompts
         `"${outputFile}"`,
-        //"1>output.txt", // Redirect standard output to a file
-        //"2>errors.txt", // Redirect standard error to a file
       ],
       { shell: true }
     );
     ffmpegCommand.stderr.on("data", (data) => {
-      //console.error(`STDERR DATA ${data}`);
       parentPort.postMessage({ type: "stderr", data: data.toString() });
     });
     ffmpegCommand.on("exit", (code) => {
-      //console.log("EXIT CODE IN WORKER", code);
       parentPort.postMessage({ type: "code", data: code });
-      if (code !== 0) {
-        // If the exit code is non-zero, reject the promise
-        // This will trigger the "error" event in the main thread
-        reject(new Error(code));
-        ffmpegCommand.unref();
-      } else {
-        // Resolve the promise if the exit code is 0
-        resolve();
-      }
-      //ffmpegCommand.unref();
+
+      resolve();
     });
     ffmpegCommand.on("error", (error) => {
       console.log("ERROR IN WORKER FFMPEGCOMMAND", error);
@@ -65,7 +48,6 @@ const convertFile = async ({ inputFile, outputFile, outputFormat }) => {
     });
   });
 };
-convertFile(workerData);
 const runConversion = async () => {
   try {
     await convertFile(workerData);
