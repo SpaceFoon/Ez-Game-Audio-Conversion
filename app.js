@@ -30,17 +30,17 @@ const handleError = (errorMessage) => {
 const isFileBusy = async (file) => {
   if (!existsSync(file)) return false;
   try {
-    // Try opening the file in write mode without blocking the event loop
-    const fd = openSync(file);
+    const fd = openSync(file, "r+");
     closeSync(fd);
-    return false; // File is not busy
+    return false;
   } catch (error) {
     if (error.code === "EBUSY") {
       const userInput = await getAnswer(
-        `🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
+        `\n${error}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
       );
       return isFileBusy(file);
     } else if (error.code === "ENOENT") {
+      console.error("code", error);
     } else {
       console.error(`🚨🚨⛔ Error writing to CSV file: ${error} ⛔🚨🚨`);
       throw error;
@@ -52,24 +52,20 @@ const addToLog = async (log, file) => {
   const logPath = settings.filePath;
   let fileName = `${logPath}/logs.csv`;
   const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
-  //await isFileBusy(fileName);
   if (log.type === "stderr") {
     fileName = `${logPath}/error.csv`;
-    //await isFileBusy(fileName);
 
     if (!existsSync(fileName)) {
       try {
         console.log("error.csv did not exist");
-        writeFileSync(fileName, "Timestamp,Error, file\n"); // Header for the CSV file
+        writeFileSync(fileName, "Timestamp,Error, file\n");
         return;
       } catch (error) {
         console.error("ADD to LOG ERROR");
         return addToLog(log, file);
       }
     }
-    //replacing returns with commas for csv file
     log.data = log.data.replace(/\r\n|\r/g, "");
-    //console.log("message", log, "file11 ", file);
     try {
       const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
       appendFileSync(fileName, csvRow);
@@ -89,7 +85,6 @@ const addToLog = async (log, file) => {
   }
   try {
     const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
-    //console.log("csvRow: " + csvRow);
     appendFileSync(fileName, csvRow);
   } catch (err) {
     console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
@@ -176,7 +171,6 @@ const UserInputInitSettings = () => {
                 .map((el) => el + "✅ ")
                 .join("")}`
             );
-            //console.log(settings);
             resolve(settings);
           }
         }
@@ -189,15 +183,12 @@ const UserInputInitSettings = () => {
 
 //Searches for files that meet criteria
 const searchFiles = (settings) => {
-  //console.log("Settings:", settings);
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.filePath;
   //midi can have .mid or .midi extension
   if (settings.inputFormats.includes("midi")) {
     fileExtensions.push(".mid");
   }
-  //console.log("Search Path:", searchPath);
-  //console.log("File Extensions:", fileExtensions);
 
   const allFiles = [];
 
@@ -361,7 +352,6 @@ const createConversionList = async (files) => {
 //Creaters workers to conver files
 const convertFiles = async (files) => {
   const jobStartTime = performance.now();
-  // console.log(`${jobStartTime} jobStartTime`);
   await isFileBusy(`${settings.filePath}/logs.csv`);
   await isFileBusy(`${settings.filePath}/error.csv`);
   try {
@@ -381,11 +371,8 @@ const convertFiles = async (files) => {
 
   const processFile = async (file, workerCounter, task, tasksLeft) => {
     const workerStartTime = performance.now();
-    // await isFileBusy(`${settings.filePath}/logs.csv`);
-    // await isFileBusy(`${settings.filePath}/errors.csv`);
-    console.log(`\n📋 task ${task} started with ${tasksLeft} tasks left`);
     console.log(
-      `🛠️ 👷‍♂️ Worker ${workerCounter} has started  at outputfile:\n ${file.outputFile}📤`
+      `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left on outputfile:\n   ${file.outputFile}📤`
     );
 
     return new Promise((resolve, reject) => {
@@ -404,7 +391,6 @@ const convertFiles = async (files) => {
           const workerCompTime = workerEndTime - workerStartTime;
           addToLog(message, file);
           if (message.data === 0) {
-            // console.log("Worker Message:", message);
             successfulFiles.push(file);
             console.log(
               `\n🛠️👷‍♂️ Worker`,
@@ -418,17 +404,17 @@ const convertFiles = async (files) => {
             );
             resolve();
           } else if (message.data !== 0) {
-            //if (!failedFiles[file]) {
-            failedFiles.push(file);
-            //}
+            if (!failedFiles[file]) {
+              failedFiles.push(file);
+            }
             console.error(
-              chalk.bgRed(
-                "\n🚨🚨⛔ Worker",
-                workerCounter,
-                "did not finish file ⛔🚨🚨: ",
-                file.outputFile,
-                "🔇"
-              )
+              // chalk.bgRed(
+              "\n🚨🚨⛔ Worker",
+              workerCounter,
+              "did not finish file ⛔🚨🚨: ",
+              file.outputFile,
+              "🔇"
+              // )
             );
             resolve();
           }
@@ -436,7 +422,6 @@ const convertFiles = async (files) => {
       });
       worker.on("error", (code) => {
         console.error(`🚨🚨⛔ Worker had an error with code:`, code, "⛔🚨🚨");
-        //addToLog(code, file);
         reject(code);
       });
 
@@ -473,19 +458,13 @@ const convertFiles = async (files) => {
 
 const finalize = (failedFiles, successfulFiles, jobStartTime) => {
   const jobEndTime = performance.now();
-  // console.log(`Job end time ${jobEndTime}`);
-  // console.log(`jobStartTime ${jobStartTime}`);
-  // console.log(`successfulFiles.length ${successfulFiles.length}`);
   let totalTime = jobEndTime - jobStartTime;
-  totalTime = Math.ceil(totalTime % 60);
-  let average = totalTime / successfulFiles.length;
-  average = Math.ceil(average % 60);
-  // console.log(`average ${average}`);
-  //console.log("failedfiles____", failedFiles);
+  totalTime = totalTime / 1000;
+  let average = (totalTime * 10) / successfulFiles.length;
   console.log(
     `\n    📋 Total job duration: ${totalTime.toFixed(
-      0
-    )} seconds\n    ⌛ Average task duration ${average.toFixed(0)} seconds\n`
+      2
+    )} seconds\n    ⌛ Average task duration ${average.toFixed(2)} seconds\n`
   );
   if (successfulFiles && successfulFiles.length > 0) {
     console.log(

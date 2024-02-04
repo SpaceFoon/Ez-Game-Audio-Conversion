@@ -39,11 +39,10 @@ const convertFile = async ({ inputFile, outputFile, outputFormat }) => {
     });
     ffmpegCommand.on("exit", (code) => {
       parentPort.postMessage({ type: "code", data: code });
-
       resolve();
     });
     ffmpegCommand.on("error", (error) => {
-      console.log("ERROR IN WORKER FFMPEGCOMMAND", error);
+      console.error("ERROR IN WORKER FFMPEGCOMMAND", error);
       reject(error);
     });
   });
@@ -53,7 +52,6 @@ const runConversion = async () => {
     await convertFile(workerData);
   } catch (error) {
     parentPort.postMessage("error", error);
-    //console.error("Worker catch: ", error);
   }
 };
 
