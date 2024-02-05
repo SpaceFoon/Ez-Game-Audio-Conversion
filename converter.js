@@ -12,7 +12,7 @@ const convertFile = async ({ inputFile, outputFile, outputFormat }) => {
       ogg: { codec: "libopus", additionalOptions: ["-b:a", "192k"] }, //-b:a contant BR
       mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] },
       wav: { codec: "pcm_s16le" },
-      m4a: { codec: "aac ", additionalOptions: ["-q:a", "2.0"] },
+      m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.1"] },
       flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
     };
     const { codec, additionalOptions = [] } = formatConfig[outputFormat];
