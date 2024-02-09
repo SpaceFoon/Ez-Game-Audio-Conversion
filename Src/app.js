@@ -10,7 +10,7 @@ const { join } = require("path");
 const { converterWorker, runConversion } = require("./converterWorker");
 join(__dirname, "./converterWorker.js");
 console.log(converterWorker, runConversion);
-console.log("DIRNAME", __dirname, __filename);
+console.log("DIRNAME app", __dirname, __filename);
 console.log(
   chalk.bgMagenta.bold.cyan(`
 **************************************************************************************************************************

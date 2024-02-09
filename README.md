@@ -97,3 +97,7 @@ RM2003 Compatible	   YES	NO	   YES	YES
 
 M4A files are compressed using the 'AAC' lossy.
 Use WAV for Flac for lossless.
+
+
+Icon from https://icon-icons.com/download/16123/ICO/128/
+or here https://icon-icons.com/icon/audio-card/103432

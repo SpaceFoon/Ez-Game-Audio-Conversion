@@ -129,7 +129,4 @@ out
 .vscode/
 
 .history/
-Ez Game Audio Converter/src/bin/ffmpeg.exe
-ffmpeg.exe
-*.zip
-Ez Game Audio Converter/src-tauri/src/bin/ffmpeg-x86_64-pc-windows-msvc.exe
+*.exe

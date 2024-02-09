@@ -34,6 +34,7 @@ const convertFiles = async (files) => {
     );
 
     return new Promise((resolve, reject) => {
+      console.log("m--dir", __dirname);
       const worker = new Worker(`${__dirname}/converterWorker.js`, {
         workerData: file,
       });
