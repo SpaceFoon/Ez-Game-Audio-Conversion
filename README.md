@@ -1,16 +1,21 @@
 # EZ-Game-Audio-Conversion
 
-Convert ALL your audio files to other formats in just a few clicks.  
+Simple batch audio conversion.
 
-This is a command-line application that allows you to search for audio files in a specified directory and its subdirectories, then convert them to different output formats.  
+Multi-threaded and portable.
 
-I made this for myself and other game devs that have run into the problem of of having hundrededs and sometimes thousands of audio files, all in different formats, that needed to be converted to a few other formats depending on the build target of the game. Not all game devs are programmers, audio experts or even "power users".  
+Just extract the zip and run the app.
 
-Don't use this for audio meant to be used in a video editor!  
+Search for audio files in a specified directory and its subdirectories, then convert them to different output formats.  
 
-There is https://ffmpeg-batch.sourceforge.io/ that does this but it's confusing and slower. In my testing it hungs and crashes and has weird dialogs that don't ask a question but require yes or no to continue.  
+I made this for myself and other game devs that have run into the problem of of having hundrededs and sometimes thousands of audio files, all in different formats, that needed to be converted to a few other formats depending on the build target of the game. Not all game devs are programmers, audio experts or even "power users". 
 
-My softwares goal is to be as simple and easy as possible and to just work.  
+There should be no learning curve with this software. This softwares goal is to be as simple and easy as possible. To just work.
+
+Don't use this for audio meant to be used in a video editor! Video editors don't like the variable bit rate used.
+
+There is https://ffmpeg-batch.sourceforge.io/ that does this but it's confusing and slower but does much more if you need it. In my testing it hung and crashed a bit.
+
 
 ## What
 
@@ -32,7 +37,6 @@ My softwares goal is to be as simple and easy as possible and to just work.
 - Automatically selects bitrate about 192kbs or lower for the output. This is a balance between great sound quality and small file size.
 - Uses Variable Bitrate (VBR) when possible for smaller file size.
 - M4A files are compressed using the 'AAC' lossy. Use WAV or FLAC for lossless.
-- FLAC and WAV are not compressed as outputs. This means no quality is lost.
 
 ## Planned
 
@@ -43,38 +47,31 @@ My softwares goal is to be as simple and easy as possible and to just work.
 ## Prerequisites
 
 - Windows PC
-- Node.js (version ?.?.? or higher)
-- npm (version ?.?.? or higher)
+- Windows Terminal installed for better looks.
 
 ## Installation
 
-1. Clone or download the repository.
-2. Install node and dependencies.
-3. Download https://www.ffmpeg.org/download.html
-4. Copy the 3 exe files from \bin to the root of this project
+None.
+Just unzip the folder and run the exe.
+
+If you want to build from source, use the Pkg Node module and npm run build.
 
 ## Usage
 
-1. node .\app.js\
-2. Follow the prompts to provide the necessary information:
+1. Follow the setup prompts. Recommend to copy and paste file path. Right click to paste.
 
-- Enter the full file path to start the search. This will search all subfolders!
-- Enter the file extensions to look for. Leave blank for all (e.g., mp3 wav).
-- Enter the output formats. Leave blank for all (e.g., ogg m4a). This will output to all the formats you input separately. 
-- Enter the audio bitrate from 32 to 320. Leave blank for 192 (e.g., 128).
+2. The application will search for matching files based on the provided criteria and display the list of files to be converted.
 
-3. The application will search for matching files based on the provided criteria and display the list of files to be converted.
-5. Duplicate file names with different extensions will be deleted from the list in favor of the best format.
+3. Duplicate file names with different extensions will be deleted from the list in favor of the best format.
 
-6. Follow more prompts to decided what to do for each file. Adding "a" to your selection will make it for all subsequent files.
-   - O: Overwrite any file with the same name.
+4. Follow prompt if conflicting outfiles. Adding "a" to your selection will make it for all subsequent files.
+   - O: Overwrite file with the same name. Will not overwrite itself.
    - R: Rename will add copy to the name
    - S: Skip will not convert this file.
    
-7. Review the list of files to be converted and confirm to proceed by typing "yes" or "no" when prompted.
+5. Review the list of files to be converted and confirm to proceed by typing "yes" or "no" when prompted.
 
-8. If you choose to proceed, the application will convert the audio files to the specified output formats and save them in the same directory as the input files.
-   Logs will confirm each file has been successfully converted.
+6. While converting you can watch the progress and any errors. When all tasks are complete there will be logs in the file path you specified earlier. If there are any errors they will be in a different log.
 
 ## License
 
