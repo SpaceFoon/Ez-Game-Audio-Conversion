@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node ./src/app.js",
-    "build": "pkg . -o ./dist/ez.exe",
+    "build": "pkg . -o ./dist/EZ-Game-Audio.exe",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "pkg": {

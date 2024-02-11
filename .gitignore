@@ -127,6 +127,6 @@ out
 .pnp.*
 
 .vscode/
-
+ffmpeg-6.1.1-essentials_build.zip
 .history/
 *.exe
