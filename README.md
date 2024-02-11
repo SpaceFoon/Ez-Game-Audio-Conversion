@@ -8,7 +8,7 @@ Just extract the zip and run the app.
 
 Search for audio files in a specified directory and its subdirectories, then convert them to different output formats.  
 
-I made this for myself and other game devs that have run into the problem of of having hundrededs and sometimes thousands of audio files, all in different formats, that needed to be converted to a few other formats depending on the build target of the game. Not all game devs are programmers, audio experts or even "power users". 
+I made this for myself and other game devs that have run into the problem of of having hundreds and sometimes thousands of audio files, all in different formats, that needed to be converted to a few other formats depending on the build target of the game. Not all game devs are programmers, audio experts or even "power users". 
 
 There should be no learning curve with this software. This softwares goal is to be as simple and easy as possible. To just work.
 
