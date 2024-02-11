@@ -1,12 +1,14 @@
 // converterWorker.js
-
-const { join } = require("path");
 const { spawn } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
-
+const path = require("path");
 const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
-  console.log("DIRNAME", process.cwd(), __dirname, __filename);
-  console.log(__dirname + "\\ffmpeg.exe");
+  // console.log("process.env.ComSpec ", process.env.ComSpec);
+  // console.log("DIRNAME worker", process.cwd(), __dirname, __filename);
+  // process.chdir(`C:\\snapshot\\Ez-Game-Audio-Conversion\\src`);
+  // console.log("inputFile", inputFile);
+  const ffmpegPath = path.join(process.cwd(), `/ffmpeg.exe`);
+  // console.log("path worker", ffmpegPath);
   return new Promise((resolve, reject) => {
     const formatConfig = {
       //Despite what you read online these are the best codecs and work fine.
@@ -17,9 +19,10 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
       m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.1"] },
       flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
     };
+
     const { codec, additionalOptions = [] } = formatConfig[outputFormat];
     const ffmpegCommand = spawn(
-      join(__dirname, "\\ffmpeg.exe"),
+      ffmpegPath,
       [
         "-loglevel",
         "error", // Sends all errors to stdeer
@@ -34,7 +37,9 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
         "-y", //Disable prompts
         `"${outputFile}"`,
       ],
-      { shell: true }
+      {
+        shell: true,
+      }
     );
     ffmpegCommand.stderr.on("data", (data) => {
       parentPort.postMessage({ type: "stderr", data: data.toString() });

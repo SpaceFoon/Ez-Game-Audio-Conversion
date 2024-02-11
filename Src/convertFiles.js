@@ -34,7 +34,7 @@ const convertFiles = async (files) => {
     );
 
     return new Promise((resolve, reject) => {
-      console.log("m--dir", __dirname);
+      // console.log("m--dir", __dirname);
       const worker = new Worker(`${__dirname}/converterWorker.js`, {
         workerData: file,
       });
@@ -42,6 +42,7 @@ const convertFiles = async (files) => {
       worker.on("message", (message) => {
         if (message.type === "stderr") {
           console.error("ERROR MESSAGE FROM FFMPEG", message.data);
+          //console.warn(`filepath`, __dirname, __filename);
           addToLog(message, file);
           return;
         }
