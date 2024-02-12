@@ -1,6 +1,6 @@
 # EZ-Game-Audio-Conversion
 
-**Effortless unattended batch audio conversion tool.**
+**Effortless Unattended Batch Audio Conversion Tool.**
 
 ## Introduction
 
@@ -9,7 +9,7 @@ EZ-Game-Audio-Conversion offers a seamless solution to the common challenge of b
 ## Key Features
 
 - **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
-- **Efficient Conversion:** Utilizes multi-threading to process large volumes of audio files as fast and your PC allows.
+- **Efficient Conversion:** Utilizes multi-threading to process large volumes of audio files as fast as your PC allows.
 - **Auto Bitrate and Codec Selection:** Automatically selects Variable Bitrate (VBR) at 192kbs or equivalent. This is a balance between great sound quality and small file size.
 - **Comprehensive Format Support:** Converts between FLAC, WAV, MP3, OGG, and M4A, formats. More to come.
 - **Automatic Codec Selection:** Selects optimal codecs and bitrates for each file, ensuring high-quality output.
