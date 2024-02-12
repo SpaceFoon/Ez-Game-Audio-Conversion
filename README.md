@@ -1,100 +1,122 @@
 # EZ-Game-Audio-Conversion
 
-Simple batch audio conversion.
+**Effortless unattended batch audio conversion tool.**
 
-Multi-threaded and portable.
+## Introduction
 
-Just extract the zip and run the app.
+EZ-Game-Audio-Conversion offers a seamless solution to the common challenge of batch audio conversion, specifically tailored for game developers. With its intuitive interface and powerful capabilities, this tool streamlines the process of converting large numbers of audio files in various formats. Whether you're a seasoned developer or new to game creation, EZ-Game-Audio-Conversion simplifies audio management, ensuring high-quality output without the hassle of complex setup or configuration. Just unzip, run the app, and let it handle the rest.
 
-Search for audio files in a specified directory and its subdirectories, then convert them to different output formats.  
+## Key Features
 
-I made this for myself and other game devs that have run into the problem of of having hundreds and sometimes thousands of audio files, all in different formats, that needed to be converted to a few other formats depending on the build target of the game. Not all game devs are programmers, audio experts or even "power users". 
+- **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
+- **Efficient Conversion:** Utilizes multi-threading to process large volumes of audio files as fast and your PC allows.
+- **Auto Bitrate and Codec Selection:** Automatically selects Variable Bitrate (VBR) at 192kbs or equivalent. This is a balance between great sound quality and small file size.
+- **Comprehensive Format Support:** Converts between FLAC, WAV, MP3, OGG, and M4A, formats. More to come.
+- **Automatic Codec Selection:** Selects optimal codecs and bitrates for each file, ensuring high-quality output.
+- **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
+- **High-Quality Output:** Employs FFMPEG for superior sound quality and codec support.
+- **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best format. Unatteded confict resoultion means no interruptions.
 
-There should be no learning curve with this software. This softwares goal is to be as simple and easy as possible. To just work.
+## Installation
 
-Don't use this for audio meant to be used in a video editor! Video editors don't like the variable bit rate used.
-
-There is https://ffmpeg-batch.sourceforge.io/ that does this but it's confusing and slower but does much more if you need it. In my testing it hung and crashed a bit.
-
-
-## What
-
-- For the conversion of large numbers of audio files that may be buried in folders.
-- For the simplest interface with unattended batch jobs.
-- Supports conversion to and from FLAC, WAV, MP3, OGG, M4A and MIDI as an input only.
-
-## Why
-
-- Searches recursively in location to find all files that fit your criteria.
-- Unattended batches, click it and forget it.
-- Privacy and reliability, internet is never used!
-- Uses FFMPEG for the highest quality sound with the best codecs.
-- Automatically selects codec and bitrate for each file.
-
-## Additional Info
-
-- If duplicate file names with different extensions, automatically selects the file with the best format. ie FLAC over MP3.
-- Automatically selects bitrate about 192kbs or lower for the output. This is a balance between great sound quality and small file size.
-- Uses Variable Bitrate (VBR) when possible for smaller file size.
-- M4A files are compressed using the 'AAC' lossy. Use WAV or FLAC for lossless.
-
-## Planned
-
-- Add output location option.
-- An Advanced option set for setting bit rate. Not priory as a higher bitrate won't be noticeable 99.9% of the time.
-- Sister apps that do the same thing for pictures and videos!
+1. **Download** Zip file "EZ-Game-Audio.zip"
+2. **Extract**  folder "EZ-Game-Audio-Converter"
+3. **Run** file "EZ-Game-Audio.exe"
 
 ## Prerequisites
 
 - Windows PC
-- Windows Terminal installed for better looks.
-
-## Installation
-
-None.
-Just unzip the folder and run the exe.
-
-If you want to build from source, use the Pkg Node module and npm run build.
+- Windows Terminal for enhanced visual experience.
 
 ## Usage
 
-1. Follow the setup prompts. Recommend to copy and paste file path. Right click to paste.
+1. **Setup:** Follow the setup prompts. It's recommended to copy and paste file paths. Right-click to paste.
 
-2. The application will search for matching files based on the provided criteria and display the list of files to be converted.
+2. **File Selection:** The application will search for matching files based on the provided criteria and display the list of files to be converted.
 
-3. Duplicate file names with different extensions will be deleted from the list in favor of the best format.
+3. **Duplicate Handling:** Duplicate file names with different extensions will be automatically resolved, retaining the best or lossless format.
 
-4. Follow prompt if conflicting outfiles. Adding "a" to your selection will make it for all subsequent files.
-   - O: Overwrite file with the same name. Will not overwrite itself.
-   - R: Rename will add copy to the name
-   - S: Skip will not convert this file.
-   
-5. Review the list of files to be converted and confirm to proceed by typing "yes" or "no" when prompted.
+4. **Conflict Resolution:** Resolve conflicts for conflicting output files:
+   - `O`: Overwrite file with the same name. It won't overwrite itself.
+   - `R`: Rename the file.
+   - `S`: Skip the conversion for this file.
+   - Adding `a` to your selection will apply it to all subsequent files.
 
-6. While converting you can watch the progress and any errors. When all tasks are complete there will be logs in the file path you specified earlier. If there are any errors they will be in a different log.
+5. **Confirmation:** Review the list of files to be converted and confirm by typing "yes" or "no" when prompted.
+
+6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, logs will be available at the specified file path. Any errors will be logged separately.
+
+## Source
+
+Prefer a hands-on approach over trusting random files from the internet? No worries. Build EZ-Game-Audio-Conversion from source for peace of mind.
+
+Install NodeJs and the Pkg Node module then execute `npm run build`. Even simpler, use `npm run start`. Just remember to have `ffmpeg.exe` located alongside wherever you run the application from.
 
 ## License
 
-This project is licensed under the [GNU AFFERO GENERAL PUBLIC LICENSE](https://www.gnu.org/licenses/agpl-3.0.txt).
+This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
 
-## More info:
+## Audio File Type Compatibility
 
-https://rpgmaker.net/articles/2633/
-RMMV uses m4a as well but not really needed in 2023
+### RPG Maker
 
-Features	            MP3	Ogg	WAV	MIDI  
-Loop OK	            NO	   YES	YES	YES  
-Loop Inside (Tags)	NO	   YES	NO	   YES  
-File Size Optimize.	YES	YES	NO	   OMG YES  
-Realistic Sound	   YES	YES	YES	NO  
-RMMV Compatible	   NO	   YES	NO	   NO  
-RMVX/Ace Compatible	YES	YES	YES	YES  
-RMXP Compatible	   YES	YES	YES	YES  
-RM2003 Compatible	   YES	NO	   YES	YES  
+| Features           | MP3  | OGG  | WAV  | M4A[^1] | MIDI |
+|--------------------|------|------|------|------|------|
+| Loop OK            | NO   | YES  | YES  | YES  | YES  |
+| Loop Inside (Tags) | NO   | YES  | NO   | YES  | YES  |
+| File Size Optimize | YES  | YES  | NO   | YES[^2]   | OMG YES |
+| Realistic Sound    | YES  | YES  | YES  | YES  | NO   |
+| RMVX/Ace Compatible| YES  | YES  | YES  | NO   | YES  |
+| RMXP Compatible    | YES  | YES  | YES  | NO   | YES  |
+| RM2003 Compatible  | YES  | NO   | YES  | NO   | YES  |
+| RMMV Compatible    | NO   | YES  | NO   | YES  | NO   |
+| RMMZ Compatible    | NO   | YES  | NO   | NO   | NO   |
 
-M4A files are compressed using the 'AAC' lossy.
-Use WAV for Flac for lossless.
+[^1]: Not needed in 2024.
+[^2]: M4A can be lossless but isn't when converted by this software.
 
+- Source: [RPGMaker.net](https://rpgmaker.net/articles/2633/)
 
-Icon from https://icon-icons.com/download/16123/ICO/128/
-or here https://icon-icons.com/icon/audio-card/103432
+#### Unity
+
+- **Supported Formats:** MPEG(1/2/3), OGG, .aiff, .mod, .it, .s3m, .xm
+
+Source: [Unity Documentation](https://docs.unity3d.com/352/Documentation/Manual/AudioFiles.html)
+
+#### Godot
+
+- **Supported Formats:** WAV, MP3, OGG
+
+Source: [Godot Documentation](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_audio_samples.html#supported-audio-formats)
+
+#### Unreal Engine
+
+- **Supported Format:** WAV
+- Unreal Engine imports uncompressed, little endian, 16-bit Wave (WAV) files at any sample rate.
+
+Source: [Unreal Engine Documentation](https://docs.unrealengine.com/4.27/en-US/WorkingWithAudio/ImportingAudio/)
+
+#### Ren'Py
+
+- **Supported Formats:** Ogg Opus, Ogg Vorbis, MP3, MP2, FLAC, WAV (uncompressed 16-bit signed PCM only)
+
+Source: [Ren'Py Documentation](https://www.renpy.org/doc/html/audio.html)
+
+#### Game Maker Studio
+
+- **Supported Formats:** .ogg, *.mp3 and *.wav
+Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Audio/Audio.htm)
+
+#### Additional Comparison
+
+For a detailed comparison of audio formats for games, refer to [this article](https://dev.to/tenry/comparison-of-audio-formats-for-games-jak).
+
+### Additional Notes
+
+- M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
+- WAV uses the pcm_s16le codec, while OGG uses the newer Opus codec.
+- Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
+
+### Other Attributes
+
+- [Icon Source](https://icon-icons.com/icon/audio-card/103432)
