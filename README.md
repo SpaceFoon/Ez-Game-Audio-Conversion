@@ -122,5 +122,4 @@ For a detailed comparison of audio formats for games, refer to [this article](ht
 
 ### Other Attributes
 
-- [Icon Source](https://icon-icons.com/icon/audio-card/16123)
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
