@@ -5,15 +5,15 @@ const path = require("path");
 const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
   // console.log("process.env.ComSpec ", process.env.ComSpec);
   // console.log("DIRNAME worker", process.cwd(), __dirname, __filename);
-  // process.chdir(`C:\\snapshot\\Ez-Game-Audio-Conversion\\src`);
   // console.log("inputFile", inputFile);
-  const ffmpegPath = path.join(process.cwd(), `/ffmpeg.exe`);
-  // console.log("path worker", ffmpegPath);
+  const ffmpegPath = path.join(process.cwd(), `\\ffmpeg.exe`);
+  //ffmpegPath = ffmpegPath.replace(/ /g, "\\ ");
+  console.log("path worker", ffmpegPath);
   return new Promise((resolve, reject) => {
     const formatConfig = {
       //Despite what you read online these are the best codecs and work fine.
-      //-b:a = contant BR -q:a = variable.
-      ogg: { codec: "libopus", additionalOptions: ["-b:a", "192k"] }, //-b:a contant BR
+      //-b:a = constant BR -q:a = variable.
+      ogg: { codec: "libopus", additionalOptions: ["-b:a", "192k"] },
       mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] },
       wav: { codec: "pcm_s16le" },
       m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.1"] },
@@ -22,7 +22,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
 
     const { codec, additionalOptions = [] } = formatConfig[outputFormat];
     const ffmpegCommand = spawn(
-      ffmpegPath,
+      `"${ffmpegPath}"`,
       [
         "-loglevel",
         "error", // Sends all errors to stdeer
