@@ -86,7 +86,7 @@ const addToLog = async (log, file) => {
 
     if (!existsSync(fileName)) {
       try {
-        console.log("error.csv did not exist");
+        //console.log("error.csv did not exist");
         writeFileSync(fileName, "Timestamp,Error, file\n");
         return;
       } catch (error) {
@@ -105,7 +105,7 @@ const addToLog = async (log, file) => {
   }
   if (!existsSync(fileName)) {
     try {
-      console.log("logs.csv did not exist");
+      //console.log("logs.csv did not exist");
       writeFileSync(fileName, "Timestamp,Exit Code, Input, Output\n"); // Header for the CSV file
       return;
     } catch (error) {

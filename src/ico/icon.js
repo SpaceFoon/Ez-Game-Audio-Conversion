@@ -22,7 +22,7 @@ load().then((ResEdit) => {
       { lang: 1033, codepage: 1200 },
       {
         ProductName: "EZ Game Audio Conversion",
-        FileDescription: "Simple game audio conversion tool.",
+        FileDescription: "Simple Game Audio Conversion Tool.",
         CompanyName: "Fooney",
         LegalCopyright: `GPL-3.0`,
       }
