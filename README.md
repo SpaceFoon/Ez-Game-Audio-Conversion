@@ -1,4 +1,4 @@
-# EZ-Game-Audio-Conversion
+# EZ Game Audio Conversion
 
 **Effortless Unattended Batch Audio Conversion Tool.**
 
@@ -53,6 +53,8 @@ Prefer a hands-on approach over trusting random files from the internet? No worr
 
 Install NodeJs and the Pkg Node module then execute `npm run build`. Even simpler, use `npm run start`. Just remember to have `ffmpeg.exe` located alongside wherever you run the application from.
 
+<https://github.com/SpaceFoon/Ez-Game-Audio-Conversion>
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
@@ -61,17 +63,17 @@ This project is licensed under the [GNU Affero General Public License (AGPL-3.0)
 
 ### RPG Maker
 
-| Features           | MP3  | OGG  | WAV  | M4A[^1] | MIDI |
-|--------------------|------|------|------|------|------|
-| Loop OK            | NO   | YES  | YES  | YES  | YES  |
-| Loop Inside (Tags) | NO   | YES  | NO   | YES  | YES  |
-| File Size Optimize | YES  | YES  | NO   | YES[^2]   | OMG YES |
-| Realistic Sound    | YES  | YES  | YES  | YES  | NO   |
-| RMVX/Ace Compatible| YES  | YES  | YES  | NO   | YES  |
-| RMXP Compatible    | YES  | YES  | YES  | NO   | YES  |
-| RM2003 Compatible  | YES  | NO   | YES  | NO   | YES  |
-| RMMV Compatible    | NO   | YES  | NO   | YES  | NO   |
-| RMMZ Compatible    | NO   | YES  | NO   | NO   | NO   |
+| Features |  MP3 |  OGG | WAV | M4A[^1] | MIDI |
+|--|--|--|--|--|--|
+| Loop OK | NO | YES | YES | YES | YES |
+| Loop Inside (Tags) | NO | YES | NO | YES | YES |
+| File Size Optimize | YES | YES | NO | YES[^2] | OMG YES |
+| Realistic Sound | YES | YES | YES | YES | NO |
+| RMVX/Ace Compatible| YES | YES | YES | NO | YES |
+| RMXP Compatible | YES | YES | YES | NO | YES |
+| RM2003 Compatible | YES | NO | YES | NO | YES |
+| RMMV Compatible | NO | YES | NO | YES | NO |
+| RMMZ Compatible | NO | YES | NO | NO | NO |
 
 [^1]: Not needed in 2024.
 [^2]: M4A can be lossless but isn't when converted by this software.
@@ -80,8 +82,7 @@ This project is licensed under the [GNU Affero General Public License (AGPL-3.0)
 
 #### Unity
 
-- **Supported Formats:**
-`MPEG(1/2/3), OGG, .aiff, .mod, .it, .s3m, .xm`
+- **Supported Formats:** `MPEG(1/2/3), OGG, .aiff, .mod, .it, .s3m, .xm`
 
 Source: [Unity Documentation](https://docs.unity3d.com/352/Documentation/Manual/AudioFiles.html)
 
@@ -121,4 +122,5 @@ For a detailed comparison of audio formats for games, refer to [this article](ht
 
 ### Other Attributes
 
-- [Icon Source](https://icon-icons.com/icon/audio-card/103432)
+- [Icon Source](https://icon-icons.com/icon/audio-card/16123)
+- [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
