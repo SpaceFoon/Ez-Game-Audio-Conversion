@@ -1,5 +1,5 @@
 const { existsSync } = require("fs");
-const { join, basename, extname, dirname } = require("path");
+const { join, basename, extname, dirname, normalize } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings } = require("./utils");
 
@@ -18,13 +18,20 @@ const createConversionList = async (files) => {
         `${basename(inputFile, extname(inputFile))} copy (1)`
       )}.${outputFormat}`;
 
-      if (inputFile == outputFile) continue;
+      //yes these are both required
+      if (inputFile == outputFile) {
+        continue;
+      }
+      if (inputFile.toLowerCase() === outputFile.toLowerCase()) {
+        continue;
+      }
 
       const responseActions = {
         o: () => {
           return (response = null);
         },
         oa: () => {
+          if (!existsSync(outputFile)) return;
           /* Nothing to do as default is overwrite */
         },
         r: () => {
@@ -32,6 +39,7 @@ const createConversionList = async (files) => {
           return (response = null);
         },
         ra: () => {
+          if (!existsSync(outputFile)) return;
           outputFile = outputFileCopy;
         },
         s: () => {
@@ -39,11 +47,13 @@ const createConversionList = async (files) => {
           return (response = null);
         },
         sa: () => {
+          if (!existsSync(outputFile)) return;
           outputFile = "skipped! ⏭️";
         },
       };
       switch (response) {
         case "":
+          console.error("response was empty:", response);
           break;
         case "ra":
           responseActions["ra"]();
@@ -67,8 +77,8 @@ const createConversionList = async (files) => {
                     `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
                   )
                 );
-
                 response = response.trim().toLowerCase();
+
                 if (responseActions[response]) {
                   responseActions[response]();
                   break;
@@ -76,7 +86,10 @@ const createConversionList = async (files) => {
                   response = null;
                   console.warn("\n⚠️Invalid selection! Try again⚠️");
                 }
-              } else break;
+              } else {
+                //console.warn(outputFile);
+                break;
+              }
             }
           }
       }

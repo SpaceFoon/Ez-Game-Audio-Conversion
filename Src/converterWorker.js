@@ -7,8 +7,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
   // console.log("DIRNAME worker", process.cwd(), __dirname, __filename);
   // console.log("inputFile", inputFile);
   const ffmpegPath = path.join(process.cwd(), `\\ffmpeg.exe`);
-  //ffmpegPath = ffmpegPath.replace(/ /g, "\\ ");
-  console.log("path worker", ffmpegPath);
+  //console.log("path worker", ffmpegPath);
   return new Promise((resolve, reject) => {
     const formatConfig = {
       //Despite what you read online these are the best codecs and work fine.
