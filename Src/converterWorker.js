@@ -1,12 +1,12 @@
 // converterWorker.js
 const { spawn } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
-const path = require("path");
+const { join } = require("path");
 const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
   // console.log("process.env.ComSpec ", process.env.ComSpec);
   // console.log("DIRNAME worker", process.cwd(), __dirname, __filename);
   // console.log("inputFile", inputFile);
-  const ffmpegPath = path.join(process.cwd(), `\\ffmpeg.exe`);
+  const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
   //console.log("path worker", ffmpegPath);
   return new Promise((resolve, reject) => {
     const formatConfig = {

@@ -70,13 +70,13 @@ const convertFiles = async (files) => {
               failedFiles.push(file);
             }
             console.error(
-              // chalk.bgRed(
-              "\n🚨🚨⛔ Worker",
-              workerCounter,
-              "did not finish file ⛔🚨🚨: ",
-              file.outputFile,
-              "🔇"
-              // )
+              chalk.bgRed(
+                "\n🚨🚨⛔ Worker",
+                workerCounter,
+                "did not finish file ⛔🚨🚨: ",
+                file.outputFile,
+                "🔇"
+              )
             );
             resolve();
           }
