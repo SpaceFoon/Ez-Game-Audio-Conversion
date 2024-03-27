@@ -4,23 +4,30 @@
 
 ## Introduction
 
-EZ-Game-Audio-Conversion offers a seamless solution to the common challenge of batch audio conversion, specifically tailored for game developers. With its intuitive interface and powerful capabilities, this tool streamlines the process of converting large numbers of audio files in various formats. Whether you're a seasoned developer or new to game creation, EZ-Game-Audio-Conversion simplifies audio management, ensuring high-quality output without the hassle of complex setup or configuration.
+EZ-Game-Audio-Conversion offers a seamless solution to the common challenge of batch audio conversion, specifically tailored for game developers. With its intuitive interface and powerful capabilities, this tool streamlines the process of converting batch audio conversion with various formats. Whether you're a seasoned developer or new to game creation, EZ-Game-Audio-Conversion simplifies audio management, ensuring high-quality output without the hassle of complex setup or configuration.
+
+Time spent fiddling with a tool is time not spent working on your game.
+
+This tool streamlines the process of batch audio file conversion.
+
+Tailored specifically for game developers, this tool ensures top-notch audio quality and small file sizes without the need for extensive knowledge. With almost no setup time and multi-threaded conversion, it's the easiest, fastest, and most reliable solution available. Plus, now with support for loop tags!
 
 ## Features
 
 - **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
-- **Unattended Batch Jobs**: With recursive file searching and conflict resolution, just set it and forget it.
+- **Unattended Batch Jobs**: With recursive file searching and unattended conflict resolution, just set it and forget it.
 - **Multi-threading:** No job too big or small when your CPU is fully utilized.
-- **Automatic Bitrate and Codec Selection:** Automatically selects best codec and Variable Bitrate (VBR) at 192kbs or near equivalent. Balanced between great sound quality and small file size.
+- **Automatic Bitrate and Codec Selection:** Automatically selects best codec and Variable Bitrate (VBR) at 128kbs or near equivalent. Balanced between great sound quality and small file size.
 - **Comprehensive Format Support:** Converts between FLAC, WAV, MP3, OGG, and M4A, formats. More to come.
-- **Automatic Bitrate and Codec Selection:** Selects optimal codecs and bitrates for each file, ensuring high-quality output.
 - **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
-- **High-Quality Output:** Employs FFMPEG for superior sound quality and codec support.
-- **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best format.
+- **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support and speed.
+- **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best input file.
+- **Meta Data Support:** Will transfer basic meta data like title and artist. Works with all formats.
+- **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically.
 
 ## Installation
 
-1. **Download** Zip file "EZ-Game-Audio.zip"
+1. **Download** Zip "EZ-Game-Audio.zip"
 2. **Extract**  folder "EZ-Game-Audio-Converter"
 3. **Run** file "EZ-Game-Audio.exe"
 
@@ -38,7 +45,7 @@ EZ-Game-Audio-Conversion offers a seamless solution to the common challenge of b
 3. **Duplicate Handling:** Duplicate file names with different extensions will be automatically resolved, retaining the best or lossless format.
 
 4. **Conflict Resolution:** Resolve conflicts for conflicting output files:
-   - `O`: Overwrite file with the same name. File will not overwrite itself.
+   - `O`: Overwrite file with the same name. File will not overwrite itself but will skip instead.
    - `R`: Rename the file.
    - `S`: Skip the conversion for this file.
    - Adding `a` to your selection will apply it to all subsequent files.
@@ -75,7 +82,8 @@ This project is licensed under the [GNU Affero General Public License (AGPL-3.0)
 | RMMV Compatible | NO | YES | NO | YES | NO |
 | RMMZ Compatible | NO | YES | NO | NO | NO |
 
-[^1]: Not needed in 2024.
+RPG Maker MV can support Ogg Opus but the editor preview won't work.
+[^1]: Not needed in 2024?
 [^2]: M4A can be lossless but isn't when converted by this software.
 
 - Source: [RPGMaker.net](https://rpgmaker.net/articles/2633/)
@@ -119,6 +127,10 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 #### Additional Comparison
 
 For a detailed comparison of audio formats for games, refer to [this article](https://dev.to/tenry/comparison-of-audio-formats-for-games-jak).
+
+https://wiki.xiph.org/Opus_Recommended_Settings
+
+
 
 ### Other Attributes
 
