@@ -4,13 +4,7 @@
 
 ## Introduction
 
-EZ-Game-Audio-Conversion offers a seamless solution to the common challenge of batch audio conversion, specifically tailored for game developers. With its intuitive interface and powerful capabilities, this tool streamlines the process of converting batch audio conversion with various formats. Whether you're a seasoned developer or new to game creation, EZ-Game-Audio-Conversion simplifies audio management, ensuring high-quality output without the hassle of complex setup or configuration.
-
-Time spent fiddling with a tool is time not spent working on your game.
-
-This tool streamlines the process of batch audio file conversion.
-
-Tailored specifically for game developers, this tool ensures top-notch audio quality and small file sizes without the need for extensive knowledge. With almost no setup time and multi-threaded conversion, it's the easiest, fastest, and most reliable solution available. Plus, now with support for loop tags!
+EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion. Tailored specifically for game developers, this tool ensures top-notch audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest, and most reliable solution available. Plus, now with support for loop tags!
 
 ## Features
 
@@ -58,8 +52,9 @@ Tailored specifically for game developers, this tool ensures top-notch audio qua
 
 Prefer a hands-on approach over trusting random files from the internet? No worries. Build EZ-Game-Audio-Conversion from source for peace of mind.
 
-Install NodeJs and the Pkg Node module then execute `npm run build`. Even simpler, use `npm run start`. Just remember to have `ffmpeg.exe` located alongside wherever you run the application from.
+Install NodeJs and the Pkg Node module then execute `npm run build`. Even simpler, use `npm run start`. Just remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
 
+To change things like bitrate and codec, look in `converterWorker.js`. 
 <https://github.com/SpaceFoon/Ez-Game-Audio-Conversion>
 
 ## License
