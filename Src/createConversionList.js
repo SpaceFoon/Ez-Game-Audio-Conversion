@@ -5,6 +5,7 @@ const { getAnswer, settings } = require("./utils");
 
 //Create final list of files to convert by asking user for each conflicting file
 const createConversionList = async (files) => {
+  let convertSelf;
   const conversionList = [];
   let response = null;
   for (const inputFile of files) {
@@ -15,15 +16,45 @@ const createConversionList = async (files) => {
       )}.${outputFormat}`;
       let outputFileCopy = `${join(
         dirname(inputFile),
-        `${basename(inputFile, extname(inputFile))} copy (1)`
+        `${basename(inputFile, extname(inputFile))}-copy(1)`
       )}.${outputFormat}`;
 
-      //yes these are both required
-      if (inputFile == outputFile) {
-        continue;
-      }
-      if (inputFile.toLowerCase() === outputFile.toLowerCase()) {
-        continue;
+      //yes, both checks are required
+      if (
+        inputFile === outputFile ||
+        inputFile.toLowerCase() === outputFile.toLowerCase()
+      ) {
+        if (convertSelf === "yes") {
+          outputFile = `${join(
+            dirname(inputFile),
+            `${basename(inputFile, extname(inputFile))}-copy(2)`
+          )}.${outputFormat}`;
+        } else if (convertSelf === "no") {
+          continue;
+        } else {
+          while (!convertSelf) {
+            convertSelf = await getAnswer(
+              chalk.blueBright(
+                '\n Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
+              )
+            );
+
+            if (/^no$/i.test(convertSelf)) {
+              console.log("🚫 Not converting files to own type! 🚫");
+              convertSelf = "no";
+              continue;
+            }
+            if (!/^yes$/i.test(convertSelf)) {
+              console.warn('⚠️ Invalid input, please type "yes" or "no" ⚠️');
+            }
+            if (/^yes$/i.test(convertSelf)) {
+              outputFile = `${join(
+                dirname(inputFile),
+                `${basename(inputFile, extname(inputFile))}-copy(2)`
+              )}.${outputFormat}`;
+            }
+          }
+        }
       }
 
       const responseActions = {
@@ -106,9 +137,9 @@ const createConversionList = async (files) => {
     );
     console.log(
       chalk.cyanBright(
-        "\n🔄 Pending conversion 🔄",
+        "\n🔄 Pending Conversion 🔄",
         conversionList.length,
-        "files\n",
+        " Output Files\n",
         numbered.join("\n")
       )
     );

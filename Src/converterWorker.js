@@ -48,12 +48,12 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
 
   let loopStart = parseInt(
     metadata.streams[0]?.tags?.LOOPSTART ||
-      metadata.format.tags.LOOPSTART ||
+      metadata.format?.tags?.LOOPSTART ||
       null
   );
   let loopLength = parseInt(
     metadata.streams[0]?.tags?.LOOPLENGTH ||
-      metadata.format.tags.LOOPLENGTH ||
+      metadata.format?.tags?.LOOPLENGTH ||
       null
   );
   //opus doesn't do 441000 hz.
@@ -113,13 +113,14 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
     const formatConfig = {
       //Despite what you read online these are the best codecs and work fine with most game engines.
       //-b:a = constant BR -q:a = variable.
+      //https://trac.ffmpeg.org/wiki/Encode/MP3
       ogg: {
         codec: "libopus",
-        additionalOptions: ["-b:a", "92k", "-ar 48000"],
+        additionalOptions: ["-b:a", "64k", "-ar 48000"], //vbr by default
       },
-      mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "6"] },
+      mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] }, //175 Average	150-195	-q:a 3
       wav: { codec: "pcm_s16le" },
-      m4a: { codec: "aac ", additionalOptions: ["-q:a", ".8"] },
+      m4a: { codec: "aac ", additionalOptions: ["-q:a", ".8"] }, //https://trac.ffmpeg.org/wiki/Encode/AAC
       flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
     };
     const titleData = title ? `-metadata title="${title}"` : "";
@@ -146,7 +147,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
         "-y", //Overwrite output files without asking.
         `${titleData}`,
         `${loopData}`, //retains loop tags if they are present
-        // `-ac ${channels}`, // retain inputs number of tracks, Mono/Stereo or more
+        `-ac ${channels}`, // retain inputs number of tracks, Mono/Stereo or more
         `"${outputFile}"`,
       ],
       {
@@ -161,7 +162,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
       resolve();
     });
     ffmpegCommand.on("error", (error) => {
-      console.error("ERROR IN WORKER FFMPEGCOMMAND", error);
+      console.error("🛑 ERROR IN FFMPEGCOMMAND", error);
       reject(error);
     });
   });
@@ -170,7 +171,14 @@ const runConversion = async () => {
   try {
     await converterWorker(workerData);
   } catch (error) {
-    //parentPort.postMessage("error", error);
+    // no idea why this error happens as soon as you load the app but it gets in the way.
+    if (
+      error !=
+      "TypeError: Cannot destructure property 'inputFile' of 'object null' as it is null."
+    ) {
+      console.error("🛑 ERROR in converterWorker:", error);
+      //parentPort.postMessage("error", error);
+    }
   }
 };
 runConversion();
