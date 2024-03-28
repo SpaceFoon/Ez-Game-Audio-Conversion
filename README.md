@@ -16,8 +16,8 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion.
 - **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
 - **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support and speed.
 - **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best input file.
-- **Meta Data Support:** Will transfer basic meta data like title and artist. Works with all formats.
-- **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically.
+- **Meta Data Support:** Will transfer basic meta data like title. Works with all formats.
+- **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
 
 ## Installation
 
@@ -28,7 +28,7 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion.
 ## Prerequisites
 
 - Windows PC
-- Windows Terminal for enhanced visual experience.
+- Windows Terminal from the Windows Store for enhanced visual experience.
 
 ## Usage
 
@@ -77,7 +77,9 @@ This project is licensed under the [GNU Affero General Public License (AGPL-3.0)
 | RMMV Compatible | NO | YES | NO | YES | NO |
 | RMMZ Compatible | NO | YES | NO | NO | NO |
 
-RPG Maker MV can support Ogg Opus but the editor preview won't work.
+RPG Maker MV can support Ogg Opus but the editor preview won't work. 
+
+If you want loop tags to work to work in RMMV then you will need my plugin. [FugsOpusMV](https://github.com/SpaceFoon/FugsOpusMV)
 [^1]: Not needed in 2024?
 [^2]: M4A can be lossless but isn't when converted by this software.
 
