@@ -1,14 +1,14 @@
 {
   "name": "ez-game-audio-conversion",
-  "version": "1.3.2",
-  "description": "Unattended batch conversion of audio file types with recursive searching. Powered by ffmpeg.",
+  "version": "1.4.0",
+  "description": "Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.",
   "main": "app.js",
   "bin": {
     "ez-game-audio-conversion": "src/app.js"
   },
   "scripts": {
     "start": "node ./src/app.js",
-    "build": "pkg . -o ./dist/EZ-Game-Audio.exe",
+    "build": "set PKG_ENV=packaging && pkg . -o ./dist/EZ-Game-Audio-Conversion/EZ-Game-Audio.exe --compress GZIP && node src/ico/icon.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "pkg": {
@@ -39,5 +39,9 @@
   "bugs": {
     "url": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/issues"
   },
-  "homepage": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion#readme"
+  "homepage": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion#readme",
+  "devDependencies": {
+    "pkg": "^5.8.1",
+    "resedit": "^2.0.0"
+  }
 }

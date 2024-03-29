@@ -171,16 +171,11 @@ const runConversion = async () => {
   try {
     await converterWorker(workerData);
   } catch (error) {
-    // no idea why this error happens as soon as you load the app but it gets in the way.
-    if (
-      error !=
-      "TypeError: Cannot destructure property 'inputFile' of 'object null' as it is null."
-    ) {
-      console.error("🛑 ERROR in converterWorker:", error);
-      //parentPort.postMessage("error", error);
-    }
+    console.error("🛑 ERROR in converterWorker:", error);
+    //parentPort.postMessage("error", error);
   }
 };
+
 runConversion();
 module.exports = {
   runConversion,

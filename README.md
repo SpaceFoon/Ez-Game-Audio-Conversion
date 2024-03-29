@@ -4,7 +4,7 @@
 
 ## Introduction
 
-EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion. Tailored specifically for game developers, this tool ensures top-notch audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest, and most reliable solution available. Plus, now with support for loop tags!
+EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest, and most reliable solution available. Plus, now with support for loop tags!
 
 ## Features
 
@@ -50,12 +50,19 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion.
 
 ## Source
 
-Prefer a hands-on approach over trusting random files from the internet? No worries. Build EZ-Game-Audio-Conversion from source for peace of mind.
+Prefer a hands-on approach over trusting random files from the internet? Here's how:
 
-Install NodeJs and the Pkg Node module then execute `npm run build`. Even simpler, use `npm run start`. Just remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
+1. Clone the repository or download.
+
+2. In the project folder, run `npm i` then `npm run build` to build the executable.
+ OR
+2. Or run `npm i` then `npm run start` to run from your terminal.
+
+3. Remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
+[FFMPEG Essentials Build Download](https://www.gyan.dev/ffmpeg/builds/#release-builds)
 
 To change things like bitrate and codec, look in `converterWorker.js`. 
-<https://github.com/SpaceFoon/Ez-Game-Audio-Conversion>
+[On Github](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
 
 ## License
 

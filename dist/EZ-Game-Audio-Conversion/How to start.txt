@@ -1,2 +1,2 @@
-1. Extract the folder from Zip.
+1. Extract the folder from Zip. Cannot run from zip
 2. Open EZ-Game-Audio.exe

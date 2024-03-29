@@ -7,7 +7,11 @@ const convertFiles = require("./convertFiles");
 const { handleError, settings } = require("./utils");
 const finalize = require("./finalize");
 const { join } = require("path");
-const { converterWorker, runConversion } = require("./converterWorker");
+// this only runs when packaging the file with pkg.js
+if (process.env.PKG_ENV === "packaging") {
+  const { converterWorker, runConversion } = require("./converterWorker");
+}
+
 join(__dirname, "./converterWorker.js");
 
 // console.log(converterWorker, runConversion);

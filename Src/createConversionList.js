@@ -27,7 +27,7 @@ const createConversionList = async (files) => {
         if (convertSelf === "yes") {
           outputFile = `${join(
             dirname(inputFile),
-            `${basename(inputFile, extname(inputFile))}-copy(2)`
+            `${basename(inputFile, extname(inputFile))}-copy(1)`
           )}.${outputFormat}`;
         } else if (convertSelf === "no") {
           continue;
@@ -50,7 +50,7 @@ const createConversionList = async (files) => {
             if (/^yes$/i.test(convertSelf)) {
               outputFile = `${join(
                 dirname(inputFile),
-                `${basename(inputFile, extname(inputFile))}-copy(2)`
+                `${basename(inputFile, extname(inputFile))}-copy(1)`
               )}.${outputFormat}`;
             }
           }
