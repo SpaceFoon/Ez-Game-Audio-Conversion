@@ -45,15 +45,14 @@ const getUserInput = (settings) => {
               askOutputPath();
             }
             askInputFormats();
-          } else {
-            settings.outputFilePath = outputFilePath;
-            console.log(
-              chalk.green.italic(
-                `\n📝 Output Filepath: ${settings.outputFilePath} ✅`
-              )
-            );
-            askInputFormats();
           }
+          settings.outputFilePath = outputFilePath;
+          console.log(
+            chalk.green.italic(
+              `\n📝 Output Filepath: ${settings.outputFilePath} ✅`
+            )
+          );
+          askInputFormats();
         }
       );
     };
