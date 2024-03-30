@@ -3,48 +3,71 @@ const { spawn, execSync } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
 const { join } = require("path");
 
-async function getMetadata(inputFile) {
+const getMetadata = async (inputFile) => {
   // console.log("start get meta data");
   try {
+    const ffprobePath = join(process.cwd(), `\\ffprobe.exe`);
     const output = execSync(
-      `ffprobe -v quiet -print_format json -show_format -show_streams "${inputFile}"`,
+      `"${ffprobePath}" -v quiet -print_format json -show_format -show_streams "${inputFile}"`,
       { encoding: "utf8" }
     );
     const metadata = JSON.parse(output);
     // console.log("return meta");
     return metadata;
   } catch (error) {
-    console.error("Error:", error.message);
+    console.error("😅 Error running ffprobe.exe:", error.message);
     return null;
   }
-}
+};
 
 const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
+  console.log(inputFile, outputFile, outputFormat);
   const metadata = await getMetadata(inputFile);
   // console.log("start convertworker");
   if (!metadata) {
-    console.error("No meta data found!!!:", inputFile);
+    return console.error("No meta data found!!!:", inputFile);
   }
-  // console.log("22222222222");
   // console.log("metadata", metadata);
-  let channels = null;
-  let bitrate = null;
-  let sampleRate = null;
   const streamTags = metadata.streams[0].tags || "";
   const formatTags = metadata.format.tags || "";
 
-  const title =
-    streamTags?.title ||
-    streamTags?.TITLE ||
-    formatTags?.title ||
-    formatTags?.TITLE ||
-    "";
-
-  if (metadata.streams[0]) {
-    channels = metadata.streams[0].channels || 2;
-    bitrate = metadata.streams[0].bit_rate || null;
-    sampleRate = metadata.streams[0].sample_rate || null;
+  function getMetadataField(tags, formatTags, field) {
+    const tagVariants = [field.toLowerCase(), field.toUpperCase()];
+    for (const tag of tagVariants) {
+      if (tags[tag]) return tags[tag];
+      if (formatTags[tag]) return formatTags[tag];
+    }
+    return "";
   }
+  const metadataFields = [
+    "title",
+    "artist",
+    "album",
+    "comment",
+    "date",
+    "track",
+    "genre",
+    "album_artist",
+  ];
+  const metadataDataArray = [];
+
+  metadataFields.forEach((field) => {
+    // Get the metadata value for the current field
+    const value = getMetadataField(streamTags, formatTags, field);
+    // If the value exists, add it to the metadata data array
+    if (value) {
+      // Adjust field names as necessary
+      const adjustedField = field === "track" ? "trackNumber" : field;
+      metadataDataArray.push(`-metadata ${adjustedField}="${value}"`);
+    }
+  });
+  const metaData = metadataDataArray.join(" ");
+  console.log("meta data---------", metaData);
+
+  const channels = "-ac " + metadata.streams[0].channels || "-ac 2";
+  const bitrate = metadata.streams[0].bit_rate || null;
+  const sampleRate = metadata.streams[0].sample_rate || null;
+  let sampleString = "";
 
   let loopStart = parseInt(
     metadata.streams[0]?.tags?.LOOPSTART ||
@@ -59,22 +82,41 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
   //opus doesn't do 441000 hz.
   if (outputFormat === "ogg") {
     // console.log(typeof sampleRate);
-
+    let newSample = null;
     if (typeof sampleRate === "string") {
-      // Check if sampleRate is a string
+      // Only the following values are valid sampling rates for opus: 48000, 24000, 16000, 12000, or 8000
+      // vorbis is 8k to 192k
+      // mp3 = 8; 11.025; 12; 16; 22.05; 24; 32; 44.1; 48;
+      // ffmpeg can handle all but opus which it just makes everything 48k which is not needed
+      // and a waste of space for some audio files.
       const sampleRateNumber = parseInt(sampleRate); // Convert string to number
       if (!isNaN(sampleRateNumber)) {
-        if (sampleRateNumber !== 48000) {
-          // console.log("sampleRate !== 48000", sampleRateNumber);
-          const ratio = 48000 / sampleRateNumber;
-          // console.log("ratio", ratio);
-          // console.log(loopStart);
-          loopStart = Math.round(loopStart * ratio);
-          // console.log(loopStart);
-          // console.log(loopLength);
-          loopLength = Math.round(loopLength * ratio);
-          // console.log(loopLength);
+        if (sampleRateNumber >= 48000) {
+          newSample = 48000;
+        } else if (sampleRateNumber >= 32000) {
+          newSample = 48000;
+        } else if (sampleRateNumber >= 22050) {
+          newSample = 24000;
+        } else if (sampleRateNumber > 16000) {
+          newSample = 24000;
+        } else if (sampleRateNumber > 12000) {
+          newSample = 16000;
+        } else if (sampleRateNumber >= 8000) {
+          newSample = 12000;
+        } else if (sampleRateNumber < 8000) {
+          newSample = 8000;
         }
+        // console.log("sampleRate !== 48000", sampleRateNumber);
+        const ratio = 48000 / sampleRateNumber;
+        // console.log("ratio", ratio);
+        // console.log(loopStart);
+        loopStart = Math.round(loopStart * ratio);
+        // console.log(loopStart);
+        // console.log(loopLength);
+        loopLength = Math.round(loopLength * ratio);
+        // console.log(loopLength);
+        sampleString = "-ar " + newSample.toString();
+        console.log("new sample rate-------", sampleString);
       } else {
         console.error("Invalid sampleRate:", sampleRate);
       }
@@ -100,34 +142,35 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
   // console.log(outputFormat);
   if (!isNaN(loopStart) && !isNaN(loopLength)) {
     loopData = `-metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
-    // this doesn't work anyway...
-    if (outputFormat === "m4a" || outputFormat === "wav") {
-      // console.log("is wav or m4a");
-      loopData = `-metadata:s:a:0 LOOPSTART="${loopStart}" -metadata:s:a:0 LOOPLENGTH="${loopLength}"`;
-    }
     // console.log("loop data detected:", loopData);
   }
+  const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
+  // console.log("start promise");
+  const formatConfig = {
+    // Despite what you read online these are the best codecs and work fine with most game engines.
 
+    // https://trac.ffmpeg.org/wiki/Encode/MP3
+    // https://www.reddit.com/r/ffmpeg/comments/ms77y4/libfdk_aac_vs_aac/
+    // https://trac.ffmpeg.org/wiki/Encode/AAC
+    // -b:a = constant BR -q:a = variable.
+    ogg: {
+      codec: "libopus",
+      additionalOptions: [
+        "-b:a",
+        "64k",
+        // , "-ar 48000"
+      ], //vbr by default
+    },
+    mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] }, //175 Average	150-195	-q:a 3
+    wav: { codec: "pcm_s16le" },
+    m4a: { codec: "aac ", additionalOptions: ["-q:a", ".8"] },
+    aiff: { codec: "pcm_s16le" },
+    flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
+  };
+
+  // console.log("titleData", titleData);
+  const { codec, additionalOptions = [] } = formatConfig[outputFormat];
   return new Promise((resolve, reject) => {
-    // console.log("start promise");
-    const formatConfig = {
-      //Despite what you read online these are the best codecs and work fine with most game engines.
-      //-b:a = constant BR -q:a = variable.
-      //https://trac.ffmpeg.org/wiki/Encode/MP3
-      ogg: {
-        codec: "libopus",
-        additionalOptions: ["-b:a", "64k", "-ar 48000"], //vbr by default
-      },
-      mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] }, //175 Average	150-195	-q:a 3
-      wav: { codec: "pcm_s16le" },
-      m4a: { codec: "aac ", additionalOptions: ["-q:a", ".8"] }, //https://trac.ffmpeg.org/wiki/Encode/AAC
-      flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
-    };
-    const titleData = title ? `-metadata title="${title}"` : "";
-    // console.log("titleData", titleData);
-    const { codec, additionalOptions = [] } = formatConfig[outputFormat];
-    const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
-    //------------------------------conversion-------------------------------------------------------------------------
     const ffmpegCommand = spawn(
       `"${ffmpegPath}"`,
       [
@@ -141,13 +184,14 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
         "-c:a", // = codec:audio Indicates the codec for the audio stream.
         codec,
         ...additionalOptions, // Specific codec settings
+        `${sampleString}`,
         "-vn", // -vn stops ffmpeg from making output a video file and causing errors
         // "-threads", // will tinker with one day
         // "1",
         "-y", //Overwrite output files without asking.
-        `${titleData}`,
+        `${metaData}`, //Basic meta data
         `${loopData}`, //retains loop tags if they are present
-        `-ac ${channels}`, // retain inputs number of tracks, Mono/Stereo or more
+        `${channels}`, // retain inputs number of tracks, Mono/Stereo or more
         `"${outputFile}"`,
       ],
       {
@@ -167,12 +211,13 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
     });
   });
 };
+
 const runConversion = async () => {
   try {
     await converterWorker(workerData);
   } catch (error) {
     console.error("🛑 ERROR in converterWorker:", error);
-    //parentPort.postMessage("error", error);
+    parentPort.postMessage("error", error);
   }
 };
 
@@ -182,3 +227,13 @@ module.exports = {
   converterWorker,
   getMetadata,
 };
+
+// const title = getMetadataField(streamTags, formatTags, "title");
+// const artist = getMetadataField(streamTags, formatTags, "artist");
+// const album = getMetadataField(streamTags, formatTags, "album");
+// const comment = getMetadataField(streamTags, formatTags, "comment");
+// const date = getMetadataField(streamTags, formatTags, "date");
+// const track = getMetadataField(streamTags, formatTags, "track");
+// const genre = getMetadataField(streamTags, formatTags, "genre");
+// const album_artist = getMetadataField(streamTags, formatTags, "album_artist");
+// const metaData = metadataDataArray.join(" ");

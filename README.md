@@ -64,15 +64,17 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 To change things like bitrate and codec, look in `converterWorker.js`. 
 [On Github](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
 
-## License
+### Additional Notes
 
-This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
+- M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
+- WAV and AIFF uses the pcm_s16le codec, while OGG uses the newer Opus codec.
+- Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
 
 ## Audio File Type Compatibility
 
 ### RPG Maker
 
-| Features |  MP3 |  OGG | WAV | M4A[^1] | MIDI |
+| Features |  MP3 |  OGG[^3] | WAV | M4A[^1] | MIDI |
 |--|--|--|--|--|--|
 | Loop OK | NO | YES | YES | YES | YES |
 | Loop Inside (Tags) | NO | YES | NO | YES | YES |
@@ -84,31 +86,33 @@ This project is licensed under the [GNU Affero General Public License (AGPL-3.0)
 | RMMV Compatible | NO | YES | NO | YES | NO |
 | RMMZ Compatible | NO | YES | NO | NO | NO |
 
-RPG Maker MV can support Ogg Opus but the editor preview won't work. 
-
-If you want loop tags to work to work in RMMV then you will need my plugin. [FugsOpusMV](https://github.com/SpaceFoon/FugsOpusMV)
 [^1]: Not needed in 2024?
 [^2]: M4A can be lossless but isn't when converted by this software.
+[^3]: Opus codec for OGG files is better but Vorbis is more compatiable.
 
 - Source: [RPGMaker.net](https://rpgmaker.net/articles/2633/)
 
+RPG Maker **MV and MZ will play Opus but do not support loop tags**. MV will not play Opus in the editor.
+
+If you want Opus loop tags to work to work in RMMV-MZ then you will need my plugin. 
+[Download FugsOpusMV Here!](https://spacefoon.itch.io/fugs-ogg-opus-loop-tag-support-for-rmmv)
+
 #### Unity
 
-- **Supported Formats:** `MPEG(1/2/3), OGG, .aiff, .mod, .it, .s3m, .xm`
+- **Supported Formats:** `MPEG(1/2/3), OGG Vorbis, .aiff, .mod, .it, .s3m, .xm`
 
 Source: [Unity Documentation](https://docs.unity3d.com/352/Documentation/Manual/AudioFiles.html)
 
 #### Godot
 
-- **Supported Formats:** `WAV, MP3, OGG`
+- **Supported Formats:** `WAV, MP3, OGG Vorbis`
 
 Source: [Godot Documentation](https://docs.godotengine.org/en/stable/tutorials/assets_pipeline/importing_audio_samples.html#supported-audio-formats)
 
 #### Unreal Engine
 
 - **Supported Format:** `WAV`
-- Unreal Engine imports uncompressed, little endian, 16-bit Wave (WAV) files at any sample rate which this software exports to.
-
+- Unreal Engine currently imports uncompressed, little endian , 16-bit Wave (WAV) files at any sample rate (although, we recommend sample rates of 44.1 kHz or 22.05 kHz).
 Source: [Unreal Engine Documentation](https://docs.unrealengine.com/4.27/en-US/WorkingWithAudio/ImportingAudio/)
 
 #### Ren'Py
@@ -119,22 +123,35 @@ Source: [Ren'Py Documentation](https://www.renpy.org/doc/html/audio.html)
 
 #### Game Maker Studio
 
-- **Supported Formats:** `OGG, MP3 and WAV`
+- **Supported Formats:** `OGG Vorbis, MP3 and WAV`
 Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Audio/Audio.htm)
-
-### Additional Notes
-
-- M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
-- WAV uses the pcm_s16le codec, while OGG uses the newer Opus codec.
-- Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
 
 #### Additional Comparison
 
 For a detailed comparison of audio formats for games, refer to [this article](https://dev.to/tenry/comparison-of-audio-formats-for-games-jak).
 
-https://wiki.xiph.org/Opus_Recommended_Settings
+[Opus bit rate and sample info](https://wiki.xiph.org/Opus_Recommended_Settings)
+
+## On the Web
+
+Leave a comment and a like to support me!
+
+[Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion)
+[Source on GitHub](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
+[RPG Maker Forums](https://forums.rpgmakerweb.com/index.php?threads/v1-3-tool-ez-batch-game-audio-converter-for-windows.163150/)
+[GameJolt](https://gamejolt.com/@Fooney)
+[Reddit](https://www.reddit.com/user/Puzzleheaded-Soup362/)
+[Twitter](https://twitter.com/Fooney_)
+[Email me](mailto:fooneyfoo@gmail.com)
+[](https://ko-fi.com/fooney58825)
+[](https://app.gumroad.com/dashboard)
+[](https://www.gamedev.net/fooney/)
+[](https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/)
 
 
+## License
+
+This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
 
 ### Other Attributes
 

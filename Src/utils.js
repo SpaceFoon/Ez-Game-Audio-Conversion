@@ -11,6 +11,7 @@ const chalk = require("chalk");
 
 let settings = {
   filePath: "",
+  outputFilePath: "",
   inputFormats: [],
   outputFormats: [],
   //bitrate: 0, placehold for future options

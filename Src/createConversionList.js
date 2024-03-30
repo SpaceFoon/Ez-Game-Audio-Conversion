@@ -1,10 +1,12 @@
 const { existsSync } = require("fs");
-const { join, basename, extname, dirname, normalize } = require("path");
+const { join, basename, extname, dirname } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings } = require("./utils");
 
 //Create final list of files to convert by asking user for each conflicting file
 const createConversionList = async (files) => {
+  const { filePath, outputFilePath } = settings;
+  // console.log("settings", filePath, outputFilePath);
   let convertSelf;
   const conversionList = [];
   let response = null;
@@ -14,11 +16,24 @@ const createConversionList = async (files) => {
         dirname(inputFile),
         basename(inputFile, extname(inputFile))
       )}.${outputFormat}`;
+
       let outputFileCopy = `${join(
         dirname(inputFile),
         `${basename(inputFile, extname(inputFile))}-copy(1)`
       )}.${outputFormat}`;
 
+      if (filePath != outputFilePath) {
+        outputFile = `${join(
+          outputFilePath,
+          `${basename(inputFile, extname(inputFile))}`
+        )}.${outputFormat}`;
+        conversionList.push({
+          inputFile,
+          outputFile,
+          outputFormat,
+        });
+        continue;
+      }
       //yes, both checks are required
       if (
         inputFile === outputFile ||
