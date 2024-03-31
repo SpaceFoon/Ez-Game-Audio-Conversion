@@ -1,6 +1,6 @@
 # EZ Game Audio Conversion
 
-**Effortless Unattended Batch Audio Conversion Tool.**
+**Unattended Batch Audio Conversion Tool for Game Devs**
 
 ## Introduction
 
@@ -8,27 +8,29 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion.
 
 ## Features
 
-- **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
-- **Unattended Batch Jobs**: With recursive file searching and unattended conflict resolution, just set it and forget it.
-- **Multi-threading:** No job too big or small when your CPU is fully utilized.
-- **Automatic Bitrate and Codec Selection:** Automatically selects best codec and Variable Bitrate (VBR) at 128kbs or near equivalent. Balanced between great sound quality and small file size.
-- **Comprehensive Format Support:** Converts between FLAC, WAV, MP3, OGG, and M4A, formats. More to come.
-- **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
-- **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support and speed.
-- **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best input file.
-- **Meta Data Support:** Will transfer basic meta data like title. Works with all formats.
-- **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
+- 💻 **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
+- 🔄 **Unattended Batch Jobs:** With recursive file searching and unattended conflict resolution, set it and forget it.
+- 🚀 **Multi-threading:** No job too big or small when all your CPU cores fully utilized.
+- 🎵 **Automatic Bitrate and Codec Selection:** Automatically selects best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.
+- 📁 **Comprehensive Format Support:** Converts between FLAC, AIFF, WAV, MP3, OGG, and M4A, formats. More to come.
+- 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
+- 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
+- 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best input file.
+- 📝 **Meta Data Support:** Will transfer all basic meta data with all formats that support it.
+- 🔁 **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
+- 🎼 **Opus AND Vorbis Support for Ogg:** Use opus when you can and Vorbis when you have to.
+
 
 ## Installation
 
 1. **Download** Zip "EZ-Game-Audio.zip"
-2. **Extract**  folder "EZ-Game-Audio-Converter"
-3. **Run** file "EZ-Game-Audio.exe"
+2. **Extract**  Folder "EZ-Game-Audio-Converter"
+3. **Run** File "EZ-Game-Audio.exe"
 
 ## Prerequisites
 
 - Windows PC
-- Windows Terminal from the Windows Store for enhanced visual experience.
+- Not required: Windows Terminal from the Windows Store for enhanced visual experience (emoji support 😎 ).
 
 ## Usage
 
@@ -61,7 +63,8 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 3. Remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
 [FFMPEG Essentials Build Download](https://www.gyan.dev/ffmpeg/builds/#release-builds)
 
-To change things like bitrate and codec, look in `converterWorker.js`. 
+To change things like bitrate and codec, look in `converterWorker.js`.
+
 [On Github](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
 
 ### Additional Notes
