@@ -9,8 +9,8 @@ const deleteDuplicateFiles = (files) => {
     ".mp3",
     ".m4a",
     ".wav",
-    "aiff",
     ".flac",
+    ".aiff",
   ];
   const fileobjs = files.map((file) => [
     join(dirname(file), basename(file, extname(file))),
@@ -29,14 +29,16 @@ const deleteDuplicateFiles = (files) => {
     const current = uniq.get(name);
     if (priorityList.indexOf(ext) > priorityList.indexOf(current)) {
       console.log(
-        chalk.yellow(`Replacing file: ${name}${current} with ${name}${ext}`)
+        chalk.yellow(
+          ` 🚨 Replacing Input File: ♻️  ${name}${current} with 🔀 ${name}${ext}`
+        )
       );
       droppedFiles.push(`${name}${current}`);
       uniq.set(name, ext);
     } else {
       console.log(
         chalk.yellow(
-          `Replacing input file: ${name}${current} with ${name}${ext}`
+          `🚨 Replacing Input File: ♻️  ${name}${ext} with 🔀 ${name}${current}`
         )
       );
       droppedFiles.push(`${name}${ext}`);
@@ -51,9 +53,9 @@ const deleteDuplicateFiles = (files) => {
   // console.log(
   //   chalk.blue(`Unique files after processing: ${uniqueFiles.join(", ")}`)
   // );
-  console.log(
-    chalk.bgYellow(`Dropped from input list: ${droppedFiles.join(", ")}`)
-  );
+  // console.log(
+  //   chalk.bgYellow(`Dropped from input list: ${droppedFiles.join(", ")}`)
+  // );
 
   return uniqueFiles;
 };

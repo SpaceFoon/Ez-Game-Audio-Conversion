@@ -5,6 +5,7 @@ const {
   existsSync,
   appendFileSync,
   writeFileSync,
+  statSync,
 } = require("fs");
 const moment = require("moment");
 const chalk = require("chalk");
@@ -14,7 +15,8 @@ let settings = {
   outputFilePath: "",
   inputFormats: [],
   outputFormats: [],
-  //bitrate: 0, placehold for future options
+  oggCodec: "",
+  //bitrate: 0, placeholder for future options
   //quality: 2,
 };
 
@@ -32,26 +34,13 @@ const handleError = (errorMessage) => {
 };
 const originalConsoleError = console.error;
 
-// Override console.error with a custom function
 console.error = function (...args) {
-  // Apply chalk.red to all arguments
   const coloredArgs = args.map((arg) => chalk.red.bold(arg));
-
-  // Call the original console.error with colored arguments
   originalConsoleError.apply(console, coloredArgs);
 };
 
-// Example usage
-// console.error("This is an error message in red!");
-// Save the original console.error function
-const originalConsolwarn = console.warn;
-
-// Override console.error with a custom function
 console.warn = function (...args) {
-  // Apply chalk.red to all arguments
   const coloredArgs = args.map((arg) => chalk.yellow.bold(arg));
-
-  // Call the original console.error with colored arguments
   originalConsolwarn.apply(console, coloredArgs);
 };
 
@@ -79,9 +68,9 @@ const isFileBusy = async (file) => {
 };
 
 const addToLog = async (log, file) => {
-  const logPath = settings.filePath;
+  const logPath = settings.outputFilePath;
   let fileName = `${logPath}/logs.csv`;
-  const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
+  const timestamp = moment().format("DD-MM-YYYY HH:mm:ss");
   if (log.type === "stderr") {
     fileName = `${logPath}/error.csv`;
 
@@ -97,7 +86,11 @@ const addToLog = async (log, file) => {
     }
     log.data = log.data.replace(/\r\n|\r/g, "");
     try {
-      const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
+      const csvRow =
+        `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`.replace(
+          /,/g,
+          ""
+        );
       appendFileSync(fileName, csvRow);
     } catch (err) {
       console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
@@ -114,13 +107,33 @@ const addToLog = async (log, file) => {
     }
   }
   try {
-    const csvRow = `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`;
+    const csvRow =
+      `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`.replace(
+        /,/g,
+        ""
+      );
     appendFileSync(fileName, csvRow);
   } catch (err) {
     console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
   }
 };
 
+const checkDiskSpace = async (directory) => {
+  statSync(directory, (err, stats) => {
+    if (err) {
+      console.error("Error:", err);
+      return;
+    }
+
+    const availableSpaceMB = (stats["blksize"] * stats["blocks"]) / 1024 / 1024;
+
+    if (availableSpaceMB >= 50) {
+      console.log("There is at least 50 megabytes of disk space available.");
+    } else {
+      console.log("There is not enough disk space available.");
+    }
+  });
+};
 module.exports = {
   getAnswer,
   handleError,
@@ -128,4 +141,5 @@ module.exports = {
   addToLog,
   rl,
   settings,
+  checkDiskSpace,
 };

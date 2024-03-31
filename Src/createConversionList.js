@@ -5,49 +5,89 @@ const { getAnswer, settings } = require("./utils");
 
 //Create final list of files to convert by asking user for each conflicting file
 const createConversionList = async (files) => {
-  const { filePath, outputFilePath } = settings;
+  const { filePath, outputFilePath, outputFormats } = settings;
+  // console.log("outputFilePathoutputFilePath", settings);
+  let { oggCodec } = settings;
   // console.log("settings", filePath, outputFilePath);
   let convertSelf;
   const conversionList = [];
   let response = null;
+  let folder = null;
+
+  if (outputFilePath !== filePath) {
+    folder = outputFilePath;
+    // console.log("folder", folder);
+  } else {
+    // console.log("outputFilePath = filePath)", files[0]);
+    folder = dirname(files[0]);
+  }
   for (const inputFile of files) {
-    for (const outputFormat of settings.outputFormats) {
+    for (const outputFormat of outputFormats) {
+      if (outputFormats.includes("ogg") && !oggCodec) {
+        // Await the user's input using a promise-returning function
+        const askOggCodec = async () => {
+          const userResponse = await getAnswer(
+            chalk.blue.bold(
+              "\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?",
+              "\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮🚗",
+              "\n💡 If you don't want to worry about it, 📝 Leave blank for Vorbis: "
+            )
+          );
+          oggCodec = userResponse.trim().toLowerCase();
+          // console.log("3", oggCodec);
+
+          if (!oggCodec || (oggCodec !== "vorbis" && oggCodec !== "opus")) {
+            console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
+            await askOggCodec(); // Keep asking until a valid input is provided
+          } else {
+            settings.oggCodec = oggCodec;
+            console.log(
+              chalk.green.italic(`\nOgg Codec ⚙  Selected: ${oggCodec} ✅`)
+            );
+          }
+        };
+
+        try {
+          await askOggCodec();
+        } finally {
+          // console.log("FINALLY");
+        }
+      }
+
       let outputFile = `${join(
-        dirname(inputFile),
+        folder,
         basename(inputFile, extname(inputFile))
       )}.${outputFormat}`;
 
+      let copyNumber = 1;
+      let baseNameCopy = basename(inputFile, extname(inputFile));
+      let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)$/);
+
+      // console.log("match:", match);
+      if (match) {
+        baseNameCopy = match[1];
+        copyNumber = parseInt(match[2]) + 1;
+        // console.log("base and copy number", baseName, copyNumber);
+      }
       let outputFileCopy = `${join(
-        dirname(inputFile),
-        `${basename(inputFile, extname(inputFile))}-copy(1)`
+        folder,
+        `${baseNameCopy}-copy(${copyNumber})`
       )}.${outputFormat}`;
 
-      if (filePath != outputFilePath) {
-        outputFile = `${join(
-          outputFilePath,
-          `${basename(inputFile, extname(inputFile))}`
-        )}.${outputFormat}`;
-        conversionList.push({
-          inputFile,
-          outputFile,
-          outputFormat,
-        });
-        continue;
-      }
       //yes, both checks are required
       if (
         inputFile === outputFile ||
         inputFile.toLowerCase() === outputFile.toLowerCase()
       ) {
-        if (convertSelf === "yes") {
+        if (convertSelf === "yes" || filePath !== outputFilePath) {
           outputFile = `${join(
-            dirname(inputFile),
+            folder,
             `${basename(inputFile, extname(inputFile))}-copy(1)`
           )}.${outputFormat}`;
         } else if (convertSelf === "no") {
           continue;
         } else {
-          while (!convertSelf) {
+          while (!convertSelf && filePath == !outputFilePath) {
             convertSelf = await getAnswer(
               chalk.blueBright(
                 '\n Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
@@ -64,7 +104,7 @@ const createConversionList = async (files) => {
             }
             if (/^yes$/i.test(convertSelf)) {
               outputFile = `${join(
-                dirname(inputFile),
+                folder,
                 `${basename(inputFile, extname(inputFile))}-copy(1)`
               )}.${outputFormat}`;
             }
@@ -117,7 +157,9 @@ const createConversionList = async (files) => {
           while (true) {
             if (!response) {
               if (existsSync(outputFile)) {
-                console.warn(`${outputFile} already exists!`);
+                console.log(
+                  chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
+                );
                 response = await getAnswer(
                   chalk.blue.bold(
                     `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`

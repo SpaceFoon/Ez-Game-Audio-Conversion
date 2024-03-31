@@ -1,6 +1,6 @@
 const { existsSync, mkdirSync } = require("fs");
 const chalk = require("chalk");
-const { rl } = require("./utils");
+const { rl, checkDiskSpace } = require("./utils");
 
 //Starts with user input
 const getUserInput = (settings) => {
@@ -48,10 +48,9 @@ const getUserInput = (settings) => {
           }
           settings.outputFilePath = outputFilePath;
           console.log(
-            chalk.green.italic(
-              `\n📝 Output Filepath: ${settings.outputFilePath} ✅`
-            )
+            chalk.green.italic(`\n📝 Output Filepath: ${outputFilePath} ✅`)
           );
+          checkDiskSpace(outputFilePath);
           askInputFormats();
         }
       );

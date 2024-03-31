@@ -15,18 +15,23 @@ const getMetadata = async (inputFile) => {
     // console.log("return meta");
     return metadata;
   } catch (error) {
-    console.error("😅 Error running ffprobe.exe:", error.message);
+    if ((inputFile.outputFormat = ".aiff")) return null;
+    "😅 Error running ffprobe.exe:", error.message;
     return null;
   }
 };
 
-const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
-  console.log(inputFile, outputFile, outputFormat);
+const converterWorker = async ({
+  file: { inputFile, outputFile, outputFormat },
+  settings: { oggCodec },
+}) => {
+  // console.log("settings-----------", oggCodec);
+  // console.log(inputFile, outputFile, outputFormat);
   const metadata = await getMetadata(inputFile);
   // console.log("start convertworker");
-  if (!metadata) {
-    return console.error("No meta data found!!!:", inputFile);
-  }
+  // if (!metadata) {
+  //   return console.error("No meta data found!!!:", inputFile);
+  // }
   // console.log("metadata", metadata);
   const streamTags = metadata.streams[0].tags || "";
   const formatTags = metadata.format.tags || "";
@@ -62,7 +67,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
     }
   });
   const metaData = metadataDataArray.join(" ");
-  console.log("meta data---------", metaData);
+  // console.log("meta data---------", metaData);
 
   const channels = "-ac " + metadata.streams[0].channels || "-ac 2";
   const bitrate = metadata.streams[0].bit_rate || null;
@@ -80,8 +85,8 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
       null
   );
   //opus doesn't do 441000 hz.
-  if (outputFormat === "ogg") {
-    // console.log(typeof sampleRate);
+  // console.log("oggCodec", oggCodec);
+  if (outputFormat === "ogg" && oggCodec === "opus") {
     let newSample = null;
     if (typeof sampleRate === "string") {
       // Only the following values are valid sampling rates for opus: 48000, 24000, 16000, 12000, or 8000
@@ -107,7 +112,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
           newSample = 8000;
         }
         // console.log("sampleRate !== 48000", sampleRateNumber);
-        const ratio = 48000 / sampleRateNumber;
+        const ratio = newSample / sampleRateNumber;
         // console.log("ratio", ratio);
         // console.log(loopStart);
         loopStart = Math.round(loopStart * ratio);
@@ -116,7 +121,7 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
         loopLength = Math.round(loopLength * ratio);
         // console.log(loopLength);
         sampleString = "-ar " + newSample.toString();
-        console.log("new sample rate-------", sampleString);
+        // console.log("new sample rate-------", sampleString);
       } else {
         console.error("Invalid sampleRate:", sampleRate);
       }
@@ -124,52 +129,52 @@ const converterWorker = async ({ inputFile, outputFile, outputFormat }) => {
       console.error("Sample rate is not a string:", sampleRate);
     }
   }
-  // console.log("Loop Start:", loopStart);
-  // console.log("Loop Length:", loopLength);
-  // console.log("bitrate:", bitrate);
-  // console.log("channels:", channels);
-  // console.log("formatTags", formatTags);
-  // console.log("streamTags", streamTags);
-  // console.log("title:", title);
   // console.log("sampleRate:", sampleRate);
-  let loopData = "";
-  let finalBitrate = 92000;
-  if (bitrate < finalBitrate) {
-    finalBitrate = bitrate;
-  }
-
-  // console.log(finalBitrate, "finalBitrate");
   // console.log(outputFormat);
+  let loopData = "";
   if (!isNaN(loopStart) && !isNaN(loopLength)) {
     loopData = `-metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
     // console.log("loop data detected:", loopData);
   }
   const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
   // console.log("start promise");
+  // Despite what you read online these are the best codecs.
+  //https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
+  // https://trac.ffmpeg.org/wiki/Encode/MP3
+  // https://trac.ffmpeg.org/wiki/Encode/AAC page is wrong about aac being experimental
+  // -b:a = constant BR -q:a = variable.
   const formatConfig = {
-    // Despite what you read online these are the best codecs and work fine with most game engines.
-
-    // https://trac.ffmpeg.org/wiki/Encode/MP3
-    // https://www.reddit.com/r/ffmpeg/comments/ms77y4/libfdk_aac_vs_aac/
-    // https://trac.ffmpeg.org/wiki/Encode/AAC
-    // -b:a = constant BR -q:a = variable.
     ogg: {
-      codec: "libopus",
-      additionalOptions: [
-        "-b:a",
-        "64k",
-        // , "-ar 48000"
-      ], //vbr by default
+      vorbis: {
+        codec: "libvorbis",
+        additionalOptions: ["-q:a", "1.2"],
+      },
+      opus: {
+        codec: "libopus",
+        additionalOptions: ["-b:a", "64k"], //vbr by default
+      },
     },
-    mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "3"] }, //175 Average	150-195	-q:a 3
+    mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "4"] }, //-V 4	165average	140-188 range
     wav: { codec: "pcm_s16le" },
-    m4a: { codec: "aac ", additionalOptions: ["-q:a", ".8"] },
+    m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.5"] },
     aiff: { codec: "pcm_s16le" },
     flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
   };
+  const getFormatConfig = (outputFormat, oggCodec) => {
+    // console.log("Output format:", outputFormat);
+    // console.log("Format config:", formatConfig);
 
-  // console.log("titleData", titleData);
-  const { codec, additionalOptions = [] } = formatConfig[outputFormat];
+    if (outputFormat === "ogg") {
+      return formatConfig.ogg[oggCodec];
+    } else {
+      return formatConfig[outputFormat];
+    }
+  };
+
+  const { codec, additionalOptions = [] } = getFormatConfig(
+    outputFormat,
+    oggCodec
+  );
   return new Promise((resolve, reject) => {
     const ffmpegCommand = spawn(
       `"${ffmpegPath}"`,
@@ -227,13 +232,3 @@ module.exports = {
   converterWorker,
   getMetadata,
 };
-
-// const title = getMetadataField(streamTags, formatTags, "title");
-// const artist = getMetadataField(streamTags, formatTags, "artist");
-// const album = getMetadataField(streamTags, formatTags, "album");
-// const comment = getMetadataField(streamTags, formatTags, "comment");
-// const date = getMetadataField(streamTags, formatTags, "date");
-// const track = getMetadataField(streamTags, formatTags, "track");
-// const genre = getMetadataField(streamTags, formatTags, "genre");
-// const album_artist = getMetadataField(streamTags, formatTags, "album_artist");
-// const metaData = metadataDataArray.join(" ");

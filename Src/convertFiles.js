@@ -4,7 +4,7 @@ const { Worker } = require("worker_threads");
 const { performance } = require("perf_hooks");
 const { cpus } = require("os");
 const chalk = require("chalk");
-const { isFileBusy, addToLog, settings } = require("./utils");
+const { isFileBusy, addToLog, settings, checkDiskSpace } = require("./utils");
 
 const convertFiles = async (files) => {
   const jobStartTime = performance.now();
@@ -34,14 +34,20 @@ const convertFiles = async (files) => {
     );
 
     return new Promise((resolve, reject) => {
-      // console.log("m--dir", __dirname);
+      // console.log("settings-------", settings);
       const worker = new Worker(`${__dirname}/converterWorker.js`, {
-        workerData: file,
+        workerData: { file, settings },
       });
 
       worker.on("message", (message) => {
         if (message.type === "stderr") {
-          console.error("ERROR MESSAGE FROM FFMPEG", message.data);
+          console.error(
+            "ERROR MESSAGE FROM FFMPEG:",
+            message.data,
+            "Output file:",
+            file.outputFile
+          );
+          checkDiskSpace(settings.outputFilePath);
           //console.warn(`filepath`, __dirname, __filename);
           addToLog(message, file);
           return;
