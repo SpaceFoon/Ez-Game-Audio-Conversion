@@ -33,8 +33,8 @@ const converterWorker = async ({
   //   return console.error("No meta data found!!!:", inputFile);
   // }
   // console.log("metadata", metadata);
-  const streamTags = metadata.streams[0].tags || "";
-  const formatTags = metadata.format.tags || "";
+  const streamTags = metadata?.streams[0]?.tags || "";
+  const formatTags = metadata?.format?.tags || "";
 
   function getMetadataField(tags, formatTags, field) {
     const tagVariants = [field.toLowerCase(), field.toUpperCase()];

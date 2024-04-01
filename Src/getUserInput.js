@@ -104,7 +104,7 @@ const getUserInput = (settings) => {
     const askOutputFormats = () => {
       rl.question(
         chalk.blue.bold(
-          "\n✏️ Enter the output formats. Leave blank for all 🚨 (e.g., flac ogg mp3 m4a wav): "
+          "\n✏️ Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
         ),
         (outputFormatString) => {
           settings.outputFormats = outputFormatString

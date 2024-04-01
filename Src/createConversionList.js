@@ -3,6 +3,24 @@ const { join, basename, extname, dirname } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings } = require("./utils");
 
+let folder = null;
+
+const getOutputFileCopy = async (inputFile, outputFormat) => {
+  let copyNumber = 1;
+  let baseNameCopy = basename(inputFile, extname(inputFile));
+  let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)$/);
+
+  // console.log("match:", match);
+  if (match) {
+    baseNameCopy = match[1];
+    copyNumber = parseInt(match[2]) + 1;
+    // console.log("base and copy number", baseName, copyNumber);
+  }
+  return `${join(
+    folder,
+    `${baseNameCopy}-copy(${copyNumber})`
+  )}.${outputFormat}`;
+};
 //Create final list of files to convert by asking user for each conflicting file
 const createConversionList = async (files) => {
   const { filePath, outputFilePath, outputFormats } = settings;
@@ -12,7 +30,6 @@ const createConversionList = async (files) => {
   let convertSelf;
   const conversionList = [];
   let response = null;
-  let folder = null;
 
   if (outputFilePath !== filePath) {
     folder = outputFilePath;
@@ -35,8 +52,8 @@ const createConversionList = async (files) => {
           );
           oggCodec = userResponse.trim().toLowerCase();
           // console.log("3", oggCodec);
-
-          if (!oggCodec || (oggCodec !== "vorbis" && oggCodec !== "opus")) {
+          if (!oggCodec) oggCodec = "opus";
+          if (oggCodec !== "vorbis" && oggCodec !== "opus") {
             console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
             await askOggCodec(); // Keep asking until a valid input is provided
           } else {
@@ -53,25 +70,11 @@ const createConversionList = async (files) => {
           // console.log("FINALLY");
         }
       }
+      const outputFileCopy = await getOutputFileCopy(inputFile, outputFormat);
 
       let outputFile = `${join(
         folder,
         basename(inputFile, extname(inputFile))
-      )}.${outputFormat}`;
-
-      let copyNumber = 1;
-      let baseNameCopy = basename(inputFile, extname(inputFile));
-      let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)$/);
-
-      // console.log("match:", match);
-      if (match) {
-        baseNameCopy = match[1];
-        copyNumber = parseInt(match[2]) + 1;
-        // console.log("base and copy number", baseName, copyNumber);
-      }
-      let outputFileCopy = `${join(
-        folder,
-        `${baseNameCopy}-copy(${copyNumber})`
       )}.${outputFormat}`;
 
       //yes, both checks are required
@@ -79,15 +82,12 @@ const createConversionList = async (files) => {
         inputFile === outputFile ||
         inputFile.toLowerCase() === outputFile.toLowerCase()
       ) {
-        if (convertSelf === "yes" || filePath !== outputFilePath) {
-          outputFile = `${join(
-            folder,
-            `${basename(inputFile, extname(inputFile))}-copy(1)`
-          )}.${outputFormat}`;
+        if (convertSelf === "yes" || filePath !== folder) {
+          outputFile = outputFileCopy;
         } else if (convertSelf === "no") {
           continue;
         } else {
-          while (!convertSelf && filePath == !outputFilePath) {
+          while (!convertSelf && filePath === folder) {
             convertSelf = await getAnswer(
               chalk.blueBright(
                 '\n Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
@@ -103,10 +103,7 @@ const createConversionList = async (files) => {
               console.warn('⚠️ Invalid input, please type "yes" or "no" ⚠️');
             }
             if (/^yes$/i.test(convertSelf)) {
-              outputFile = `${join(
-                folder,
-                `${basename(inputFile, extname(inputFile))}-copy(1)`
-              )}.${outputFormat}`;
+              outputFile = outputFileCopy;
             }
           }
         }
@@ -160,6 +157,7 @@ const createConversionList = async (files) => {
                 console.log(
                   chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
                 );
+
                 response = await getAnswer(
                   chalk.blue.bold(
                     `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
@@ -172,7 +170,7 @@ const createConversionList = async (files) => {
                   break;
                 } else {
                   response = null;
-                  console.warn("\n⚠️Invalid selection! Try again⚠️");
+                  console.warn("\n⚠️ Invalid selection! Try again ⚠️");
                 }
               } else {
                 //console.warn(outputFile);
