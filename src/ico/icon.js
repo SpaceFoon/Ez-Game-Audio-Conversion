@@ -31,8 +31,8 @@ load().then((ResEdit) => {
     );
     vi.removeStringValue({ lang: 1033, codepage: 1200 }, "OriginalFilename");
     vi.removeStringValue({ lang: 1033, codepage: 1200 }, "InternalName");
-    vi.setFileVersion(1, 0, 4, 0);
-    vi.setProductVersion(1, 0, 4, 0);
+    vi.setFileVersion(1, 4, 3, 0);
+    vi.setProductVersion(1, 4, 3, 0);
     vi.outputToResourceEntries(res.entries);
     res.outputResource(exe);
     fs.writeFileSync(output, Buffer.from(exe.generate()));

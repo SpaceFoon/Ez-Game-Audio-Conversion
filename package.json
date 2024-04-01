@@ -1,6 +1,6 @@
 {
-  "name": "ez-game-audio-conversion",
-  "version": "1.4.0",
+  "name": "EZ-Game-Audio-Conversion",
+  "version": "1.4.3",
   "description": "Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.",
   "main": "app.js",
   "bin": {
