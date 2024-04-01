@@ -34,13 +34,25 @@ const handleError = (errorMessage) => {
 };
 const originalConsoleError = console.error;
 
+// Override console.error with a custom function
 console.error = function (...args) {
+  // Apply chalk.red to all arguments
   const coloredArgs = args.map((arg) => chalk.red.bold(arg));
+
+  // Call the original console.error with colored arguments
   originalConsoleError.apply(console, coloredArgs);
 };
 
+// console.error("This is an error message in red!");
+// Save the original console.error function
+const originalConsolwarn = console.warn;
+
+// Override console.error with a custom function
 console.warn = function (...args) {
+  // Apply chalk.red to all arguments
   const coloredArgs = args.map((arg) => chalk.yellow.bold(arg));
+
+  // Call the original console.error with colored arguments
   originalConsolwarn.apply(console, coloredArgs);
 };
 
@@ -84,13 +96,16 @@ const addToLog = async (log, file) => {
         return addToLog(log, file);
       }
     }
-    log.data = log.data.replace(/\r\n|\r/g, "");
+
     try {
+      const time = timestamp.replace(",", "");
+      const data = log.data.toString().replace(",", "");
+      const inputFile = file.inputFile.replace(",", "");
+      const outputFile = file.outputFile.replace(",", "");
+
       const csvRow =
-        `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`.replace(
-          /,/g,
-          ""
-        );
+        `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, "") +
+        "\n";
       appendFileSync(fileName, csvRow);
     } catch (err) {
       console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
@@ -107,17 +122,19 @@ const addToLog = async (log, file) => {
     }
   }
   try {
+    const time = timestamp.replace(",", "");
+    const data = log.data.toString().replace(",", "");
+    const inputFile = file.inputFile.replace(",", "");
+    const outputFile = file.outputFile.replace(",", "");
+
     const csvRow =
-      `${timestamp},${log.data},${file.inputFile},${file.outputFile}\n`.replace(
-        /,/g,
-        ""
-      );
+      `${time},${data},${inputFile},${outputFile}\n`.replace(/[\r\n]+/g, "") +
+      "\n";
     appendFileSync(fileName, csvRow);
   } catch (err) {
     console.error(`🚨🚨⛔ Error writing to CSV file: ${err} ⛔🚨🚨`);
   }
 };
-
 const checkDiskSpace = async (directory) => {
   statSync(directory, (err, stats) => {
     if (err) {
