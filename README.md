@@ -4,21 +4,21 @@
 
 ## Introduction
 
-EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest, and most reliable solution available. Plus, now with support for loop tags!
+EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!
 
 ## Features
 
 - 💻 **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
 - 🔄 **Unattended Batch Jobs:** With recursive file searching and unattended conflict resolution, set it and forget it.
-- 🚀 **Multi-threading:** No job too big or small when all your CPU cores fully utilized.
-- 🎵 **Automatic Bitrate and Codec Selection:** Automatically selects best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.
-- 📁 **Comprehensive Format Support:** Converts between FLAC, AIFF, WAV, MP3, OGG, and M4A, formats. More to come.
+- 🚀 **Multi-threading:** No job too big or small when all your CPU cores are fully utilized.
+- 🎵 **Automatic Bitrate and Codec Selection:** Automatically selects the best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.
+- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. More to come.
 - 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
 - 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
-- 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names and selects the best input file.
-- 📝 **Meta Data Support:** Will transfer all basic meta data with all formats that support it.
+- 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extentions. Selects the best input file format.
+- 📝 **Meta Data Support:** Will transfer all basic meta data to and from all formats that support it.
 - 🔁 **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
-- 🎼 **Opus AND Vorbis Support for Ogg:** Use opus when you can and Vorbis when you have to.
+- 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis when you have to.
 
 
 ## Installation
@@ -36,7 +36,7 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion.
 
 1. **Setup:** Follow the setup prompts. It's recommended to copy and paste file path. Right-click to paste.
 
-2. **File Selection:** The application will search for matching files based on the provided criteria and display the list of files to be converted.
+2. **File Selection:** The application will search for matching files based on the provided criteria and display the list of input files to be converted.
 
 3. **Duplicate Handling:** Duplicate file names with different extensions will be automatically resolved, retaining the best or lossless format.
 
@@ -44,11 +44,11 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio file conversion.
    - `O`: Overwrite file with the same name. File will not overwrite itself but will skip instead.
    - `R`: Rename the file.
    - `S`: Skip the conversion for this file.
-   - Adding `a` to your selection will apply it to all subsequent files.
+   - Adding `a` to your selection will apply it to all subsequent files. 
 
 5. **Confirmation:** Review the list of files to be converted and confirm by typing "yes" or "no" when prompted.
 
-6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, logs will be available at the specified file path. Any errors will be logged separately.
+6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, logs.csv will be available at the specified file path. Any errors will be logged separately to errors.csv. Some files may produce errors but still convert correctly. 
 
 ## Source
 
@@ -58,7 +58,7 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 
 2. In the project folder, run `npm i` then `npm run build` to build the executable.
  OR
-2. Or run `npm i` then `npm run start` to run from your terminal.
+2. Run `npm i` then `npm run start` to run from your terminal.
 
 3. Remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
 [FFMPEG Essentials Build Download](https://www.gyan.dev/ffmpeg/builds/#release-builds)
@@ -70,9 +70,8 @@ To change things like bitrate and codec, look in `converterWorker.js`.
 ### Additional Notes
 
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
-- WAV and AIFF uses the pcm_s16le codec, while OGG uses the newer Opus codec.
+- WAV and AIFF uses the pcm_s16le codec, while OGG uses the newer Opus codec by default.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
-
 ## Audio File Type Compatibility
 
 ### RPG Maker
@@ -137,7 +136,7 @@ For a detailed comparison of audio formats for games, refer to [this article](ht
 
 ## On the Web
 
-Leave a comment and a like to support me!
+Your comments and likes are appreciated for support!
 
 [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion)
 [Source on GitHub](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
@@ -145,7 +144,7 @@ Leave a comment and a like to support me!
 [GameJolt](https://gamejolt.com/@Fooney)
 [Reddit](https://www.reddit.com/user/Puzzleheaded-Soup362/)
 [Twitter](https://twitter.com/Fooney_)
-[Email me](mailto:fooneyfoo@gmail.com)
+[Email me @](mailto:fooneyfoo@gmail.com)
 [](https://ko-fi.com/fooney58825)
 [](https://app.gumroad.com/dashboard)
 [](https://www.gamedev.net/fooney/)
@@ -155,6 +154,6 @@ Leave a comment and a like to support me!
 
 This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
 
-### Other Attributes
+### Attribution 
 
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
