@@ -8,7 +8,7 @@ const getUserInput = (settings) => {
     const askInputPath = () => {
       rl.question(
         chalk.blue.bold(
-          "\n✏️ Enter the full file path to start the search. 🔍 WILL SEARCH ALL SUB FOLDERS 📂: "
+          "\n✏️ Enter the full file path to start the search. 🔍 WILL SEARCH ALL SUB FOLDERS 📂 Right-click to paste 🐭 : "
         ),
         (filePath) => {
           if (!existsSync(filePath)) {

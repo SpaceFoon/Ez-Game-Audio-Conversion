@@ -69,9 +69,9 @@ const converterWorker = async ({
   const metaData = metadataDataArray.join(" ");
   // console.log("meta data---------", metaData);
 
-  const channels = "-ac " + metadata.streams[0].channels || "-ac 2";
-  const bitrate = metadata.streams[0].bit_rate || null;
-  const sampleRate = metadata.streams[0].sample_rate || null;
+  const channels = "-ac " + metadata.streams[0]?.channels || "-ac 2";
+  const bitrate = metadata.streams[0]?.bit_rate || null;
+  const sampleRate = metadata.streams[0]?.sample_rate || null;
   let sampleString = "";
 
   let loopStart = parseInt(
