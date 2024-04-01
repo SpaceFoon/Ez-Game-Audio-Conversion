@@ -15,7 +15,7 @@ let settings = {
   outputFilePath: "",
   inputFormats: [],
   outputFormats: [],
-  oggCodec: "",
+  oggCodec: null,
   //bitrate: 0, placeholder for future options
   //quality: 2,
 };
