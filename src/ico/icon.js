@@ -1,7 +1,13 @@
 const fs = require("fs");
 const { load } = require("resedit/cjs");
 load().then((ResEdit) => {
-  console.log("Icon generator started");
+  try {
+    fs.existsSync("././dist/EZ-Game-Audio.exe");
+  } catch {
+    console.log("can't find ././dist/EZ-Game-Audio.exe");
+  }
+
+  console.log("resedit started generating icon and meta data...");
   // ResEdit will be the namespace object of resedit library
   // (for example ResEdit.Data.IconFile is available)
   function windowsPostBuild(output) {
@@ -36,6 +42,8 @@ load().then((ResEdit) => {
     vi.outputToResourceEntries(res.entries);
     res.outputResource(exe);
     fs.writeFileSync(output, Buffer.from(exe.generate()));
+    console.log("resedit finised.");
   }
-  windowsPostBuild("./dist/EZ-Game-Audio-Conversion/EZ-Game-Audio.exe");
+
+  windowsPostBuild("././dist/EZ-Game-Audio.exe");
 });

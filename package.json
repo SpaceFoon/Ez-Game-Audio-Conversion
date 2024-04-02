@@ -6,11 +6,13 @@
   "bin": {
     "ez-game-audio-conversion": "src/app.js"
   },
-  "scripts": {
+"scripts": {
     "start": "node ./src/app.js",
-    "build": "set PKG_ENV=packaging && pkg . -o ./dist/EZ-Game-Audio-Conversion/EZ-Game-Audio.exe --compress GZIP && node src/ico/icon.js",
+    "build:unix": ".\\build\\build.shno",
+    "build:win": "build\\build.bat",
+    "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:unix || npm run build:win",
     "test": "echo \"Error: no test specified\" && exit 1"
-  },
+},
   "pkg": {
     "scripts": [
       "./src/*.js"

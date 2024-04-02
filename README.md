@@ -130,13 +130,17 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 
 #### Additional Comparison
 
-For a detailed comparison of audio formats for games, refer to [this article](https://dev.to/tenry/comparison-of-audio-formats-for-games-jak).
+[Detailed comparison of audio formats for games](https://dev.to/tenry/comparison-of-audio-formats-for-games-jak).
 
 [Opus bit rate and sample info](https://wiki.xiph.org/Opus_Recommended_Settings)
 
-## On the Web
+[Some testing on performace](https://stsaz.github.io/fmedia/audio-formats/)
 
-Your comments and likes are appreciated for support!
+[Comparison of coding efficiency between Opus and other popular audio formats](https://en.wikipedia.org/wiki/Opus_(audio_format)#Quality_comparison_and_low-latency_performance)
+
+## **Find me on the web:**
+
+**Your comments and likes are appreciated for support!**
 
 [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion)
 [Source on GitHub](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
