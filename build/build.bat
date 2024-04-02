@@ -56,8 +56,29 @@
 @REM     set /a count+=1
 @REM )
 @REM goto :PERPETUAL_LOOP
-echo Starting build.bat...
+
 title EZ Builder for EZ Batch Audio Convertion
+
+echo Starting build.bat...
+echo Making HTML...
+start npx markdown-to-html --source README.md --output ./readmes/README.html pause
+if errorlevel 1 (
+    echo Error: Markdown to HTML conversion failed.
+    pause
+    exit /b 1
+) else (
+    echo Markdown to HTML conversion successful.
+)
+echo Done with HTML. Making PDF...
+start md-to-pdf ./README.md
+xcopy README.pdf .\readmes /v /y /q
+if exist README.pdf (
+    echo PDF completed successfully.
+    xcopy README.pdf .\readmes /v /y /q
+) else (
+    echo Error: Conversion failed.
+)
+
 set PKG_ENV=packaging
 xcopy .\readmes .\dist /v /y /q
 xcopy .\ffmpeg-bin .\dist /v /y /q

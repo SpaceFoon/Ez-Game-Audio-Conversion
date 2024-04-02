@@ -2,6 +2,7 @@
 
 **Unattended Batch Audio Conversion Tool for Game Devs**
 
+
 ## Introduction
 
 EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!

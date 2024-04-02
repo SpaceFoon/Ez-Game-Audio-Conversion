@@ -6,13 +6,13 @@
   "bin": {
     "ez-game-audio-conversion": "src/app.js"
   },
-"scripts": {
+  "scripts": {
     "start": "node ./src/app.js",
     "build:unix": ".\\build\\build.shno",
     "build:win": "build\\build.bat",
     "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:unix || npm run build:win",
     "test": "echo \"Error: no test specified\" && exit 1"
-},
+  },
   "pkg": {
     "scripts": [
       "./src/*.js"
@@ -43,6 +43,8 @@
   },
   "homepage": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion#readme",
   "devDependencies": {
+    "markdown-to-html-cli": "^4.1.0",
+    "md-to-pdf": "^5.2.4",
     "pkg": "^5.8.1",
     "resedit": "^2.0.0"
   }
