@@ -9,8 +9,9 @@
   "scripts": {
     "start": "node ./src/app.js",
     "build:unix": ".\\build\\build.shno",
-    "build:win": "build\\build.bat",
-    "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:unix || npm run build:win",
+    "build:win": ".\\build\\build.bat"
+,
+    "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:win || npm run build:unix",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "pkg": {
