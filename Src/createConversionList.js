@@ -52,14 +52,14 @@ const createConversionList = async (files) => {
           );
           oggCodec = userResponse.trim().toLowerCase();
           // console.log("3", oggCodec);
-          if (oggCodec === "") oggCodec = "opus";
+          if (oggCodec === "") oggCodec = "vorbis";
           if (oggCodec !== "vorbis" && oggCodec !== "opus") {
             console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
             await askOggCodec(); // Keep asking until a valid input is provided
           } else {
             settings.oggCodec = oggCodec;
             console.log(
-              chalk.green.italic(`\nOgg Codec ⚙  Selected: ${oggCodec} ✅`)
+              chalk.green.italic(`\n ✨ Ogg Codec 🔌 Selected: ${oggCodec} ✅`)
             );
           }
         };
@@ -85,27 +85,29 @@ const createConversionList = async (files) => {
         if (convertSelf === "yes") {
           outputFile = outputFileCopy;
         } else if (convertSelf === "no") {
-          continue;
+          break;
         } else {
-          while (!convertSelf) {
+          while (convertSelf !== "yes" || convertSelf !== "no") {
             convertSelf = await getAnswer(
               chalk.blueBright(
-                '\n Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
+                '\n 👋❔ Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
               )
             );
 
             if (/^no$/i.test(convertSelf)) {
               console.log("\n 🚫 Not converting files to own type! 🚫");
               convertSelf = "no";
+              outputFile = "Skipped! ⏭️!";
               setTimeout(() => {}, 1000);
-              continue;
-            }
-            if (!/^yes$/i.test(convertSelf)) {
-              console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
+              break;
             }
             if (/^yes$/i.test(convertSelf)) {
               console.log("\n 🚫 Converting files to own type! 🚫");
               outputFile = outputFileCopy;
+              break;
+            }
+            if (!/^yes$/i.test(convertSelf)) {
+              console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
             }
           }
         }
@@ -128,12 +130,12 @@ const createConversionList = async (files) => {
           outputFile = outputFileCopy;
         },
         s: () => {
-          outputFile = "skipped! ⏭️";
+          outputFile = "Skipped! ⏭️";
           return (response = null);
         },
         sa: () => {
           if (!existsSync(outputFile)) return;
-          outputFile = "skipped! ⏭️";
+          outputFile = "Skipped! ⏭️";
         },
       };
       switch (response) {
@@ -214,7 +216,7 @@ const createConversionList = async (files) => {
       console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
       continue;
     }
-    return conversionList.filter((x) => x.outputFile !== "skipped! ⏭️");
+    return conversionList.filter((x) => x.outputFile !== "Skipped! ⏭️");
   }
 };
 module.exports = createConversionList;
