@@ -9,8 +9,7 @@
   "scripts": {
     "start": "node ./src/app.js",
     "build:unix": ".\\build\\build.shno",
-    "build:win": ".\\build\\build.bat"
-,
+    "build:win": ".\\build\\build.bat",
     "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:win || npm run build:unix",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -23,6 +22,7 @@
     ]
   },
   "dependencies": {
+    "cfonts": "^3.2.0",
     "chalk": "^4.1.2",
     "fs": "^0.0.1-security",
     "moment": "^2.30.1",

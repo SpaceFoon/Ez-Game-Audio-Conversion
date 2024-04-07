@@ -1,141 +1,179 @@
-const { existsSync } = require("fs");
+const { existsSync, mkdirSync } = require("fs");
 const { join, basename, extname, dirname } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings } = require("./utils");
+const { Console } = require("console");
 
-let folder = null;
+const getOutputFileCopy = async (
+  inputFile,
+  outputFormat,
+  outputFolder,
+  copyNumber = 1
+) => {
+  //This function for if file exists and needs to be renamed.
 
-const getOutputFileCopy = async (inputFile, outputFormat) => {
-  let copyNumber = 1;
   let baseNameCopy = basename(inputFile, extname(inputFile));
-  let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)$/);
+  let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
 
-  // console.log("match:", match);
   if (match) {
     baseNameCopy = match[1];
-    copyNumber = parseInt(match[2]) + 1;
-    // console.log("base and copy number", baseName, copyNumber);
+    copyNumber = parseInt(match[2], [10]);
+    copyNumber++;
   }
-  return `${join(
-    folder,
+  let outputFileCopy = `${join(
+    outputFolder,
     `${baseNameCopy}-copy(${copyNumber})`
   )}.${outputFormat}`;
+  //D:\Music\ALL THAT REMAINS - DISCOGRAPHY (1998-15) [CHANNEL NEO]\[1998] All That Remains (Demos)
+  if (existsSync(outputFileCopy)) {
+    outputFileCopy = await getOutputFileCopy(
+      outputFileCopy,
+      outputFormat,
+      outputFolder,
+      copyNumber + 1
+    );
+  }
+
+  return outputFileCopy;
 };
-//Create final list of files to convert by asking user for each conflicting file
+
+const askOggCodec = async (oggCodec) => {
+  //Choose codec for OGG
+  oggCodec = settings.oggCodec;
+  const userResponse = await getAnswer(
+    chalk.blue.bold(
+      "\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?",
+      "\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮 🚗",
+      "\n\n💡 If you don't want to worry about it, 📝 Leave blank for Vorbis: "
+    )
+  );
+  oggCodec = userResponse.trim().toLowerCase();
+
+  if (oggCodec === "") oggCodec = "vorbis";
+  if (oggCodec !== "vorbis" && oggCodec !== "opus") {
+    console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
+    await askOggCodec(); // Keep asking until a valid input is provided
+  } else {
+    settings.oggCodec = oggCodec;
+    console.log(
+      chalk.green.italic(`\n ✨ Ogg Codec 🔌 Selected: ${oggCodec} ✅`)
+    );
+    return oggCodec;
+  }
+};
+
+//Create final list of output files to convert
 const createConversionList = async (files) => {
-  const { filePath, outputFilePath, outputFormats } = settings;
-  // console.log("outputFilePathoutputFilePath", settings);
-  let { oggCodec } = settings;
-  // console.log("settings", filePath, outputFilePath);
+  // files.reverse();
+  let { inputFilePath, outputFilePath, outputFormats, oggCodec } = settings;
+  let outputFolder = null;
+
   let convertSelf = null;
   const conversionList = [];
   let response = null;
-
-  if (outputFilePath !== filePath) {
-    folder = outputFilePath;
-    // console.log("folder", folder);
-  } else {
-    // console.log("outputFilePath = filePath)", files[0]);
-    folder = dirname(files[0]);
-  }
+  let relativePath = null;
   for (const inputFile of files) {
     for (const outputFormat of outputFormats) {
+      let outputFile = null;
       if (outputFormats.includes("ogg") && !oggCodec) {
-        // Await the user's input using a promise-returning function
-        const askOggCodec = async () => {
-          const userResponse = await getAnswer(
-            chalk.blue.bold(
-              "\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?",
-              "\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮🚗",
-              "\n💡 If you don't want to worry about it, 📝 Leave blank for Vorbis: "
-            )
-          );
-          oggCodec = userResponse.trim().toLowerCase();
-          // console.log("3", oggCodec);
-          if (oggCodec === "") oggCodec = "vorbis";
-          if (oggCodec !== "vorbis" && oggCodec !== "opus") {
-            console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
-            await askOggCodec(); // Keep asking until a valid input is provided
-          } else {
-            settings.oggCodec = oggCodec;
-            console.log(
-              chalk.green.italic(`\n ✨ Ogg Codec 🔌 Selected: ${oggCodec} ✅`)
-            );
-          }
-        };
-
-        try {
-          await askOggCodec();
-        } finally {
-          // console.log("FINALLY");
-        }
+        oggCodec = await askOggCodec();
       }
-      const outputFileCopy = await getOutputFileCopy(inputFile, outputFormat);
 
-      let outputFile = `${join(
-        folder,
+      outputFile = `${join(
+        dirname(inputFile),
         basename(inputFile, extname(inputFile))
       )}.${outputFormat}`;
-
-      //yes, both checks are required
-      if (
-        inputFile === outputFile ||
-        inputFile.toLowerCase() === outputFile.toLowerCase()
-      ) {
-        if (convertSelf === "yes") {
-          outputFile = outputFileCopy;
-        } else if (convertSelf === "no") {
-          break;
-        } else {
-          while (convertSelf !== "yes" || convertSelf !== "no") {
-            convertSelf = await getAnswer(
-              chalk.blueBright(
-                '\n 👋❔ Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
-              )
+      relativePath = dirname(inputFile.substring(inputFilePath.length));
+      if (inputFilePath !== outputFilePath) {
+        outputFolder = join(outputFilePath, relativePath);
+        outputFile = join(
+          outputFolder,
+          `${basename(inputFile, extname(inputFile))}.${outputFormat}`
+        );
+        if (!existsSync(outputFolder)) {
+          try {
+            mkdirSync(outputFolder, { recursive: true });
+          } catch (error) {
+            console.error(
+              chalk.redBright.bold("Couldn't create directory, check folder"),
+              error
             );
-
-            if (/^no$/i.test(convertSelf)) {
-              console.log("\n 🚫 Not converting files to own type! 🚫");
-              convertSelf = "no";
-              outputFile = "Skipped! ⏭️!";
-              setTimeout(() => {}, 1000);
-              break;
-            }
-            if (/^yes$/i.test(convertSelf)) {
-              console.log("\n 🚫 Converting files to own type! 🚫");
-              outputFile = outputFileCopy;
-              break;
-            }
-            if (!/^yes$/i.test(convertSelf)) {
-              console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
-            }
           }
         }
+      } else {
+        outputFolder = join(inputFilePath, relativePath);
       }
 
+      //Stop from overwriting input file
+      //yes, both checks are required, no idea why
+      if (
+        inputFile.toLowerCase() === outputFile.toLowerCase() ||
+        inputFile === outputFile
+      )
+        while (true) {
+          if (convertSelf === "" || /^no$/i.test(convertSelf)) {
+            console.log("\n 🚫 Not converting files to own type! 🚫");
+            convertSelf = "no";
+            outputFile = `${outputFile} "Skipped! ⏭️!"`;
+            break;
+          }
+          if (/^yes$/i.test(convertSelf)) {
+            convertSelf = "yes";
+            console.log("\n 🔀 Converting files to own type! ✔");
+            outputFile = await getOutputFileCopy(
+              inputFile,
+              outputFormat,
+              outputFolder
+            );
+            break;
+          }
+          convertSelf = await getAnswer(
+            chalk.blueBright(
+              '\n 👋❔ Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
+            )
+          );
+          if (
+            convertSelf !== "" ||
+            convertSelf !== "yes" ||
+            convertSelf !== "no"
+          ) {
+            console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
+          }
+        }
+      // }
+      //}//
+
       const responseActions = {
-        o: () => {
+        o: async () => {
           return (response = null);
         },
-        oa: () => {
+        oa: async () => {
           if (!existsSync(outputFile)) return;
           /* Nothing to do as default is overwrite */
         },
-        r: () => {
-          outputFile = outputFileCopy;
+        r: async () => {
+          outputFile = await getOutputFileCopy(
+            inputFile,
+            outputFormat,
+            outputFolder
+          );
           return (response = null);
         },
-        ra: () => {
+        ra: async () => {
           if (!existsSync(outputFile)) return;
-          outputFile = outputFileCopy;
+          outputFile = await getOutputFileCopy(
+            outputFile,
+            outputFormat,
+            outputFolder
+          );
         },
-        s: () => {
-          outputFile = "Skipped! ⏭️";
+        s: async () => {
+          outputFile = `${outputFile} "Skipped! ⏭️"`;
           return (response = null);
         },
-        sa: () => {
+        sa: async () => {
           if (!existsSync(outputFile)) return;
-          outputFile = "Skipped! ⏭️";
+          outputFile = `${outputFile} "Skipped! ⏭️"`;
         },
       };
       switch (response) {
@@ -143,15 +181,15 @@ const createConversionList = async (files) => {
           console.error("response was empty:", response);
           break;
         case "ra":
-          responseActions["ra"]();
+          await responseActions["ra"]();
           break;
         case "sa":
-          responseActions["sa"]();
+          await responseActions["sa"]();
           break;
         case "oa":
           console.log(
             chalk.red("🔺🚩OVERWRITE FILE🚩"),
-            chalk.yellow(outputFile, "🔺")
+            chalk.yellow(outputFile, " 🔺")
           );
           break;
         default:
@@ -167,17 +205,16 @@ const createConversionList = async (files) => {
                     `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
                   )
                 );
-                response = response.trim().toLowerCase();
+                response = await response.trim().toLowerCase();
 
-                if (responseActions[response]) {
-                  responseActions[response]();
+                if (await responseActions[response]) {
+                  await responseActions[response]();
                   break;
                 } else {
                   response = null;
                   console.warn("\n⚠️ Invalid selection! Try again ⚠️");
                 }
               } else {
-                // console.warn(outputFile);
                 break;
               }
             }
@@ -191,14 +228,24 @@ const createConversionList = async (files) => {
     }
   }
   while (true) {
-    const numbered = conversionList.map(
+    // Function to remove duplicates based on outputFile
+    const removeDuplicates = async (conversionList) => {
+      const seen = new Set();
+      return conversionList.filter((conversion) => {
+        const duplicate = seen.has(conversion.outputFile);
+        seen.add(conversion.outputFile);
+        return !duplicate;
+      });
+    };
+    const uniqueConversionList = await removeDuplicates(conversionList);
+    const numbered = await uniqueConversionList.map(
       (x, index) => `🔊 ${index + 1} ${x.outputFile}`
     );
     console.log(
       chalk.cyanBright(
         "\n🔄 Pending Conversion 🔄",
-        conversionList.length,
-        "Output Files\n",
+        numbered.length,
+        "Output Files \n\n",
         numbered.join("\n")
       )
     );
@@ -209,14 +256,15 @@ const createConversionList = async (files) => {
     );
 
     if (/^no$/i.test(accept_answer)) {
-      console.log("🚫 Conversion cancelled. Exiting program 🚫");
+      console.log("\n🚫 Conversion cancelled. Exiting program 🚫");
       process.exit(0);
-    }
-    if (!/^yes$/i.test(accept_answer)) {
-      console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
+    } else if (!/^yes$/i.test(accept_answer)) {
+      console.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');
       continue;
     }
-    return conversionList.filter((x) => x.outputFile !== "Skipped! ⏭️");
+    return uniqueConversionList.filter(
+      (x) => !/Skipped!.*⏭️/g.test(x.outputFile)
+    );
   }
 };
 module.exports = createConversionList;

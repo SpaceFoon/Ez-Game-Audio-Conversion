@@ -30,7 +30,7 @@ const deleteDuplicateFiles = (files) => {
     if (priorityList.indexOf(ext) > priorityList.indexOf(current)) {
       console.log(
         chalk.yellow(
-          ` 🚨 Replacing Input File: ♻️  ${name}${current} with 🔀 ${name}${ext}`
+          ` Replacing Input File: ♻️  ${name}${current} \n with: 🔀 ${name}${ext}`
         )
       );
       droppedFiles.push(`${name}${current}`);
@@ -38,7 +38,7 @@ const deleteDuplicateFiles = (files) => {
     } else {
       console.log(
         chalk.yellow(
-          `🚨 Replacing Input File: ♻️  ${name}${ext} with 🔀 ${name}${current}`
+          `Replacing Input File: ♻️  ${name}${ext} \n with: 🔀 ${name}${current}`
         )
       );
       droppedFiles.push(`${name}${ext}`);

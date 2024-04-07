@@ -10,29 +10,30 @@ const getUserInput = (settings) => {
         chalk.blue.bold(
           "\n✏️ Enter the full file path to start the search. 🔍 WILL SEARCH ALL SUB FOLDERS 📂 Right-click to paste 🐭 : "
         ),
-        (filePath) => {
-          if (!existsSync(filePath)) {
+        (inputFilePath) => {
+          if (!existsSync(inputFilePath)) {
             console.warn("\n⚠️ File Path does not exist! 🤣😊😂");
             askInputPath();
           } else {
-            settings.filePath = filePath;
+            settings.inputFilePath = inputFilePath;
             console.log(
-              chalk.green.italic(`\n📝 Input Filepath: ${settings.filePath} ✅`)
+              chalk.green.italic(
+                `\n📝 Input Filepath: ${settings.inputFilePath} ✅`
+              )
             );
-            askOutputPath(filePath);
+            askOutputPath(inputFilePath);
           }
         }
       );
     };
-    const askOutputPath = (filePath) => {
+    const askOutputPath = (inputFilePath) => {
       rl.question(
         chalk.blue.bold(
           "\n✏️ Enter the full file path to output to. 🚨 Leave blank for same folder as input files 📂:"
         ),
         (outputFilePath) => {
-          if (outputFilePath === "") outputFilePath = filePath;
-          // outputFilePath = resolve(outputFilePath);
-          console.log(outputFilePath);
+          if (outputFilePath === "") outputFilePath = inputFilePath;
+
           if (!existsSync(outputFilePath)) {
             console.warn(
               "\n⚠️ File Path does not exist! 👨‍🏭 Creating folder... 🚧"

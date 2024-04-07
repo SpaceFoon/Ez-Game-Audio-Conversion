@@ -11,7 +11,7 @@ const moment = require("moment");
 const chalk = require("chalk");
 
 let settings = {
-  filePath: "",
+  inputFilePath: "",
   outputFilePath: "",
   inputFormats: [],
   outputFormats: [],
@@ -29,7 +29,7 @@ const rl = readline.createInterface({
 });
 
 const handleError = (errorMessage) => {
-  console.error(errorMessage);
+  console.trace(errorMessage);
   //process.exit(1);
 };
 const originalConsoleError = console.error;
