@@ -11,7 +11,6 @@ const getMetadata = async (inputFile) => {
       { encoding: "utf8" }
     );
     const metadata = JSON.parse(output);
-    // console.log("return meta");
     return metadata;
   } catch (error) {
     if ((inputFile.outputFormat = ".aiff")) return null;
@@ -52,10 +51,12 @@ const converterWorker = async ({
     const value = getMetadataField(streamTags, formatTags, field);
     // because you can break the entire ffmpegCommand with meta data
     let cleanValue = value
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\n")
-      .replace(/\\/g, "\\\\");
+      .replace(/\n/g, "")//I CANT GET THIS TO WORK \n breaks the entire command string
+      // Tested ina terminal and it works fine with `n but that doesn't work here no idea why
+      .replace(/\r/g, "")
+      .replace(/\\/g, "\\\\")//for the guy who uses "\\\"" as a title...
+      .replace(/"/g, '\\"');
+
     if (cleanValue) {
       // Adjust field names as necessary
       const adjustedField = field === "track" ? "trackNumber" : field;
@@ -80,7 +81,6 @@ const converterWorker = async ({
       null
   );
   // opus doesn't do 441000 hz.
-  // console.log("oggCodec", oggCodec);
   if (outputFormat === "ogg" && oggCodec === "opus") {
     let newSample = null;
     if (typeof sampleRate === "string") {
@@ -159,6 +159,7 @@ const converterWorker = async ({
     outputFormat,
     oggCodec
   );
+  // console.log("metadata", metaData);
   return new Promise((resolve, reject) => {
     const ffmpegCommand = spawn(
       `"${ffmpegPath}"`,
