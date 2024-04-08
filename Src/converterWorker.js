@@ -4,7 +4,6 @@ const { workerData, parentPort } = require("worker_threads");
 const { join } = require("path");
 
 const getMetadata = async (inputFile) => {
-  // console.log("start get meta data");
   try {
     const ffprobePath = join(process.cwd(), `\\ffprobe.exe`);
     const output = execSync(
@@ -25,21 +24,14 @@ const converterWorker = async ({
   file: { inputFile, outputFile, outputFormat },
   settings: { oggCodec },
 }) => {
-  // console.log("settings-----------", oggCodec);
-  // console.log(inputFile, outputFile, outputFormat);
   const metadata = await getMetadata(inputFile);
-  // console.log("start convertworker");
-  // if (!metadata) {
-  //   return console.error("No meta data found!!!:", inputFile);
-  // }
-  // console.log("metadata", metadata);
   const streamTags = metadata?.streams[0]?.tags || "";
   const formatTags = metadata?.format?.tags || "";
 
-  function getMetadataField(tags, formatTags, field) {
+  function getMetadataField(streamTags, formatTags, field) {
     const tagVariants = [field.toLowerCase(), field.toUpperCase()];
     for (const tag of tagVariants) {
-      if (tags[tag]) return tags[tag];
+      if (streamTags[tag]) return streamTags[tag];
       if (formatTags[tag]) return formatTags[tag];
     }
     return "";
@@ -60,10 +52,13 @@ const converterWorker = async ({
     // Get the metadata value for the current field
     const value = getMetadataField(streamTags, formatTags, field);
     // If the value exists, add it to the metadata data array
-    if (value) {
+    // because you can break the entire ffmpegCommand with meta data
+    let cleanValue = value.replace(/"/g, '\\"');
+    cleanValue = cleanValue.replace(/\\/g, "\\\\");
+    if (cleanValue) {
       // Adjust field names as necessary
       const adjustedField = field === "track" ? "trackNumber" : field;
-      metadataDataArray.push(`-metadata ${adjustedField}="${value}"`);
+      metadataDataArray.push(`-metadata ${adjustedField}="${cleanValue}"`);
     }
   });
   const metaData = metadataDataArray.join(" ");
@@ -156,14 +151,11 @@ const converterWorker = async ({
     },
     mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "4"] }, //-V 4	165average	140-188 range
     wav: { codec: "pcm_s16le" },
-    m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.5"] },
+    m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.4"] },
     aiff: { codec: "pcm_s16le" },
     flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
   };
   const getFormatConfig = (outputFormat, oggCodec) => {
-    // console.log("Output format:", outputFormat);
-    // console.log("Format config:", formatConfig);
-
     if (outputFormat === "ogg") {
       return formatConfig.ogg[oggCodec];
     } else {
