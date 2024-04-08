@@ -49,12 +49,13 @@ const converterWorker = async ({
   const metadataDataArray = [];
 
   metadataFields.forEach((field) => {
-    // Get the metadata value for the current field
     const value = getMetadataField(streamTags, formatTags, field);
-    // If the value exists, add it to the metadata data array
     // because you can break the entire ffmpegCommand with meta data
-    let cleanValue = value.replace(/"/g, '\\"');
-    cleanValue = cleanValue.replace(/\\/g, "\\\\");
+    let cleanValue = value
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\n")
+      .replace(/\\/g, "\\\\");
     if (cleanValue) {
       // Adjust field names as necessary
       const adjustedField = field === "track" ? "trackNumber" : field;
@@ -62,7 +63,6 @@ const converterWorker = async ({
     }
   });
   const metaData = metadataDataArray.join(" ");
-  // console.log("meta data---------", metaData);
 
   const channels = "-ac " + metadata.streams[0]?.channels || "-ac 2";
   const bitrate = metadata.streams[0]?.bit_rate || null;
@@ -79,7 +79,7 @@ const converterWorker = async ({
       metadata.format?.tags?.LOOPLENGTH ||
       null
   );
-  //opus doesn't do 441000 hz.
+  // opus doesn't do 441000 hz.
   // console.log("oggCodec", oggCodec);
   if (outputFormat === "ogg" && oggCodec === "opus") {
     let newSample = null;
@@ -106,17 +106,13 @@ const converterWorker = async ({
         } else if (sampleRateNumber < 8000) {
           newSample = 8000;
         }
-        // console.log("sampleRate !== 48000", sampleRateNumber);
         const ratio = newSample / sampleRateNumber;
-        // console.log("ratio", ratio);
-        // console.log(loopStart);
+
         loopStart = Math.round(loopStart * ratio);
-        // console.log(loopStart);
-        // console.log(loopLength);
+
         loopLength = Math.round(loopLength * ratio);
-        // console.log(loopLength);
+
         sampleString = "-ar " + newSample.toString();
-        // console.log("new sample rate-------", sampleString);
       } else {
         console.error("Invalid sampleRate:", sampleRate);
       }
@@ -124,15 +120,11 @@ const converterWorker = async ({
       console.error("Sample rate is not a string:", sampleRate);
     }
   }
-  // console.log("sampleRate:", sampleRate);
-  // console.log(outputFormat);
   let loopData = "";
   if (!isNaN(loopStart) && !isNaN(loopLength)) {
     loopData = `-metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
-    // console.log("loop data detected:", loopData);
   }
   const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
-  // console.log("start promise");
   // Despite what you read online these are the best codecs.
   //https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
   // https://trac.ffmpeg.org/wiki/Encode/MP3
