@@ -1,7 +1,6 @@
 # EZ Game Audio Conversion
 
-**Unattended Batch Audio Conversion Tool for Game Devs**
-
+## **Unattended Batch Audio Conversion Tool for Game Devs**
 
 ## Introduction
 
@@ -16,11 +15,10 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tail
 - 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. More to come.
 - 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
 - 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
-- 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extentions. Selects the best input file format.
+- 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extensions. Selects the best input file format.
 - 📝 **Meta Data Support:** Will transfer all basic meta data to and from all formats that support it.
 - 🔁 **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
 - 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis when you have to.
-
 
 ## Installation
 
@@ -45,11 +43,11 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tail
    - `O`: Overwrite file with the same name. File will not overwrite itself but will skip instead.
    - `R`: Rename the file.
    - `S`: Skip the conversion for this file.
-   - Adding `a` to your selection will apply it to all subsequent files. 
+   - Adding `a` to your selection will apply it to all subsequent files.
 
 5. **Confirmation:** Review the list of files to be converted and confirm by typing "yes" or "no" when prompted.
 
-6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, logs.csv will be available at the specified file path. Any errors will be logged separately to errors.csv. Some files may produce errors but still convert correctly. 
+6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, logs.csv will be available at the specified file path. Any errors will be logged separately to errors.csv. Some files may produce errors but still convert correctly.
 
 ## Source
 
@@ -71,8 +69,10 @@ To change things like bitrate and codec, look in `converterWorker.js`.
 ### Additional Notes
 
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
-- WAV and AIFF uses the pcm_s16le codec, while OGG uses the newer Opus codec by default.
+- WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
+- Loop tags are only supported for OGG and FLAC formats. This software cannot write loop tags to M4A files but can read them when converting. Sorry but it's a pain to fix.
+
 ## Audio File Type Compatibility
 
 ### RPG Maker
@@ -80,7 +80,7 @@ To change things like bitrate and codec, look in `converterWorker.js`.
 | Features |  MP3 |  OGG[^3] | WAV | M4A[^1] | MIDI |
 |--|--|--|--|--|--|
 | Loop OK | NO | YES | YES | YES | YES |
-| Loop Inside (Tags) | NO | YES | NO | YES | YES |
+| Loop Inside (Tags)[^4] | NO | YES | NO | YES | YES |
 | File Size Optimize | YES | YES | NO | YES[^2] | OMG YES |
 | Realistic Sound | YES | YES | YES | YES | NO |
 | RMVX/Ace Compatible| YES | YES | YES | NO | YES |
@@ -89,15 +89,16 @@ To change things like bitrate and codec, look in `converterWorker.js`.
 | RMMV Compatible | NO | YES | NO | YES | NO |
 | RMMZ Compatible | NO | YES | NO | NO | NO |
 
-[^1]: Not needed in 2024?
+[^1]: Not needed in 2024? Update: I don't care what they say, it's not needed.
 [^2]: M4A can be lossless but isn't when converted by this software.
-[^3]: Opus codec for OGG files is better but Vorbis is more compatiable.
+[^3]: Opus codec for OGG files is better but Vorbis is more compatible.
+[^4]: As opposed to the basic looping of an audio file which simply replays the file, loop Tags are a way to tell the game engine where to start and end the loop. Example: A song or background sound effect may start at 0:00 and end at 1:00 but loop from 0:30 to 1:00. This avoids replaying intros in songs and makes seamless loops possible in music and sound effects.
 
 - Source: [RPGMaker.net](https://rpgmaker.net/articles/2633/)
 
 RPG Maker **MV and MZ will play Opus but do not support loop tags**. MV will not play Opus in the editor.
 
-If you want Opus loop tags to work to work in RMMV-MZ then you will need my plugin. 
+If you want Opus loop tags to work to work in RMMV-MZ then you will need my plugin.
 [Download FugsOpusMV Here!](https://spacefoon.itch.io/fugs-ogg-opus-loop-tag-support-for-rmmv)
 
 #### Unity
@@ -135,7 +136,7 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 
 [Opus bit rate and sample info](https://wiki.xiph.org/Opus_Recommended_Settings)
 
-[Some testing on performace](https://stsaz.github.io/fmedia/audio-formats/)
+[Some testing on performance](https://stsaz.github.io/fmedia/audio-formats/)
 
 [Comparison of coding efficiency between Opus and other popular audio formats](https://en.wikipedia.org/wiki/Opus_(audio_format)#Quality_comparison_and_low-latency_performance)
 
@@ -147,18 +148,15 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 [Source on GitHub](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
 [RPG Maker Forums](https://forums.rpgmakerweb.com/index.php?threads/v1-3-tool-ez-batch-game-audio-converter-for-windows.163150/)
 [GameJolt](https://gamejolt.com/@Fooney)
-[Reddit](https://www.reddit.com/user/Puzzleheaded-Soup362/)
-[Twitter](https://twitter.com/Fooney_)
-[Email me @](mailto:fooneyfoo@gmail.com)
 [](https://ko-fi.com/fooney58825)
 [](https://app.gumroad.com/dashboard)
 [](https://www.gamedev.net/fooney/)
-[](https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/)
+[Download mirror: ascensiongamedev.com](https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/)
 
 ## License
 
 This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
 
-### Attribution 
+### Attribution
 
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
