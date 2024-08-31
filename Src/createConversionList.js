@@ -2,7 +2,6 @@ const { existsSync, mkdirSync } = require("fs");
 const { join, basename, extname, dirname } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings } = require("./utils");
-const { Console } = require("console");
 
 const getOutputFileCopy = async (
   inputFile,
@@ -11,7 +10,6 @@ const getOutputFileCopy = async (
   copyNumber = 1
 ) => {
   //This function for if file exists and needs to be renamed.
-
   let baseNameCopy = basename(inputFile, extname(inputFile));
   let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
 
@@ -24,7 +22,6 @@ const getOutputFileCopy = async (
     outputFolder,
     `${baseNameCopy}-copy(${copyNumber})`
   )}.${outputFormat}`;
-  //D:\Music\ALL THAT REMAINS - DISCOGRAPHY (1998-15) [CHANNEL NEO]\[1998] All That Remains (Demos)
   if (existsSync(outputFileCopy)) {
     outputFileCopy = await getOutputFileCopy(
       outputFileCopy,
@@ -129,19 +126,18 @@ const createConversionList = async (files) => {
           }
           convertSelf = await getAnswer(
             chalk.blueBright(
-              '\n 👋❔ Would you like to convert to same file type? ie ogg to ogg... Type "yes" ✅ or "no" ❌:  '
+              '\n 👋❔ Would you like to convert to same file type?\n Just for compression. This program will never overwrite the input file but will rename them. ie ogg to ogg... \n Type "yes" ✅ or "no" ❌:  '
             )
           );
+          console.log("convertSelf", convertSelf);
           if (
-            convertSelf !== "" ||
-            convertSelf !== "yes" ||
+            convertSelf !== "" &&
+            convertSelf !== "yes" &&
             convertSelf !== "no"
           ) {
             console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
           }
         }
-      // }
-      //}//
 
       const responseActions = {
         o: async () => {
@@ -251,7 +247,7 @@ const createConversionList = async (files) => {
     );
     const accept_answer = await getAnswer(
       chalk.blueBright(
-        '\n✏️ This is the list of files to be converted. Accept? Type "yes" ✅ or "no" ❌:  '
+        '\n✏️ This is the list of files to be converted. Start now? Type "yes" ✅ or "no" ❌:  '
       )
     );
 

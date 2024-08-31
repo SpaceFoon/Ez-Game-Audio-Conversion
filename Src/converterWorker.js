@@ -13,6 +13,7 @@ const getMetadata = async (inputFile) => {
     const metadata = JSON.parse(output);
     return metadata;
   } catch (error) {
+    //I forgot what this was for. I think its for files with no metadata and if it is, I need to check what other files might not have metadata.
     if ((inputFile.outputFormat = ".aiff")) return null;
     "😅 Error running ffprobe.exe:", error.message;
     return null;
@@ -51,10 +52,10 @@ const converterWorker = async ({
     const value = getMetadataField(streamTags, formatTags, field);
     // because you can break the entire ffmpegCommand with meta data
     let cleanValue = value
-      .replace(/\n/g, "")//I CANT GET THIS TO WORK \n breaks the entire command string
+      .replace(/\n/g, "") //I CANT GET THIS TO WORK \n breaks the entire command string
       // Tested ina terminal and it works fine with `n but that doesn't work here no idea why
       .replace(/\r/g, "")
-      .replace(/\\/g, "\\\\")//for the guy who uses "\\\"" as a title...
+      .replace(/\\/g, "\\\\") //for the guy who uses "\\\"" as a title...
       .replace(/"/g, '\\"');
 
     if (cleanValue) {

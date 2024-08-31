@@ -71,7 +71,7 @@ To change things like bitrate and codec, look in `converterWorker.js`.
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
 - WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
-- Loop tags are only supported for OGG and FLAC formats. This software cannot write loop tags to M4A files but can read them when converting. Sorry but it's a pain to fix.
+- Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix.
 
 ## Audio File Type Compatibility
 
@@ -121,7 +121,7 @@ Source: [Unreal Engine Documentation](https://docs.unrealengine.com/4.27/en-US/W
 
 #### Ren'Py
 
-- **Supported Formats:** `Ogg Opus, Ogg Vorbis, MP3, MP2, FLAC, WAV (uncompressed 16-bit signed PCM only)`
+- **Supported Formats:** `Ogg Opus, Ogg Vorbis, MP3, MP2, FLAC, AIFF WAV (uncompressed 16-bit signed PCM only)`
 
 Source: [Ren'Py Documentation](https://www.renpy.org/doc/html/audio.html)
 
