@@ -1,18 +1,18 @@
 # EZ Game Audio Conversion
 
-## **Unattended Batch Audio Conversion Tool for Game Devs**
+## **Unattended Batch Audio Conversion Tool for Game Devs and More!**
 
 ## Introduction
 
 EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!
 
-## Features
+## Feature
 
 - 💻 **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
 - 🔄 **Unattended Batch Jobs:** With recursive file searching and unattended conflict resolution, set it and forget it.
 - 🚀 **Multi-threading:** No job too big or small when all your CPU cores are fully utilized.
 - 🎵 **Automatic Bitrate and Codec Selection:** Automatically selects the best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.
-- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. More to come.
+- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. WMA to come.
 - 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
 - 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
 - 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extensions. Selects the best input file format.
@@ -33,7 +33,7 @@ EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tail
 
 ## Usage
 
-1. **Setup:** Follow the setup prompts. It's recommended to copy and paste file path. Right-click to paste.
+1. **Setup:** Follow the setup prompts. It's recommended to copy and paste file paths. Right-click to paste.
 
 2. **File Selection:** The application will search for matching files based on the provided criteria and display the list of input files to be converted.
 

@@ -197,7 +197,7 @@ const converterWorker = async ({
       resolve();
     });
     ffmpegCommand.on("error", (error) => {
-      console.error("🛑 ERROR IN FFMPEGCOMMAND", error);
+      console.error("🛑 ERROR IN ffmpegCommand", error);
       reject(error);
     });
   });

@@ -1,4 +1,3 @@
-const chalk = require("chalk");
 const getUserInput = require("./getUserInput");
 const searchFiles = require("./searchFiles");
 const deleteDuplicateFiles = require("./deleteDuplicateFiles");
@@ -10,6 +9,7 @@ const { join } = require("path");
 const cfonts = require("cfonts");
 
 // this only runs when packaging the file with pkg.js
+// it's to force the worker to be included in the package
 if (process.env.PKG_ENV === "packaging") {
   const { converterWorker, runConversion } = require("./converterWorker");
 }

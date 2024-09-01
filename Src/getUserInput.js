@@ -8,7 +8,10 @@ const getUserInput = (settings) => {
     const askInputPath = () => {
       rl.question(
         chalk.blue.bold(
-          "\n✏️ Enter the full file path to start the search. 🔍 WILL SEARCH ALL SUB FOLDERS 📂 Right-click to paste 🐭 : "
+          "\n 📁 Choose the folder to search for files to convert. ",
+          "\n 🔍 This will recursively search, ie: all subfolders ",
+          "\n 🐭 Right-click to paste. ",
+          "\n ✏️  Input Folder Path: "
         ),
         (inputFilePath) => {
           if (!existsSync(inputFilePath)) {
@@ -29,7 +32,7 @@ const getUserInput = (settings) => {
     const askOutputPath = (inputFilePath) => {
       rl.question(
         chalk.blue.bold(
-          "\n✏️ Enter the full file path to output to. 🚨 Leave blank for same folder as input files 📂:"
+          "\n✏️  Enter the output filepath. 🚨 Leave blank for same folder as input files 📂:"
         ),
         (outputFilePath) => {
           if (outputFilePath === "") outputFilePath = inputFilePath;
@@ -60,7 +63,7 @@ const getUserInput = (settings) => {
     const askInputFormats = () => {
       rl.question(
         chalk.blue.bold(
-          "\n✏️ Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
+          "\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
         ),
         (inputFormatString) => {
           settings.inputFormats = inputFormatString
@@ -105,7 +108,7 @@ const getUserInput = (settings) => {
     const askOutputFormats = () => {
       rl.question(
         chalk.blue.bold(
-          "\n✏️ Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
+          "\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
         ),
         (outputFormatString) => {
           settings.outputFormats = outputFormatString

@@ -41,7 +41,7 @@ const askOggCodec = async (oggCodec) => {
     chalk.blue.bold(
       "\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?",
       "\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮 🚗",
-      "\n\n💡 If you don't want to worry about it, 📝 Leave blank for Vorbis: "
+      "\n\n💡 If you are unsure, leave blank for Vorbis: "
     )
   );
   oggCodec = userResponse.trim().toLowerCase();
@@ -126,10 +126,9 @@ const createConversionList = async (files) => {
           }
           convertSelf = await getAnswer(
             chalk.blueBright(
-              '\n 👋❔ Would you like to convert to same file type?\n Just for compression. This program will never overwrite the input file but will rename them. ie ogg to ogg... \n Type "yes" ✅ or "no" ❌:  '
+              '\n 👋❔ Would you like to convert to same file type?\n For compression. This program will never overwrite the input file but will rename them. ie ogg to ogg... \n Type "yes" ✅ or "no" ❌:  '
             )
           );
-          console.log("convertSelf", convertSelf);
           if (
             convertSelf !== "" &&
             convertSelf !== "yes" &&
@@ -146,6 +145,7 @@ const createConversionList = async (files) => {
         oa: async () => {
           if (!existsSync(outputFile)) return;
           /* Nothing to do as default is overwrite */
+          // ffmpeg will overwrite the file without asking if this is messed up.
         },
         r: async () => {
           outputFile = await getOutputFileCopy(

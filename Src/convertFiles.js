@@ -1,4 +1,4 @@
-//Creaters workers to conver files
+//Creates workers to convert files
 
 const { Worker } = require("worker_threads");
 const { performance } = require("perf_hooks");
@@ -29,7 +29,7 @@ const convertFiles = async (files) => {
     const workerStartTime = performance.now();
     console.log(
       chalk.cyanBright(
-        `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left on outputfile:\n   ${file.outputFile}📤`
+        `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left on output file:\n   ${file.outputFile}📤`
       )
     );
 
@@ -48,7 +48,6 @@ const convertFiles = async (files) => {
             file.outputFile
           );
           checkDiskSpace(settings.outputFilePath);
-          //console.warn(`filepath`, __dirname, __filename);
           addToLog(message, file);
           return;
         }

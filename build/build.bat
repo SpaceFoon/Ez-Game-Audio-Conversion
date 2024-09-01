@@ -5,10 +5,10 @@ color 0A
 @REM Change Color of text and background to something cooler. Redundant for reliability.
 @REM Go to the following file path and delete the file to get your terminal colors back.
 @REM Don't worry, your old ones are somewhere else.
-echo $Host.UI.RawUI.BackgroundColor = 'DarkGreen' > "%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
-echo $Host.UI.RawUI.ForegroundColor = 'White' >> "%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.BackgroundColor = 'DarkGreen'"
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.ForegroundColor = 'White'"
+@REM echo $Host.UI.RawUI.BackgroundColor = 'DarkGreen' > "%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
+@REM echo $Host.UI.RawUI.ForegroundColor = 'White' >> "%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
+@REM powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.BackgroundColor = 'DarkGreen'"
+@REM powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.ForegroundColor = 'White'"
 
 echo Starting build.bat...
 @rem This is a hack for pkg to find the node worker files.
