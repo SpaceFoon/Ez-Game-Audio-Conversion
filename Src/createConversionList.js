@@ -3,13 +3,13 @@ const { join, basename, extname, dirname } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings } = require("./utils");
 
+// Get a unique output file name
 const getOutputFileCopy = async (
   inputFile,
   outputFormat,
   outputFolder,
   copyNumber = 1
 ) => {
-  //This function for if file exists and needs to be renamed.
   let baseNameCopy = basename(inputFile, extname(inputFile));
   let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
 
@@ -61,7 +61,6 @@ const askOggCodec = async (oggCodec) => {
 
 //Create final list of output files to convert
 const createConversionList = async (files) => {
-  // files.reverse();
   let { inputFilePath, outputFilePath, outputFormats, oggCodec } = settings;
   let outputFolder = null;
 
@@ -101,15 +100,15 @@ const createConversionList = async (files) => {
         outputFolder = join(inputFilePath, relativePath);
       }
 
-      //Stop from overwriting input file
-      //yes, both checks are required, no idea why
+      // Stops from overwriting input file.
+      // Yes, both checks are required, no idea why..
       if (
         inputFile.toLowerCase() === outputFile.toLowerCase() ||
         inputFile === outputFile
       )
         while (true) {
           if (convertSelf === "" || /^no$/i.test(convertSelf)) {
-            console.log("\n 🚫 Not converting files to own type! 🚫");
+            console.log("\n 🚫 Not converting files to own type! 🚫 \n");
             convertSelf = "no";
             outputFile = `${outputFile} "Skipped! ⏭️!"`;
             break;
@@ -117,6 +116,7 @@ const createConversionList = async (files) => {
           if (/^yes$/i.test(convertSelf)) {
             convertSelf = "yes";
             console.log("\n 🔀 Converting files to own type! ✔");
+            //Rename. Never overwrite input file.
             outputFile = await getOutputFileCopy(
               inputFile,
               outputFormat,
@@ -234,6 +234,9 @@ const createConversionList = async (files) => {
       });
     };
     const uniqueConversionList = await removeDuplicates(conversionList);
+    // const noSkippedFiles = uniqueConversionList.filter(
+    //   (x) => !/Skipped!.*⏭️/g.test(x.outputFile)
+    // );
     const numbered = await uniqueConversionList.map(
       (x, index) => `🔊 ${index + 1} ${x.outputFile}`
     );

@@ -28,10 +28,6 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const handleError = (errorMessage) => {
-  console.trace(errorMessage);
-  //process.exit(1);
-};
 const originalConsoleError = console.error;
 
 // Override console.error with a custom function
@@ -45,7 +41,7 @@ console.error = function (...args) {
 
 // console.error("This is an error message in red!");
 // Save the original console.error function
-const originalConsolwarn = console.warn;
+const originalConsolWarn = console.warn;
 
 // Override console.error with a custom function
 console.warn = function (...args) {
@@ -53,7 +49,7 @@ console.warn = function (...args) {
   const coloredArgs = args.map((arg) => chalk.yellow.bold(arg));
 
   // Call the original console.error with colored arguments
-  originalConsolwarn.apply(console, coloredArgs);
+  originalConsolWarn.apply(console, coloredArgs);
 };
 
 const isFileBusy = async (file) => {
@@ -69,11 +65,14 @@ const isFileBusy = async (file) => {
           `\n${error}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
         )
       );
+      await userInput();
       return isFileBusy(file);
     } else if (error.code === "ENOENT") {
       console.error("code", error);
     } else {
-      console.error(`\n🚨🚨⛔ Error writing to CSV file: ${error} ⛔🚨🚨`);
+      console.error(
+        `\n🚨🚨⛔ Error writing to CSV file: ${error.message} ⛔🚨🚨`
+      );
       throw error;
     }
   }
@@ -83,7 +82,7 @@ const addToLog = async (log, file) => {
   const logPath = settings.outputFilePath;
   let fileName = `${logPath}/logs.csv`;
   const timestamp = moment().format("DD-MM-YYYY HH:mm:ss");
-  if (log.type === "stderr") {
+  if (log.type === "stderr" || log.type === "error") {
     fileName = `${logPath}/error.csv`;
 
     if (!existsSync(fileName)) {
@@ -123,7 +122,13 @@ const addToLog = async (log, file) => {
   }
   try {
     const time = timestamp.replace(",", "");
-    const data = log.data.toString().replace(",", "");
+    let data;
+    if (!log.data) {
+      data = "No error message";
+    } else {
+      data = log.data.toString().replace(",", "");
+    }
+    // const data = log.data.toString().replace(",", "");
     const inputFile = file.inputFile.replace(",", "");
     const outputFile = file.outputFile.replace(",", "");
 
@@ -153,7 +158,6 @@ const checkDiskSpace = async (directory) => {
 };
 module.exports = {
   getAnswer,
-  handleError,
   isFileBusy,
   addToLog,
   rl,

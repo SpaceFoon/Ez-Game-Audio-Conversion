@@ -11,7 +11,7 @@
     "build:unix": ".\\build\\build.shno",
     "build:win": ".\\build\\build.bat",
     "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:win || npm run build:unix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "pkg": {
     "scripts": [
@@ -44,6 +44,7 @@
   },
   "homepage": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion#readme",
   "devDependencies": {
+    "jest": "^29.7.0",
     "markdown-to-html-cli": "^4.1.0",
     "md-to-pdf": "^5.2.4",
     "pkg": "^5.8.1",

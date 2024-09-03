@@ -3,8 +3,8 @@ const chalk = require("chalk");
 
 const deleteDuplicateFiles = (files) => {
   const priorityList = [
-    "midi",
-    "mid",
+    ".midi",
+    ".mid",
     ".ogg",
     ".mp3",
     ".m4a",

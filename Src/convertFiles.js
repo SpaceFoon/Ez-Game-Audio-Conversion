@@ -40,7 +40,8 @@ const convertFiles = async (files) => {
       });
 
       worker.on("message", (message) => {
-        if (message.type === "stderr") {
+        if (message.type === "error" || message.type === "stderr") {
+          // console.warn("message2", message.type, message.data);
           console.error(
             "ERROR MESSAGE FROM FFMPEG:",
             message.data,
@@ -48,7 +49,8 @@ const convertFiles = async (files) => {
             file.outputFile
           );
           checkDiskSpace(settings.outputFilePath);
-          addToLog(message, file);
+          addToLog("error", file);
+          reject(new Error(message.data));
           return;
         }
         if (message.type === "code") {
@@ -71,6 +73,7 @@ const convertFiles = async (files) => {
             );
             resolve();
           } else if (message.data !== 0) {
+            // console.warn("message", message.data);
             if (!failedFiles[file]) {
               failedFiles.push(file);
             }
@@ -78,7 +81,7 @@ const convertFiles = async (files) => {
               chalk.bgRed(
                 "\n🚨🚨⛔ Worker",
                 workerCounter,
-                "did not finish file ⛔🚨🚨: ",
+                "did not finish file successfully ⛔🚨🚨: ",
                 file.outputFile,
                 "🔇"
               )
@@ -112,7 +115,7 @@ const convertFiles = async (files) => {
             if (workerCounter > 8) workerCounter = workerCounter - 8;
             await processFile(file, workerCounter, task, tasksLeft);
           } catch (error) {
-            console.error("ERROR", error);
+            console.error(error);
           }
         }
       })()
@@ -122,4 +125,4 @@ const convertFiles = async (files) => {
   await Promise.all(workerPromises);
   return { failedFiles, successfulFiles, jobStartTime };
 };
-module.exports = convertFiles;
+module.exports = { convertFiles };

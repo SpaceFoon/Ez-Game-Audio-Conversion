@@ -1,4 +1,5 @@
 // converterWorker.js
+// Worker runs ffprobe.exe to get meta data then ffmpeg.exe to convert on one file.
 const { spawn, execSync } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
 const { join } = require("path");
@@ -13,9 +14,9 @@ const getMetadata = async (inputFile) => {
     const metadata = JSON.parse(output);
     return metadata;
   } catch (error) {
-    //I forgot what this was for. I think its for files with no metadata and if it is, I need to check what other files might not have metadata.
+    // aiff files not supported by ffprobe
     if ((inputFile.outputFormat = ".aiff")) return null;
-    "😅 Error running ffprobe.exe:", error.message;
+    console.error("😅 Error running ffprobe.exe:", error.message);
     return null;
   }
 };
@@ -24,15 +25,26 @@ const converterWorker = async ({
   file: { inputFile, outputFile, outputFormat },
   settings: { oggCodec },
 }) => {
-  const metadata = await getMetadata(inputFile);
-  const streamTags = metadata?.streams[0]?.tags || "";
-  const formatTags = metadata?.format?.tags || "";
+  const metadata = (await getMetadata(inputFile)) || {};
+  let streamTags;
+  let formatTags;
+  if (metadata.streams) {
+    streamTags = metadata.streams[0].tags || "";
+  }
+  if (metadata.format) {
+    formatTags = metadata.format.tags || "";
+  }
+  // streamTags = metadata?.streams?[0]?.tags || "";
+  // formatTags = metadata?.format?.tags || "";
 
   function getMetadataField(streamTags, formatTags, field) {
     const tagVariants = [field.toLowerCase(), field.toUpperCase()];
     for (const tag of tagVariants) {
-      if (streamTags[tag]) return streamTags[tag];
-      if (formatTags[tag]) return formatTags[tag];
+      // Tags will only be on one of these objects
+      if (streamTags) {
+        if (streamTags[tag]) return streamTags[tag] || {};
+        if (formatTags[tag]) return formatTags[tag] || {};
+      }
     }
     return "";
   }
@@ -49,6 +61,7 @@ const converterWorker = async ({
   const metadataDataArray = [];
 
   metadataFields.forEach((field) => {
+    if (!field) return "";
     const value = getMetadataField(streamTags, formatTags, field);
     // because you can break the entire ffmpegCommand with meta data
     let cleanValue = value
@@ -59,31 +72,41 @@ const converterWorker = async ({
       .replace(/"/g, '\\"');
 
     if (cleanValue) {
-      // Adjust field names as necessary
+      // Normalize name of track to trackNumber
       const adjustedField = field === "track" ? "trackNumber" : field;
       metadataDataArray.push(`-metadata ${adjustedField}="${cleanValue}"`);
     }
   });
   const metaData = metadataDataArray.join(" ");
 
-  const channels = "-ac " + metadata.streams[0]?.channels || "-ac 2";
-  const bitrate = metadata.streams[0]?.bit_rate || null;
-  const sampleRate = metadata.streams[0]?.sample_rate || null;
+  const channels =
+    metadata && metadata.streams && metadata.streams[0]
+      ? `-ac ${metadata.streams[0].channels}`
+      : "-ac 2";
+  const bitrate =
+    metadata && metadata.streams && metadata.streams[0]
+      ? metadata.streams[0].bit_rate
+      : null;
+  const sampleRate =
+    metadata && metadata.streams && metadata.streams[0]
+      ? metadata.streams[0].sample_rate
+      : null;
   let sampleString = "";
 
   let loopStart = parseInt(
-    metadata.streams[0]?.tags?.LOOPSTART ||
-      metadata.format?.tags?.LOOPSTART ||
+    // loop data can be in stream or format tags
+    (metadata.streams && metadata.streams[0]?.tags?.LOOPSTART) ||
+      (metadata.format && metadata.format?.tags?.LOOPSTART) ||
       null
   );
+
   let loopLength = parseInt(
-    metadata.streams[0]?.tags?.LOOPLENGTH ||
-      metadata.format?.tags?.LOOPLENGTH ||
+    (metadata.streams && metadata.streams[0]?.tags?.LOOPLENGTH) ||
+      (metadata.format && metadata.format?.tags?.LOOPLENGTH) ||
       null
   );
   // opus doesn't do 441000 hz.
   if (outputFormat === "ogg" && oggCodec === "opus") {
-    let newSample = null;
     if (typeof sampleRate === "string") {
       // Only the following values are valid sampling rates for opus: 48000, 24000, 16000, 12000, or 8000
       // vorbis is 8k to 192k
@@ -91,34 +114,39 @@ const converterWorker = async ({
       // ffmpeg can handle all but opus which it just makes everything 48k which is not needed
       // and a waste of space for some audio files.
       const sampleRateNumber = parseInt(sampleRate); // Convert string to number
-      if (!isNaN(sampleRateNumber)) {
-        if (sampleRateNumber >= 48000) {
-          newSample = 48000;
-        } else if (sampleRateNumber >= 32000) {
-          newSample = 48000;
-        } else if (sampleRateNumber >= 22050) {
-          newSample = 24000;
-        } else if (sampleRateNumber > 16000) {
-          newSample = 24000;
-        } else if (sampleRateNumber > 12000) {
-          newSample = 16000;
-        } else if (sampleRateNumber >= 8000) {
-          newSample = 12000;
-        } else if (sampleRateNumber < 8000) {
-          newSample = 8000;
-        }
-        const ratio = newSample / sampleRateNumber;
-
-        loopStart = Math.round(loopStart * ratio);
-
-        loopLength = Math.round(loopLength * ratio);
-
-        sampleString = "-ar " + newSample.toString();
-      } else {
-        console.error("Invalid sampleRate:", sampleRate);
+      let newSample = null;
+      // if (!isNaN(sampleRateNumber)) {
+      if (sampleRateNumber >= 48000) {
+        newSample = 48000;
+      } else if (sampleRateNumber >= 32000) {
+        newSample = 48000;
+      } else if (sampleRateNumber >= 22050) {
+        newSample = 24000;
+      } else if (sampleRateNumber > 16000) {
+        newSample = 24000;
+      } else if (sampleRateNumber > 12000) {
+        newSample = 16000;
+      } else if (sampleRateNumber >= 8000) {
+        newSample = 12000;
+      } else if (sampleRateNumber < 8000) {
+        newSample = 8000;
       }
+      const ratio = newSample / sampleRateNumber;
+
+      loopStart = Math.round(loopStart * ratio);
+
+      loopLength = Math.round(loopLength * ratio);
+
+      sampleString = newSample ? "-ar " + newSample.toString() : "";
+      // } else {
+      //   console.error("Invalid sampleRate:", sampleRate);
+      // }
     } else {
-      console.error("Sample rate is not a string:", sampleRate);
+      console.error(
+        "Sample rate is not a string, setting to 48k. Old sample:",
+        sampleRate
+      );
+      newSample = 48000;
     }
   }
   let loopData = "";
@@ -127,7 +155,7 @@ const converterWorker = async ({
   }
   const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
   // Despite what you read online these are the best codecs.
-  //https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
+  // https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
   // https://trac.ffmpeg.org/wiki/Encode/MP3
   // https://trac.ffmpeg.org/wiki/Encode/AAC page is wrong about aac being experimental
   // -b:a = constant BR -q:a = variable.
@@ -146,7 +174,7 @@ const converterWorker = async ({
     wav: { codec: "pcm_s16le" },
     m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.4"] },
     aiff: { codec: "pcm_s16le" },
-    flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] },
+    flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] }, //Minimal compression but 30% smaller than without.
   };
   const getFormatConfig = (outputFormat, oggCodec) => {
     if (outputFormat === "ogg") {
@@ -169,9 +197,9 @@ const converterWorker = async ({
         "error", // Sends all errors to stdeer
         "-i", //input file
         `"${inputFile}"`,
-        "-map_metadata",
-        // "0",
-        "-1", // Strip all metadata from input
+        // "-map_metadata",
+        // // "0",
+        // "-1", // Strip all metadata from input
         "-c:a", // = codec:audio Indicates the codec for the audio stream.
         codec,
         ...additionalOptions, // Specific codec settings
@@ -208,7 +236,7 @@ const runConversion = async () => {
     await converterWorker(workerData);
   } catch (error) {
     console.error("🛑 ERROR in converterWorker:", error);
-    parentPort.postMessage("error", error);
+    parentPort.postMessage({ type: "error", data: error.message });
   }
 };
 

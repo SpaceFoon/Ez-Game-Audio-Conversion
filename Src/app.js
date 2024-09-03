@@ -1,15 +1,17 @@
+// app.js
+// Description: Prints title then runs a  simple promise chain that runs the entire application.
 const getUserInput = require("./getUserInput");
 const searchFiles = require("./searchFiles");
 const deleteDuplicateFiles = require("./deleteDuplicateFiles");
 const createConversionList = require("./createConversionList");
-const convertFiles = require("./convertFiles");
-const { handleError, settings } = require("./utils");
+const { convertFiles } = require("./convertFiles");
+const { settings } = require("./utils");
 const finalize = require("./finalize");
 const { join } = require("path");
 const cfonts = require("cfonts");
 
-// this only runs when packaging the file with pkg.js
-// it's to force the worker to be included in the package
+// This only runs when packaging the file with pkg.js
+// It's to force the worker to be included in the package
 if (process.env.PKG_ENV === "packaging") {
   const { converterWorker, runConversion } = require("./converterWorker");
 }
@@ -148,7 +150,6 @@ getUserInput(settings)
     finalize(failedFiles, successfulFiles, jobStartTime);
   })
   .catch((error) => {
-    console.error("Fatal Error");
-    handleError(error);
+    console.error("Fatal Error", error);
   })
   .finally(() => {});
