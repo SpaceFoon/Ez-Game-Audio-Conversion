@@ -31,6 +31,7 @@ const convertFiles = async (files) => {
 
   const processFile = async (file, workerCounter, task, tasksLeft) => {
     const workerStartTime = performance.now();
+    checkDiskSpace(settings.outputFilePath);
     console.log(
       chalk.cyanBright(
         `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left on output file:\n   ${file.outputFile}📤`
@@ -55,11 +56,10 @@ const convertFiles = async (files) => {
           // Catch disk space errors and stop a runway process
           if (/no space left/i.test(message.data)) {
             console.error(
-              chalk.redBright("Stopping due to insufficient disk space.")
+              "\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨"
             );
             process.exit(1);
           }
-          checkDiskSpace(settings.outputFilePath);
           addToLog(message, file);
           reject(new Error(message.data));
           return;

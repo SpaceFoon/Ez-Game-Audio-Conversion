@@ -28,16 +28,14 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const originalConsoleError = console.error;
-
 // Override console.error with a custom function
+const originalConsoleError = console.error;
 console.error = function (...args) {
   // Apply chalk.red to all arguments
   const coloredArgs = args.map((arg) => chalk.red.bold(arg));
   // Call the original console.error with colored arguments
   originalConsoleError.apply(console, coloredArgs);
 };
-// console.error("This is an error message in red!");
 // Save the original console.error function
 const originalConsolWarn = console.warn;
 // Override console.error with a custom function
@@ -62,6 +60,10 @@ const checkDiskSpace = async (directory) => {
       console.log("There is at least 50 megabytes of disk space available.");
     } else {
       console.log("There is not enough disk space available.");
+      setTimeout(() => {
+        checkDiskSpace(directory);
+      }, 5000);
+      checkDiskSpace(directory);
     }
   });
 };
