@@ -65,11 +65,12 @@ const converterWorker = async ({
     const value = getMetadataField(streamTags, formatTags, field);
     // because you can break the entire ffmpegCommand with meta data
     let cleanValue = value
-      .replace(/\n/g, "") //I CANT GET THIS TO WORK \n breaks the entire command string
+      .replaceAll(/\n/g, "") //I CANT GET THIS TO WORK \n breaks the entire command string
       // Tested ina terminal and it works fine with `n but that doesn't work here no idea why
-      .replace(/\r/g, "")
-      .replace(/\\/g, "\\\\") //for the guy who uses "\\\"" as a title...
-      .replace(/"/g, '\\"');
+      //I was using replace and not replaceAll
+      .replaceAll(/\r/g, "")
+      .replaceAll(/\\/g, "\\\\") //for the guy who uses "\\\"" as a title...
+      .replaceAll(/"/g, '\\"');
 
     if (cleanValue) {
       // Normalize name of track to trackNumber

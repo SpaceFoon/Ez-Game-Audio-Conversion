@@ -1,4 +1,5 @@
 const { performance } = require("perf_hooks");
+const { settings } = require("./utils");
 
 const chalk = require("chalk");
 const { rl } = require("./utils");
@@ -33,7 +34,9 @@ const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
   } else {
     console.log("🚀🎉✨No conversions failed✨🎉🚀");
   }
-  console.log(" 🌞🌈🌼 Have a nice day! 🌼🌈🌞\n");
+  console.log(
+    ` 🌞🌈🌼 Log files are in: ${settings.outputFilePath} Have a nice day! 🌼🌈🌞\n`
+  );
 
   const quit = () => {
     rl.question(chalk.blue("(☞ﾟヮﾟ)☞  Press Enter to close 🔚"), () => {

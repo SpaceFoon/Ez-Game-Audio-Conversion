@@ -4,12 +4,16 @@ const { Worker } = require("worker_threads");
 const { performance } = require("perf_hooks");
 const { cpus } = require("os");
 const chalk = require("chalk");
-const { isFileBusy, addToLog, settings, checkDiskSpace } = require("./utils");
+const {
+  initializeFileNames,
+  addToLog,
+  settings,
+  checkDiskSpace,
+} = require("./utils");
 
 const convertFiles = async (files) => {
+  initializeFileNames();
   const jobStartTime = performance.now();
-  await isFileBusy(`${settings.filePath}/logs.csv`);
-  await isFileBusy(`${settings.filePath}/error.csv`);
   try {
     var cpuNumber = cpus().length;
   } catch {
@@ -40,8 +44,8 @@ const convertFiles = async (files) => {
       });
 
       worker.on("message", (message) => {
+        // Errors messages
         if (message.type === "error" || message.type === "stderr") {
-          // console.warn("message2", message.type, message.data);
           console.error(
             "ERROR MESSAGE FROM FFMPEG:",
             message.data,
@@ -49,10 +53,12 @@ const convertFiles = async (files) => {
             file.outputFile
           );
           checkDiskSpace(settings.outputFilePath);
-          addToLog("error", file);
+          addToLog(message, file);
           reject(new Error(message.data));
           return;
         }
+
+        // File Success code
         if (message.type === "code") {
           const workerEndTime = performance.now();
           const workerCompTime = workerEndTime - workerStartTime;
@@ -72,8 +78,8 @@ const convertFiles = async (files) => {
               )
             );
             resolve();
+            // File Failure code
           } else if (message.data !== 0) {
-            // console.warn("message", message.data);
             if (!failedFiles[file]) {
               failedFiles.push(file);
             }
