@@ -52,6 +52,13 @@ const convertFiles = async (files) => {
             "Output file:",
             file.outputFile
           );
+          // Catch disk space errors and stop a runway process
+          if (/no space left/i.test(message.data)) {
+            console.error(
+              chalk.redBright("Stopping due to insufficient disk space.")
+            );
+            process.exit(1);
+          }
           checkDiskSpace(settings.outputFilePath);
           addToLog(message, file);
           reject(new Error(message.data));

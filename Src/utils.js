@@ -119,6 +119,9 @@ const addToLog = async (log, file) => {
   const time = timestamp.replaceAll(",", "");
   const data = log.data?.toString().replaceAll(",", "") || "Unknown Error";
   const inputFile = file.inputFile?.replaceAll(",", "") || "Unknown Input File";
+  if (data === "Unknown Error") {
+    console.error("Unknown Error log, file: ", log, file);
+  }
   const outputFile =
     file.outputFile?.replaceAll(",", "") || "Unknown Output File";
   const logPath = settings.outputFilePath;
