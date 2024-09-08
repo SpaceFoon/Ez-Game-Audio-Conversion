@@ -1,5 +1,6 @@
 // app.js
 // Description: Prints title then runs a  simple promise chain that runs the entire application.
+// Uses require instead of module imports for compatibility with pkg.
 const getUserInput = require("./getUserInput");
 const searchFiles = require("./searchFiles");
 const deleteDuplicateFiles = require("./deleteDuplicateFiles");
@@ -16,8 +17,6 @@ if (process.env.PKG_ENV === "packaging") {
   const { converterWorker, runConversion } = require("./converterWorker");
 }
 join(__dirname, "./converterWorker.js");
-// console.log(converterWorker, runConversion);
-// console.log("DIRNAME app", __dirname, __filename);
 
 process.stdout.write(`[Console]::Title = "EZ Game Audio"`);
 process.stdout.write("\x1b]0;EZ Game Audio\x1b\x5c");

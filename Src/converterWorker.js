@@ -155,11 +155,13 @@ const converterWorker = async ({
     loopData = `-metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
   }
   const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
-  // Despite what you read online these are the best codecs.
+
+  // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
   // https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
   // https://trac.ffmpeg.org/wiki/Encode/MP3
-  // https://trac.ffmpeg.org/wiki/Encode/AAC page is wrong about aac being experimental
+  // https://trac.ffmpeg.org/wiki/Encode/AAC page is wrong about aac being experimental.
   // -b:a = constant BR -q:a = variable.
+
   const formatConfig = {
     ogg: {
       vorbis: {
@@ -168,7 +170,7 @@ const converterWorker = async ({
       },
       opus: {
         codec: "libopus",
-        additionalOptions: ["-b:a", "64k"], //vbr by default
+        additionalOptions: ["-b:a", "64k"], //-b:a = variable in this case...
       },
     },
     mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "4"] }, //-V 4	165average	140-188 range
@@ -198,7 +200,7 @@ const converterWorker = async ({
         "error", // Sends all errors to stdeer
         "-i", //input file
         `"${inputFile}"`,
-        // "-map_metadata",
+        // "-map_metadata", this is default I think
         // // "0",
         // "-1", // Strip all metadata from input
         "-c:a", // = codec:audio Indicates the codec for the audio stream.

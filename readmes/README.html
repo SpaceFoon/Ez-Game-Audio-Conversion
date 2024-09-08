@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>EZ-Game-Audio-Conversion</title>
+    <title>ez-game-audio-conversion</title>
     <meta content="width=device-width, initial-scale=1" name="viewport">
     <meta description="Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.">
     <meta keywords="Audio,ffmpeg,transcoding">
@@ -156,20 +156,24 @@ class MarkdownStyle extends HTMLElement {
     }
 }
 customElements.define('markdown-style', MarkdownStyle);</script><markdown-style style="max-width: 960px; margin: 0 auto 60px auto; padding: 8px;max-width: 960px;" class="markdown-style">
-    <h1 id="ez-game-audio-conversion"><a class="anchor" aria-hidden="true" tabindex="-1" href="#ez-game-audio-conversion"><span class="octicon octicon-link"></span></a>EZ Game Audio Conversion</h1>
-    <p><strong>Unattended Batch Audio Conversion Tool for Game Devs</strong></p>
+    <h1 id="ez-game-audio-conversion-"><a class="anchor" aria-hidden="true" tabindex="-1" href="#ez-game-audio-conversion-"><span class="octicon octicon-link"></span></a><span style="color:red">EZ Game Audio Conversion</span></h1>
+    <h2 id="unattended-batch-audio-conversion-tool-for-game-devs-and-more"><a class="anchor" aria-hidden="true" tabindex="-1" href="#unattended-batch-audio-conversion-tool-for-game-devs-and-more"><span class="octicon octicon-link"></span></a><strong>Unattended Batch Audio Conversion Tool for Game Devs and More!</strong></h2>
+    <h2 id="why-i-built-ez-game-audio-conversion"><a class="anchor" aria-hidden="true" tabindex="-1" href="#why-i-built-ez-game-audio-conversion"><span class="octicon octicon-link"></span></a>Why I built Ez-Game-Audio-Conversion</h2>
+    <p>I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real headache to deal with. Most game engines only support a few formats. Files need to be compressed to the smallest size possible without quality loss. Game devs also have to deal with looping audio that use loop tags.</p>
+    <p>As a new game dev, you soon may notice that you are spending more time on asset management than actual game development. I don't think game devs should spend any time learning things that are not specific to actually making games. In fact, I don't think anyone who wants some audio files converted or compressed should have to spend an entire weekend learning about audio formats and bitrates like I did.</p>
+    <p>This tool started as just a few lines of code to convert audio files for my game development projects after realized I quickly realized that the process was tedious and time-consuming. As a game developer, you are forced to wear many hats, you have to choose audio formats, bitrates, codecs, and more. The entire time you are doing and learning about this, you NOT working on your game. I wanted to create a tool that would take the guesswork out of the process and make it as easy and fast as possible. I personally use this tool for my projects.</p>
     <h2 id="introduction"><a class="anchor" aria-hidden="true" tabindex="-1" href="#introduction"><span class="octicon octicon-link"></span></a>Introduction</h2>
     <p>EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!</p>
-    <h2 id="features"><a class="anchor" aria-hidden="true" tabindex="-1" href="#features"><span class="octicon octicon-link"></span></a>Features</h2>
+    <h2 id="feature"><a class="anchor" aria-hidden="true" tabindex="-1" href="#feature"><span class="octicon octicon-link"></span></a>Feature</h2>
     <ul>
       <li>💻 <strong>User-Friendly Interface:</strong> Designed with simplicity as the main goal, eliminating any learning curve.</li>
       <li>🔄 <strong>Unattended Batch Jobs:</strong> With recursive file searching and unattended conflict resolution, set it and forget it.</li>
       <li>🚀 <strong>Multi-threading:</strong> No job too big or small when all your CPU cores are fully utilized.</li>
       <li>🎵 <strong>Automatic Bitrate and Codec Selection:</strong> Automatically selects the best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.</li>
-      <li>📁 <strong>Comprehensive Format Support:</strong> Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. More to come.</li>
+      <li>📁 <strong>Comprehensive Format Support:</strong> Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. WMA to come.</li>
       <li>🔒 <strong>Privacy and Reliability:</strong> Operates offline, ensuring data privacy and reliability.</li>
       <li>🎶 <strong>High-Quality Output:</strong> Employs FFMPEG for superior sound quality, codec support, and speed.</li>
-      <li>🤖 <strong>Intelligent File Handling:</strong> Automatically resolves duplicate file names with different file extentions. Selects the best input file format.</li>
+      <li>🤖 <strong>Intelligent File Handling:</strong> Automatically resolves duplicate file names with different file extensions. Selects the best input file format.</li>
       <li>📝 <strong>Meta Data Support:</strong> Will transfer all basic meta data to and from all formats that support it.</li>
       <li>🔁 <strong>Loop Tag Support:</strong> All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.</li>
       <li>🎼 <strong>Opus AND Vorbis Support for Ogg:</strong> Use Opus when you can and Vorbis when you have to.</li>
@@ -188,7 +192,7 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
     <h2 id="usage"><a class="anchor" aria-hidden="true" tabindex="-1" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
     <ol>
       <li>
-        <p><strong>Setup:</strong> Follow the setup prompts. It's recommended to copy and paste file path. Right-click to paste.</p>
+        <p><strong>Setup:</strong> Follow the setup prompts. It's recommended to copy and paste file paths. Right-click to paste.</p>
       </li>
       <li>
         <p><strong>File Selection:</strong> The application will search for matching files based on the provided criteria and display the list of input files to be converted.</p>
@@ -239,8 +243,9 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
     <h3 id="additional-notes"><a class="anchor" aria-hidden="true" tabindex="-1" href="#additional-notes"><span class="octicon octicon-link"></span></a>Additional Notes</h3>
     <ul>
       <li>M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.</li>
-      <li>WAV and AIFF uses the pcm_s16le codec, while OGG uses the newer Opus codec by default.</li>
+      <li>WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.</li>
       <li>Lossy formats utilize Variable Bit Rate (VBR) for increased compression.</li>
+      <li>Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix.</li>
     </ul>
     <h2 id="audio-file-type-compatibility"><a class="anchor" aria-hidden="true" tabindex="-1" href="#audio-file-type-compatibility"><span class="octicon octicon-link"></span></a>Audio File Type Compatibility</h2>
     <h3 id="rpg-maker"><a class="anchor" aria-hidden="true" tabindex="-1" href="#rpg-maker"><span class="octicon octicon-link"></span></a>RPG Maker</h3>
@@ -265,7 +270,7 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
           <td>YES</td>
         </tr>
         <tr>
-          <td>Loop Inside (Tags)</td>
+          <td>Loop Inside (Tags)<sup><a href="#user-content-fn-4" id="user-content-fnref-4" data-footnote-ref="" aria-describedby="footnote-label">3</a></sup></td>
           <td>NO</td>
           <td>YES</td>
           <td>NO</td>
@@ -277,7 +282,7 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
           <td>YES</td>
           <td>YES</td>
           <td>NO</td>
-          <td>YES<sup><a href="#user-content-fn-2" id="user-content-fnref-2" data-footnote-ref="" aria-describedby="footnote-label">3</a></sup></td>
+          <td>YES<sup><a href="#user-content-fn-2" id="user-content-fnref-2" data-footnote-ref="" aria-describedby="footnote-label">4</a></sup></td>
           <td>OMG YES</td>
         </tr>
         <tr>
@@ -358,7 +363,7 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
     </ul>
     <h4 id="renpy"><a class="anchor" aria-hidden="true" tabindex="-1" href="#renpy"><span class="octicon octicon-link"></span></a>Ren'Py</h4>
     <ul>
-      <li><strong>Supported Formats:</strong> <code>Ogg Opus, Ogg Vorbis, MP3, MP2, FLAC, WAV (uncompressed 16-bit signed PCM only)</code></li>
+      <li><strong>Supported Formats:</strong> <code>Ogg Opus, Ogg Vorbis, MP3, MP2, FLAC, AIFF WAV (uncompressed 16-bit signed PCM only)</code></li>
     </ul>
     <p>Source: <a href="https://www.renpy.org/doc/html/audio.html">Ren'Py Documentation</a></p>
     <h4 id="game-maker-studio"><a class="anchor" aria-hidden="true" tabindex="-1" href="#game-maker-studio"><span class="octicon octicon-link"></span></a>Game Maker Studio</h4>
@@ -371,7 +376,7 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
     <h4 id="additional-comparison"><a class="anchor" aria-hidden="true" tabindex="-1" href="#additional-comparison"><span class="octicon octicon-link"></span></a>Additional Comparison</h4>
     <p><a href="https://dev.to/tenry/comparison-of-audio-formats-for-games-jak">Detailed comparison of audio formats for games</a>.</p>
     <p><a href="https://wiki.xiph.org/Opus_Recommended_Settings">Opus bit rate and sample info</a></p>
-    <p><a href="https://stsaz.github.io/fmedia/audio-formats/">Some testing on performace</a></p>
+    <p><a href="https://stsaz.github.io/fmedia/audio-formats/">Some testing on performance</a></p>
     <p><a href="https://en.wikipedia.org/wiki/Opus_(audio_format)#Quality_comparison_and_low-latency_performance">Comparison of coding efficiency between Opus and other popular audio formats</a></p>
     <h2 id="find-me-on-the-web"><a class="anchor" aria-hidden="true" tabindex="-1" href="#find-me-on-the-web"><span class="octicon octicon-link"></span></a><strong>Find me on the web:</strong></h2>
     <p><strong>Your comments and likes are appreciated for support!</strong></p>
@@ -380,9 +385,10 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
       <a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion">Source on GitHub</a>
       <a href="https://forums.rpgmakerweb.com/index.php?threads/v1-3-tool-ez-batch-game-audio-converter-for-windows.163150/">RPG Maker Forums</a>
       <a href="https://gamejolt.com/@Fooney">GameJolt</a>
-      <a href="https://www.reddit.com/user/Puzzleheaded-Soup362/">Reddit</a>
-      <a href="https://twitter.com/Fooney_">Twitter</a>
-      <a href="mailto:fooneyfoo@gmail.com">Email me @</a><a href="https://ko-fi.com/fooney58825"></a><a href="https://app.gumroad.com/dashboard"></a><a href="https://www.gamedev.net/fooney/"></a><a href="https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/"></a>
+      <a href="https://ko-fi.com/fooney58825"></a>
+      <a href="https://app.gumroad.com/dashboard"></a>
+      <a href="https://www.gamedev.net/fooney/"></a>
+      <a href="https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/">Download mirror: ascensiongamedev.com</a>
     </p>
     <h2 id="license"><a class="anchor" aria-hidden="true" tabindex="-1" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
     <p>This project is licensed under the <a href="https://www.gnu.org/licenses/agpl-3.0.txt">GNU Affero General Public License (AGPL-3.0)</a>.</p>
@@ -394,13 +400,16 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
       <h2 class="sr-only" id="footnote-label"><a class="anchor" aria-hidden="true" tabindex="-1" href="#footnote-label"><span class="octicon octicon-link"></span></a>Footnotes</h2>
       <ol>
         <li id="user-content-fn-3">
-          <p>Opus codec for OGG files is better but Vorbis is more compatiable. <a href="#user-content-fnref-3" data-footnote-backref="" aria-label="Back to reference 1" class="data-footnote-backref">↩</a></p>
+          <p>Opus codec for OGG files is better but Vorbis is more compatible. <a href="#user-content-fnref-3" data-footnote-backref="" aria-label="Back to reference 1" class="data-footnote-backref">↩</a></p>
         </li>
         <li id="user-content-fn-1">
-          <p>Not needed in 2024? <a href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 2" class="data-footnote-backref">↩</a></p>
+          <p>Not needed in 2024? Update: I don't care what they say, it's not needed. <a href="#user-content-fnref-1" data-footnote-backref="" aria-label="Back to reference 2" class="data-footnote-backref">↩</a></p>
+        </li>
+        <li id="user-content-fn-4">
+          <p>As opposed to the basic looping of an audio file which simply replays the file, loop Tags are a way to tell the game engine where to start and end the loop. Example: A song or background sound effect may start at 0:00 and end at 1:00 but loop from 0:30 to 1:00. This avoids replaying intros in songs and makes seamless loops possible in music and sound effects. <a href="#user-content-fnref-4" data-footnote-backref="" aria-label="Back to reference 3" class="data-footnote-backref">↩</a></p>
         </li>
         <li id="user-content-fn-2">
-          <p>M4A can be lossless but isn't when converted by this software. <a href="#user-content-fnref-2" data-footnote-backref="" aria-label="Back to reference 3" class="data-footnote-backref">↩</a></p>
+          <p>M4A can be lossless but isn't when converted by this software. <a href="#user-content-fnref-2" data-footnote-backref="" aria-label="Back to reference 4" class="data-footnote-backref">↩</a></p>
         </li>
       </ol>
     </section>

@@ -1,6 +1,25 @@
-# EZ Game Audio Conversion
+<!-- # <span style="color:red">EZ Game Audio Conversion </span> -->
+![Title Image](dist/assets/title3.webp
+)
 
-## **Unattended Batch Audio Conversion Tool for Game Devs and More!**
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total)
+
+[![Download Now](https://img.shields.io/badge/Download%20Now-%23ff00ff?style=for-the-badge&logo=appveyor)](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/)
+
+<!-- Pre-Headline -->
+<p style="font-size: 16px; color: yellow; text-align: center;">Boost your productivity and streamline your workflow today!</p>
+
+<!-- <span style="color:red">**"The Best Unattended Batch Audio Conversion Tool There is"**</span> -->
+
+## Why I built Ez-Game-Audio-Conversion
+
+I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real headache and a huge time sink. If you spend all day learning how audio files work, you just spent all day getting nothing done in your project. You shouldn't have to be a audio engineer or terminal wizard just to have audio in the right format.
+
+The Problem: Game devs and anyone else who needs to convert audio files for whatever reason, need to know a lot about digital audio before they can even get started. This is a huge barrier to entry for new game devs and a huge time sink for experienced ones.
+
+As a new game dev, you soon may notice that you are spending more time on asset management than actual game development. I don't think game devs should spend any time learning things that are not specific to actually making games. In fact, I don't think anyone who wants some audio files converted or compressed should have to spend an entire weekend learning about audio formats and bitrates like I did.
+
+This tool started as just a few lines of code to convert audio files for my game development projects after realized I quickly realized that the process was tedious and time-consuming. As a game developer, you are forced to wear many hats, you have to choose audio formats, bitrates, codecs, and more. The entire time you are doing and learning about this, you NOT working on your game. I wanted to create a tool that would take the guesswork out of the process and make it as easy and fast as possible. I personally use this tool for my projects.
 
 ## Introduction
 
@@ -155,8 +174,11 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 
 ## License
 
-This project is licensed under the [GNU Affero General Public License (AGPL-3.0)](https://www.gnu.org/licenses/agpl-3.0.txt).
+This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International License.](http://creativecommons.org/licenses/by-nc/4.0/).
+
+If you would like to use this software for commercial purposes, please contact me on [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion) or [GameJolt](https://gamejolt.com/@Fooney) for licensing options. I just want to get paid if you are selling my work.
 
 ### Attribution
 
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
+
