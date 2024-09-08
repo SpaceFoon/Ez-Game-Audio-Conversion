@@ -29,10 +29,10 @@ load().then((ResEdit) => {
     vi.setStringValues(
       { lang: 1033, codepage: 1200 },
       {
-        ProductName: "EZ Game Audio Conversion",
+        ProductName: "EZ Game Audio Converter",
         FileDescription: "Simple Game Audio Conversion Tool.",
         CompanyName: "Fooney",
-        LegalCopyright: `GPL-3.0`,
+        LegalCopyright: `CC BY-NC`,
       }
     );
     vi.removeStringValue({ lang: 1033, codepage: 1200 }, "OriginalFilename");
@@ -42,7 +42,7 @@ load().then((ResEdit) => {
     vi.outputToResourceEntries(res.entries);
     res.outputResource(exe);
     fs.writeFileSync(output, Buffer.from(exe.generate()));
-    console.log("resedit finised.");
+    console.log("resedit finished.");
   }
 
   windowsPostBuild("././dist/EZ-Game-Audio.exe");

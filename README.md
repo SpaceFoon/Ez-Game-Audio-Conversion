@@ -2,17 +2,24 @@
 ![Title Image](dist/assets/title3.webp
 )
 
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total)
+<p align="center">
+  <img src="https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total" alt="GitHub Downloads (all assets, all releases)">
+  <img src="https://img.shields.io/github/stars/SpaceFoon/Ez-Game-Audio-Conversion" alt="GitHub Stars">
+  <img src="https://img.shields.io/github/issues/SpaceFoon/Ez-Game-Audio-Conversion" alt="GitHub Issues">
+  <img src="https://img.shields.io/github/commits-since/SpaceFoon/Ez-Game-Audio-Conversion/latest" alt="GitHub Commits">
+</p>
 
-[![Download Now](https://img.shields.io/badge/Download_Windows-0099FF?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/)
+<p align="center">
+  <a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/">
+    <img src="https://img.shields.io/badge/Download_for_Windows-0099FF?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
+  </a>
+</p>
 
 
 <!-- Pre-Headline -->
 <p style="font-size: 16px; color: yellow; text-align: center;">Boost your productivity and streamline your workflow today!</p>
 
-<!-- <span style="color:red">**"The Best Unattended Batch Audio Conversion Tool There is"**</span> -->
-
-## Why I built Ez-Game-Audio-Conversion
+## Why I built Ez Game Audio Converter
 
 I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real headache and a huge time sink. If you spend all day learning how audio files work, you just spent all day getting nothing done in your project. You shouldn't have to be a audio engineer or terminal wizard just to have audio in the right format.
 
@@ -24,7 +31,7 @@ Please leave feedback on Itch.io or Github.
 
 ## Introduction
 
-EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!
+EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!
 
 ## Feature
 
