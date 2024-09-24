@@ -1,6 +1,6 @@
 const { performance } = require("perf_hooks");
 const { settings } = require("./utils");
-
+const { spawn } = require("child_process");
 const chalk = require("chalk");
 const { rl } = require("./utils");
 
@@ -38,11 +38,24 @@ const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
     ` 🌞🌈🌼 Log files are in: ${settings.outputFilePath} Have a nice day! 🌼🌈🌞\n`
   );
 
-  const quit = () => {
-    rl.question(chalk.blue("(☞ﾟヮﾟ)☞  Press Enter to close 🔚"), () => {
-      rl.close();
-      process.exit();
+  function restartApp() {
+    console.log("Restarting the app...");
+    spawn(process.argv[0], process.argv.slice(1), {
+      stdio: "inherit",
     });
+    process.exit(); // Stop the current process
+  }
+
+  // Somewhere in your code, call restartApp() when you need to restart.
+  restartApp();
+  const quit = () => {
+    rl.question(
+      chalk.blue("(☞ﾟヮﾟ)☞  Press Enter to restart program 🔀"),
+      () => {
+        rl.close();
+        process.exit();
+      }
+    );
   };
   quit();
 };

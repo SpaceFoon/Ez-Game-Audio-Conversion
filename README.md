@@ -28,10 +28,16 @@ The Problem: Game devs and anyone else who needs to convert audio files for what
 The Solution: A simple, easy to use tool that does all the heavy lifting for you. You don't need to know anything about audio files to use this tool. Just point it at your files and let it do the work. It will automatically select the best codec and bitrate for you. It will even handle loop tags for you. It's the easiest, fastest and most reliable solution available. And it's FREE!
 
 Please leave feedback on Itch.io or Github.
-
+<!-- 
 ## Introduction
 
-EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!
+EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags! -->
+
+## Not just for game devs anymore.
+
+  Now with FULL support for Apple iTunes metadata even when converting to and from non-M4A formats. This means you can convert your iTunes library to OGG or FLAC and keep all your metadata. This includes loop tags. Not many tools that do it all, also do this.
+
+  A big feature request has been to add CD ripping support. That this feature is now available! You can now rip your CDs to any format you like. Just select the CD drive as your source and the destination folder as your output. You can even rip multiple CDs at once. This feature is still in beta so please report any issues you find.
 
 ## Feature
 
@@ -39,12 +45,12 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 - 🔄 **Unattended Batch Jobs:** With recursive file searching and unattended conflict resolution, set it and forget it.
 - 🚀 **Multi-threading:** No job too big or small when all your CPU cores are fully utilized.
 - 🎵 **Automatic Bitrate and Codec Selection:** Automatically selects the best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.
-- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. WMA to come.
+- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A AAC formats. WMA to come.
 - 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
 - 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
 - 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extensions. Selects the best input file format.
-- 📝 **Meta Data Support:** Will transfer all basic meta data to and from all formats that support it.
-- 🔁 **Loop Tag Support:** All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
+- 📝 **Meta Data Support:** All meta data, including iTunes data and Apple music will be transferred to the new file.~~Will transfer all basic meta data to and from all formats that support it.~~
+- 🔁 **Loop Tag Support:** ~~All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.~~Now supports loop tags with all formats.
 - 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis when you have to.
 
 ## Installation

@@ -15,7 +15,7 @@ const getMetadata = async (inputFile) => {
     return metadata;
   } catch (error) {
     // aiff files not supported by ffprobe
-    if ((inputFile.outputFormat = ".aiff")) return null;
+    // if ((inputFile.outputFormat = ".aiff")) return null;
     console.error("😅 Error running ffprobe.exe:", error.message);
     return null;
   }
@@ -175,7 +175,10 @@ const converterWorker = async ({
     },
     mp3: { codec: "libmp3lame", additionalOptions: ["-q:a", "4"] }, //-V 4	165average	140-188 range
     wav: { codec: "pcm_s16le" },
-    m4a: { codec: "aac ", additionalOptions: ["-q:a", "1.4"] },
+    m4a: {
+      codec: "aac ",
+      additionalOptions: ["-q:a", "1.4", "-movflags use_metadata_tags"],
+    },
     aiff: { codec: "pcm_s16le" },
     flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] }, //Minimal compression but 30% smaller than without.
   };
@@ -191,6 +194,10 @@ const converterWorker = async ({
     outputFormat,
     oggCodec
   );
+  let m4a = "";
+  if (outputFormat === ".m4a" || outputFormat === "m4a") {
+    m4a = "-movflags -use_metadata_tags";
+  }
   // console.log("metadata", metaData);
   return new Promise((resolve, reject) => {
     const ffmpegCommand = spawn(
@@ -200,9 +207,10 @@ const converterWorker = async ({
         "error", // Sends all errors to stdeer
         "-i", //input file
         `"${inputFile}"`,
-        // "-map_metadata", this is default I think
-        // // "0",
+        "-map_metadata", //this is default I think
+        "0",
         // "-1", // Strip all metadata from input
+        // `"${m4a}`,
         "-c:a", // = codec:audio Indicates the codec for the audio stream.
         codec,
         ...additionalOptions, // Specific codec settings
