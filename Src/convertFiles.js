@@ -9,6 +9,7 @@ const {
   addToLog,
   settings,
   checkDiskSpace,
+  rl,
 } = require("./utils");
 
 const convertFiles = async (files) => {
@@ -58,7 +59,7 @@ const convertFiles = async (files) => {
             console.error(
               "\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨"
             );
-            process.exit(1);
+            rl.question("Press ENTER to exit...", () => process.exit(1));
           }
           addToLog(message, file);
           reject(new Error(message.data));

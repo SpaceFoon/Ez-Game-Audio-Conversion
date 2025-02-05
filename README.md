@@ -33,11 +33,11 @@ Please leave feedback on Itch.io or Github.
 
 EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags! -->
 
-## Not just for game devs anymore.
+<!-- ## Not just for game devs anymore.
 
   Now with FULL support for Apple iTunes metadata even when converting to and from non-M4A formats. This means you can convert your iTunes library to OGG or FLAC and keep all your metadata. This includes loop tags. Not many tools that do it all, also do this.
 
-  A big feature request has been to add CD ripping support. That this feature is now available! You can now rip your CDs to any format you like. Just select the CD drive as your source and the destination folder as your output. You can even rip multiple CDs at once. This feature is still in beta so please report any issues you find.
+  A big feature request has been to add CD ripping support. That this feature is now available! You can now rip your CDs to any format you like. Just select the CD drive as your source and the destination folder as your output. You can even rip multiple CDs at once. This feature is still in beta so please report any issues you find. -->
 
 ## Feature
 
@@ -55,7 +55,7 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 
 ## Installation
 
-1. **Download** Zip "EZ-Game-Audio.zip"
+1. **Download** [Latest Release](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases)
 2. **Extract**  Folder "EZ-Game-Audio-Converter"
 3. **Run** File "EZ-Game-Audio.exe"
 
@@ -104,7 +104,7 @@ To change things like bitrate and codec, look in `converterWorker.js`.
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
 - WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
-- Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix.
+- Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix. Also cannot write AIFF meta data at the moment.
 
 ## Audio File Type Compatibility
 

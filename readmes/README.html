@@ -156,31 +156,47 @@ class MarkdownStyle extends HTMLElement {
     }
 }
 customElements.define('markdown-style', MarkdownStyle);</script><markdown-style style="max-width: 960px; margin: 0 auto 60px auto; padding: 8px;max-width: 960px;" class="markdown-style">
-    <h1 id="ez-game-audio-conversion-"><a class="anchor" aria-hidden="true" tabindex="-1" href="#ez-game-audio-conversion-"><span class="octicon octicon-link"></span></a><span style="color:red">EZ Game Audio Conversion</span></h1>
-    <h2 id="unattended-batch-audio-conversion-tool-for-game-devs-and-more"><a class="anchor" aria-hidden="true" tabindex="-1" href="#unattended-batch-audio-conversion-tool-for-game-devs-and-more"><span class="octicon octicon-link"></span></a><strong>Unattended Batch Audio Conversion Tool for Game Devs and More!</strong></h2>
-    <h2 id="why-i-built-ez-game-audio-conversion"><a class="anchor" aria-hidden="true" tabindex="-1" href="#why-i-built-ez-game-audio-conversion"><span class="octicon octicon-link"></span></a>Why I built Ez-Game-Audio-Conversion</h2>
-    <p>I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real headache to deal with. Most game engines only support a few formats. Files need to be compressed to the smallest size possible without quality loss. Game devs also have to deal with looping audio that use loop tags.</p>
-    <p>As a new game dev, you soon may notice that you are spending more time on asset management than actual game development. I don't think game devs should spend any time learning things that are not specific to actually making games. In fact, I don't think anyone who wants some audio files converted or compressed should have to spend an entire weekend learning about audio formats and bitrates like I did.</p>
-    <p>This tool started as just a few lines of code to convert audio files for my game development projects after realized I quickly realized that the process was tedious and time-consuming. As a game developer, you are forced to wear many hats, you have to choose audio formats, bitrates, codecs, and more. The entire time you are doing and learning about this, you NOT working on your game. I wanted to create a tool that would take the guesswork out of the process and make it as easy and fast as possible. I personally use this tool for my projects.</p>
-    <h2 id="introduction"><a class="anchor" aria-hidden="true" tabindex="-1" href="#introduction"><span class="octicon octicon-link"></span></a>Introduction</h2>
-    <p>EZ-Game-Audio-Conversion streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags!</p>
+    <!-- # <span style="color:red">EZ Game Audio Conversion </span> -->
+    <p>
+      <img src="dist/assets/title3.webp" alt="Title Image">
+    </p>
+    <p align="center">
+      <img src="https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total" alt="GitHub Downloads (all assets, all releases)">
+      <img src="https://img.shields.io/github/stars/SpaceFoon/Ez-Game-Audio-Conversion" alt="GitHub Stars">
+      <img src="https://img.shields.io/github/issues/SpaceFoon/Ez-Game-Audio-Conversion" alt="GitHub Issues">
+      <img src="https://img.shields.io/github/commits-since/SpaceFoon/Ez-Game-Audio-Conversion/latest" alt="GitHub Commits">
+    </p>
+    <p align="center"><a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/"><img src="https://img.shields.io/badge/Download_for_Windows-0099FF?style=for-the-badge&#x26;logo=windows&#x26;logoColor=white" alt="Download for Windows"></a></p><!-- Pre-Headline -->
+    <p style="font-size: 16px; color: yellow; text-align: center;">Boost your productivity and streamline your workflow today!</p>
+    <h2 id="why-i-built-ez-game-audio-converter"><a class="anchor" aria-hidden="true" tabindex="-1" href="#why-i-built-ez-game-audio-converter"><span class="octicon octicon-link"></span></a>Why I built Ez Game Audio Converter</h2>
+    <p>I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real headache and a huge time sink. If you spend all day learning how audio files work, you just spent all day getting nothing done in your project. You shouldn't have to be a audio engineer or terminal wizard just to have audio in the right format.</p>
+    <p>The Problem: Game devs and anyone else who needs to convert audio files for whatever reason, need to know a lot about digital audio before they can even get started. This is a huge barrier to entry for new game devs and a time sink for experienced ones.</p>
+    <p>The Solution: A simple, easy to use tool that does all the heavy lifting for you. You don't need to know anything about audio files to use this tool. Just point it at your files and let it do the work. It will automatically select the best codec and bitrate for you. It will even handle loop tags for you. It's the easiest, fastest and most reliable solution available. And it's FREE!</p>
+    <p>Please leave feedback on Itch.io or Github.</p><!-- 
+    ## Introduction
+    
+    EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags! --><!-- ## Not just for game devs anymore.
+    
+      Now with FULL support for Apple iTunes metadata even when converting to and from non-M4A formats. This means you can convert your iTunes library to OGG or FLAC and keep all your metadata. This includes loop tags. Not many tools that do it all, also do this.
+    
+      A big feature request has been to add CD ripping support. That this feature is now available! You can now rip your CDs to any format you like. Just select the CD drive as your source and the destination folder as your output. You can even rip multiple CDs at once. This feature is still in beta so please report any issues you find. -->
     <h2 id="feature"><a class="anchor" aria-hidden="true" tabindex="-1" href="#feature"><span class="octicon octicon-link"></span></a>Feature</h2>
     <ul>
       <li>💻 <strong>User-Friendly Interface:</strong> Designed with simplicity as the main goal, eliminating any learning curve.</li>
       <li>🔄 <strong>Unattended Batch Jobs:</strong> With recursive file searching and unattended conflict resolution, set it and forget it.</li>
       <li>🚀 <strong>Multi-threading:</strong> No job too big or small when all your CPU cores are fully utilized.</li>
       <li>🎵 <strong>Automatic Bitrate and Codec Selection:</strong> Automatically selects the best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.</li>
-      <li>📁 <strong>Comprehensive Format Support:</strong> Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A formats. WMA to come.</li>
+      <li>📁 <strong>Comprehensive Format Support:</strong> Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A AAC formats. WMA to come.</li>
       <li>🔒 <strong>Privacy and Reliability:</strong> Operates offline, ensuring data privacy and reliability.</li>
       <li>🎶 <strong>High-Quality Output:</strong> Employs FFMPEG for superior sound quality, codec support, and speed.</li>
       <li>🤖 <strong>Intelligent File Handling:</strong> Automatically resolves duplicate file names with different file extensions. Selects the best input file format.</li>
-      <li>📝 <strong>Meta Data Support:</strong> Will transfer all basic meta data to and from all formats that support it.</li>
-      <li>🔁 <strong>Loop Tag Support:</strong> All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.</li>
+      <li>📝 <strong>Meta Data Support:</strong> All meta data, including iTunes data and Apple music will be transferred to the new file.<del>Will transfer all basic meta data to and from all formats that support it.</del></li>
+      <li>🔁 <strong>Loop Tag Support:</strong> ~~All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.~~Now supports loop tags with all formats.</li>
       <li>🎼 <strong>Opus AND Vorbis Support for Ogg:</strong> Use Opus when you can and Vorbis when you have to.</li>
     </ul>
     <h2 id="installation"><a class="anchor" aria-hidden="true" tabindex="-1" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
     <ol>
-      <li><strong>Download</strong> Zip "EZ-Game-Audio.zip"</li>
+      <li><strong>Download</strong> <a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases">Latest Release</a></li>
       <li><strong>Extract</strong> Folder "EZ-Game-Audio-Converter"</li>
       <li><strong>Run</strong> File "EZ-Game-Audio.exe"</li>
     </ol>
@@ -245,7 +261,7 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
       <li>M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.</li>
       <li>WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.</li>
       <li>Lossy formats utilize Variable Bit Rate (VBR) for increased compression.</li>
-      <li>Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix.</li>
+      <li>Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix. Also cannot write AIFF meta data at the moment.</li>
     </ul>
     <h2 id="audio-file-type-compatibility"><a class="anchor" aria-hidden="true" tabindex="-1" href="#audio-file-type-compatibility"><span class="octicon octicon-link"></span></a>Audio File Type Compatibility</h2>
     <h3 id="rpg-maker"><a class="anchor" aria-hidden="true" tabindex="-1" href="#rpg-maker"><span class="octicon octicon-link"></span></a>RPG Maker</h3>
@@ -391,10 +407,12 @@ customElements.define('markdown-style', MarkdownStyle);</script><markdown-style 
       <a href="https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/">Download mirror: ascensiongamedev.com</a>
     </p>
     <h2 id="license"><a class="anchor" aria-hidden="true" tabindex="-1" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
-    <p>This project is licensed under the <a href="https://www.gnu.org/licenses/agpl-3.0.txt">GNU Affero General Public License (AGPL-3.0)</a>.</p>
+    <p>This project is licensed under the <a href="http://creativecommons.org/licenses/by-nc/4.0/">Creative Commons Attribution-NonCommercial 4.0 International License.</a>.</p>
+    <p>If you would like to use this software for commercial purposes, please contact me on <a href="https://spacefoon.itch.io/ez-game-audio-format-conversion">Itch.io</a> or <a href="https://gamejolt.com/@Fooney">GameJolt</a> for licensing options. I just want to get paid if you are selling my work.</p>
     <h3 id="attribution"><a class="anchor" aria-hidden="true" tabindex="-1" href="#attribution"><span class="octicon octicon-link"></span></a>Attribution</h3>
     <ul>
       <li><a href="https://icon-icons.com/icon/audio-x-generic/36263">Icon Source</a></li>
+      <li><a href="https://forums.rpgmakerweb.com/index.php?members/att_turan.41930/">Guy on forum who helped me a lot</a></li>
     </ul>
     <section data-footnotes="" class="footnotes">
       <h2 class="sr-only" id="footnote-label"><a class="anchor" aria-hidden="true" tabindex="-1" href="#footnote-label"><span class="octicon octicon-link"></span></a>Footnotes</h2>

@@ -3,10 +3,16 @@
 const { spawn, execSync } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
 const { join } = require("path");
+const { existsSync } = require("fs");
 
 const getMetadata = async (inputFile) => {
   try {
-    const ffprobePath = join(process.cwd(), `\\ffprobe.exe`);
+    let ffprobePath = join(process.cwd(), "\\ffprobe.exe"); // dev path
+
+    if (!existsSync(ffprobePath)) {
+      ffprobePath = join(process.cwd(), "bin", "\\ffprobe.exe"); // prod path
+    }
+
     const output = execSync(
       `"${ffprobePath}" -v quiet -print_format json -show_format -show_streams "${inputFile}"`,
       { encoding: "utf8" }
@@ -154,7 +160,14 @@ const converterWorker = async ({
   if (!isNaN(loopStart) && !isNaN(loopLength)) {
     loopData = `-metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
   }
-  const ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
+
+  // let ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
+
+  let ffmpegPath = join(process.cwd(), "\\ffmpeg.exe"); // dev path
+
+  if (!existsSync(ffmpegPath)) {
+    ffmpegPath = join(process.cwd(), "bin", "\\ffmpeg.exe"); // prod path
+  }
 
   // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
   // https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide

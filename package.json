@@ -1,13 +1,13 @@
 {
   "name": "ez-game-audio-conversion",
-  "version": "1.4.3",
+  "version": "1.5.1",
   "description": "Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.",
   "main": "app.js",
   "bin": {
     "ez-game-audio-conversion": "src/app.js"
   },
   "scripts": {
-    "start": "node ./src/app.js",
+    "dev": "node ./src/app.js",
     "build:unix": ".\\build\\build.shno",
     "build:win": ".\\build\\build.bat",
     "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:win || npm run build:unix",
@@ -38,8 +38,8 @@
     "ffmpeg",
     "transcoding"
   ],
-  "author": "Fooney",
-  "license": "GPL-3.0",
+  "author": "SpaceFoon",
+  "license": "Attribution-NonCommercial-ShareAlike 4.0 International",
   "bugs": {
     "url": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/issues"
   },
