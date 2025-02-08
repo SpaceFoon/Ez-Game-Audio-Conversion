@@ -39,7 +39,7 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 
   A big feature request has been to add CD ripping support. That this feature is now available! You can now rip your CDs to any format you like. Just select the CD drive as your source and the destination folder as your output. You can even rip multiple CDs at once. This feature is still in beta so please report any issues you find. -->
 
-## Feature
+## Features
 
 - 💻 **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
 - 🔄 **Unattended Batch Jobs:** With recursive file searching and unattended conflict resolution, set it and forget it.
@@ -49,8 +49,8 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 - 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
 - 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
 - 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extensions. Selects the best input file format.
-- 📝 **Meta Data Support:** All meta data, including iTunes data and Apple music will be transferred to the new file.~~Will transfer all basic meta data to and from all formats that support it.~~
-- 🔁 **Loop Tag Support:** ~~All loop meta data will be transferred to new Ogg or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.~~Now supports loop tags with all formats.
+- 📝 **Meta Data Support:** All meta data, including iTunes data and Apple music will be transferred to the new file. Will transfer all basic meta data to and from all formats that support it.
+- 🔁 **Loop Tag Support:** All loop meta data will be transferred to new OGG or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
 - 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis when you have to.
 
 ## Installation
@@ -98,13 +98,14 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 To change things like bitrate and codec, look in `converterWorker.js`.
 
 [On Github](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
-
+<!-- TODO
+add other links -->
 ### Additional Notes
 
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
 - WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
-- Loop tags are only supported for OGG FLAC and AIFF formats. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix. Also cannot write AIFF meta data at the moment.
+- Loop tags are only supported for OGG FLAC ~~and AIFF formats~~. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix. Also cannot write AIFF meta data at the moment.
 
 ## Audio File Type Compatibility
 
