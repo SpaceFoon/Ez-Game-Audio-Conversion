@@ -31,6 +31,7 @@ const converterWorker = async ({
   file: { inputFile, outputFile, outputFormat },
   settings: { oggCodec },
 }) => {
+  //ffprobe gets metadata from input
   const metadata = (await getMetadata(inputFile)) || {};
   let streamTags;
   let formatTags;
@@ -85,7 +86,7 @@ const converterWorker = async ({
     }
   });
   const metaData = metadataDataArray.join(" ");
-
+  console.log("metadataarray: ", metaData);
   const channels =
     metadata && metadata.streams && metadata.streams[0]
       ? `-ac ${metadata.streams[0].channels}`
@@ -100,6 +101,8 @@ const converterWorker = async ({
       : null;
   let sampleString = "";
 
+  console.log("Original sample rate:", sampleRate, "Type:", typeof sampleRate);
+
   let loopStart = parseInt(
     // loop data can be in stream or format tags
     (metadata.streams && metadata.streams[0]?.tags?.LOOPSTART) ||
@@ -112,6 +115,9 @@ const converterWorker = async ({
       (metadata.format && metadata.format?.tags?.LOOPLENGTH) ||
       null
   );
+
+  console.log("Original loop points:", { loopStart, loopLength });
+
   // opus doesn't do 441000 hz.
   if (outputFormat === "ogg" && oggCodec === "opus") {
     if (typeof sampleRate === "string") {
@@ -139,15 +145,13 @@ const converterWorker = async ({
         newSample = 8000;
       }
       const ratio = newSample / sampleRateNumber;
-
+      // console.log("loopStart1", loopStart);
       loopStart = Math.round(loopStart * ratio);
-
+      // console.log("loopStart2", loopStart);
+      // console.log("loopLength1", loopLength);
       loopLength = Math.round(loopLength * ratio);
-
+      // console.log("loopLength2", loopLength);
       sampleString = newSample ? "-ar " + newSample.toString() : "";
-      // } else {
-      //   console.error("Invalid sampleRate:", sampleRate);
-      // }
     } else {
       console.error(
         "Sample rate is not a string, setting to 48k. Old sample:",
@@ -158,10 +162,10 @@ const converterWorker = async ({
   }
   let loopData = "";
   if (!isNaN(loopStart) && !isNaN(loopLength)) {
-    loopData = `-metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
+    loopData = ` -metadata LOOPLENGTH="${loopLength}" -metadata LOOPSTART="${loopStart}" `;
+    console.log("loopData1", loopData);
   }
-
-  // let ffmpegPath = join(process.cwd(), `\\ffmpeg.exe`);
+  console.log("loopData2", loopData);
 
   let ffmpegPath = join(process.cwd(), "\\ffmpeg.exe"); // dev path
 
@@ -220,9 +224,9 @@ const converterWorker = async ({
         "error", // Sends all errors to stdeer
         "-i", //input file
         `"${inputFile}"`,
-        "-map_metadata", //this is default I think
-        "0",
-        // "-1", // Strip all metadata from input
+        "-map_metadata",
+        // "0",  //this is default grab it all. Doesn't work with custom data.
+        "-1", // Strip all metadata from input so we can put in our own.
         // `"${m4a}`,
         "-c:a", // = codec:audio Indicates the codec for the audio stream.
         codec,
