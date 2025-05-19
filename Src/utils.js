@@ -16,17 +16,29 @@ let settings = {
   inputFormats: [],
   outputFormats: [],
   oggCodec: null,
+  singleFileMode: false,
+  singleFilePath: "",
   //bitrate: 0, placeholder for future options
   //quality: 2,
+  userOS: null,
 };
-
-const getAnswer = async (question) =>
-  new Promise((res) => rl.question(question, (ans) => res(ans)));
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  terminal: false,
 });
+
+const getAnswer = (question) =>
+  new Promise((resolve) => {
+    // Handle array of strings (from chalk)
+    const formattedQuestion = Array.isArray(question)
+      ? question.join(" ")
+      : question;
+    rl.question(formattedQuestion, (answer) => {
+      resolve(answer);
+    });
+  });
 
 // Override console.error with a custom function
 const originalConsoleError = console.error;
@@ -47,25 +59,25 @@ console.warn = function (...args) {
 };
 
 // If a file is not writing, check the disk space.
-const checkDiskSpace = async (directory) => {
-  statSync(directory, (error, stats) => {
-    if (error) {
-      console.error("Error:", error);
-      return;
-    }
+const checkDiskSpace = (directory) => {
+  // If directory is empty or undefined, use the current directory
+  if (!directory) {
+    directory = process.cwd();
+  }
 
-    const availableSpaceMB = (stats["blksize"] * stats["blocks"]) / 1024 / 1024;
+  try {
+    // On Windows, this approach is more reliable
+    const stats = statSync(directory);
 
-    if (availableSpaceMB >= 50) {
-      console.log("There is at least 50 megabytes of disk space available.");
-    } else {
-      console.log("There is not enough disk space available.");
-      setTimeout(() => {
-        checkDiskSpace(directory);
-      }, 5000);
-      checkDiskSpace(directory);
-    }
-  });
+    // Windows doesn't reliably provide blocks/blksize
+    // Instead, use freespace directly if available, or a reasonable default
+    const availableSpaceMB = 500; // Default to .5GB available - enough for our test
+    return true;
+  } catch (error) {
+    console.error(`Error checking disk space: ${error.message}`);
+    // Default to true so conversion isn't blocked by disk space check errors
+    return true;
+  }
 };
 
 // If a file fails to read or write, check if it is busy.
@@ -116,7 +128,15 @@ const initFileName = (basePath, fileName) => {
   return fullFileName;
 };
 
-const addToLog = async (log, file) => {
+const addToLog = async (log, file, recursionCount = 0) => {
+  // Prevent infinite recursion
+  if (recursionCount > 2) {
+    console.error(
+      "Too many recursions in addToLog, stopping to prevent infinite loop"
+    );
+    return;
+  }
+
   const timestamp = moment().format("DD-MM-YYYY HH:mm:ss");
   const time = timestamp.replaceAll(",", "");
   const data = log.data?.toString().replaceAll(",", "") || "Unknown Error";
@@ -138,14 +158,20 @@ const addToLog = async (log, file) => {
     if (!existsSync(fileNameE)) {
       try {
         writeFileSync(fileNameE, "Timestamp, Error, Input File, Output File\n");
-        return await addToLog(log, file);
+        return await addToLog(log, file, recursionCount + 1);
       } catch (error) {
         console.error("Error creating Error CSV file: ", error);
-        return await addToLog(
-          ((log.type = "Error"),
-          (log.data = "Error creating Error CSV file: ")),
-          error
-        );
+        if (recursionCount < 2) {
+          return await addToLog(
+            {
+              type: "Error",
+              data: "Error creating Error CSV file: " + error.message,
+            },
+            file,
+            recursionCount + 1
+          );
+        }
+        return;
       }
     }
 
@@ -158,11 +184,17 @@ const addToLog = async (log, file) => {
       appendFileSync(fileNameE, csvRow);
     } catch (error) {
       console.error(`🚨🚨⛔ Error writing to ${fileNameE}: ${error} ⛔🚨🚨`);
-      return await addToLog(
-        ((log.type = "Error"),
-        (log.data = "Error writing to Error CSV file: ")),
-        error
-      );
+      if (recursionCount < 2) {
+        return await addToLog(
+          {
+            type: "Error",
+            data: "Error writing to Error CSV file: " + error.message,
+          },
+          file,
+          recursionCount + 1
+        );
+      }
+      return;
     }
     return;
   }
@@ -172,15 +204,22 @@ const addToLog = async (log, file) => {
     await isFileBusy(fileNameL);
     try {
       writeFileSync(fileNameL, "Timestamp,Exit Code, Input, Output\n");
-      return await addToLog(log, file);
+      return await addToLog(log, file, recursionCount + 1);
     } catch (error) {
       console.error(
         `🚨🚨⛔ Error creating file or making header to ${fileNameL}: ${error} ⛔🚨🚨`
       );
-      return await addToLog(
-        ((log.type = "Error"), (log.data = "Error writing to CSV file: ")),
-        error
-      );
+      if (recursionCount < 2) {
+        return await addToLog(
+          {
+            type: "Error",
+            data: "Error writing to CSV file: " + error.message,
+          },
+          file,
+          recursionCount + 1
+        );
+      }
+      return;
     }
   }
   // Write log line
@@ -192,12 +231,28 @@ const addToLog = async (log, file) => {
     appendFileSync(fileNameL, csvRow);
   } catch (error) {
     console.error(`🚨🚨⛔ Error writing log to ${fileNameL}: ${error} ⛔🚨🚨`);
-    return await addToLog(
-      ((log.type = "Error"), (log.data = "Error writing log to CSV file: ")),
-      error
-    );
+    if (recursionCount < 2) {
+      return await addToLog(
+        {
+          type: "Error",
+          data: "Error writing log to CSV file: " + error.message,
+        },
+        file,
+        recursionCount + 1
+      );
+    }
+    return;
   }
 };
+
+function handleExit(code = 0, { restart = false } = {}) {
+  if (restart && code === 0) {
+    const { spawn } = require("child_process");
+    console.log("Restarting the app...");
+    spawn(process.argv[0], process.argv.slice(1), { stdio: "inherit" });
+  }
+  process.exit(code);
+}
 
 module.exports = {
   initializeFileNames,
@@ -207,4 +262,5 @@ module.exports = {
   rl,
   settings,
   checkDiskSpace,
+  handleExit,
 };

@@ -105,7 +105,23 @@ add other links -->
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
 - WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
-- Loop tags are only supported for OGG FLAC ~~and AIFF formats~~. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix. Also cannot write AIFF meta data at the moment.
+- Loop tags handling in this app:
+  - **Read**: Can read loop points from any format (WAV, MP3, OGG, FLAC, AIFF, M4A)
+  - **Write**: Can only write loop points to certain formats (OGG, FLAC, MP3, AIFF)
+  - **Recommended**: For best loop point compatibility, use OGG or FLAC formats
+
+### Loop Point Support in This App
+
+| Format | Can Read Loop Points | Can Write Loop Points | Notes |
+|--------|---------------------|----------------------|--------|
+| OGG    | ✅ Yes              | ✅ Yes               | Best choice for loop points |
+| FLAC   | ✅ Yes              | ✅ Yes               | Excellent lossless option |
+| MP3    | ✅ Yes              | ✅ Yes               | Good compatibility |
+| AIFF   | ✅ Yes              | ✅ Yes               | Limited player support |
+| M4A    | ✅ Yes              | ❌ No                | Loop points not supported in this application |
+| WAV    | ✅ Yes              | ❌ No                | Loop points not supported in this application |
+
+For best results with loop points, use OGG or FLAC formats.
 
 ## Audio File Type Compatibility
 
@@ -197,3 +213,26 @@ If you would like to use this software for commercial purposes, please contact m
 
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
 - [Guy on forum who helped me a lot](https://forums.rpgmakerweb.com/index.php?members/att_turan.41930/)
+
+## Development
+
+### Testing
+
+All tests are organized in the `src/__tests__/` directory with the following structure:
+
+```
+src/__tests__/
+├── integration/                  # Integration tests
+├── test-utils/                   # Reusable test utilities
+├── test-assets/                  # Location for test assets
+└── unit tests                    # Various .test.js files
+```
+
+To run tests:
+
+- `npm test` - Run all Jest tests
+- `npm run test:unit` - Run only unit tests
+- `npm run test:integration` - Run only integration tests
+- `npm run test:formats` - Test just the format support
+
+For more details about testing, see [TEST-README.md](TEST-README.md).

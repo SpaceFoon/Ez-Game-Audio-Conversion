@@ -47,7 +47,8 @@ if exist README.pdf (
 timeout /t 1 >nul
 xcopy .\readmes .\dist /v /y /q
 xcopy .\ffmpeg-bin .\dist /v /y /q
-
+xcopy .\src\add_context_menu.bat .\dist /v /y /q
+xcopy .\src\remove_context_menu.bat .\dist /v /y /q
 :WAIT_LOOP
 timeout /t 1 >nul
 

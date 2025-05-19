@@ -8,7 +8,9 @@ const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
   const jobEndTime = performance.now();
   let totalTime = jobEndTime - jobStartTime;
   totalTime = totalTime / 1000;
-  let average = (totalTime * 10) / successfulFiles.length;
+  let average =
+    (totalTime * 10) /
+    (successfulFiles && successfulFiles.length ? successfulFiles.length : 1);
   console.log(
     `\n    📋 Total job duration: ${totalTime.toFixed(
       2
@@ -32,7 +34,7 @@ const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
       failedFiles.map((file) => `❌ ${file.outputFile}`)
     );
   } else {
-    console.log("🚀🎉✨No conversions failed✨🎉🚀");
+    console.log(" 🚀🎉✨No conversions failed✨🎉🚀");
   }
   console.log(
     ` 🌞🌈🌼 Log files are in: ${settings.outputFilePath} Have a nice day! 🌼🌈🌞\n`

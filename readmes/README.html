@@ -206,8 +206,64 @@ svg { z-index: 99; position: fixed; border: 0px; top: 0px; right: 0; }
       <li>M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.</li>
       <li>WAV and AIFF uses the pcm_s16le codec, while OGG uses the older and more compatible Vorbis codec by default.</li>
       <li>Lossy formats utilize Variable Bit Rate (VBR) for increased compression.</li>
-      <li>Loop tags are only supported for OGG FLAC <del>and AIFF formats</del>. This software cannot write loop tags to M4A files but can read them when converting to another format. Sorry, but it's a total pain to fix. Also cannot write AIFF meta data at the moment.</li>
+      <li>Loop tags handling in this app:
+        <ul>
+          <li><strong>Read</strong>: Can read loop points from any format (WAV, MP3, OGG, FLAC, AIFF, M4A)</li>
+          <li><strong>Write</strong>: Can only write loop points to certain formats (OGG, FLAC, MP3, AIFF)</li>
+          <li><strong>Recommended</strong>: For best loop point compatibility, use OGG or FLAC formats</li>
+        </ul>
+      </li>
     </ul>
+    <h3 id="loop-point-support-in-this-app"><a class="anchor" aria-hidden="true" tabindex="-1" href="#loop-point-support-in-this-app"><span class="octicon octicon-link"></span></a>Loop Point Support in This App</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Format</th>
+          <th>Can Read Loop Points</th>
+          <th>Can Write Loop Points</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>OGG</td>
+          <td>✅ Yes</td>
+          <td>✅ Yes</td>
+          <td>Best choice for loop points</td>
+        </tr>
+        <tr>
+          <td>FLAC</td>
+          <td>✅ Yes</td>
+          <td>✅ Yes</td>
+          <td>Excellent lossless option</td>
+        </tr>
+        <tr>
+          <td>MP3</td>
+          <td>✅ Yes</td>
+          <td>✅ Yes</td>
+          <td>Good compatibility</td>
+        </tr>
+        <tr>
+          <td>AIFF</td>
+          <td>✅ Yes</td>
+          <td>✅ Yes</td>
+          <td>Limited player support</td>
+        </tr>
+        <tr>
+          <td>M4A</td>
+          <td>✅ Yes</td>
+          <td>❌ No</td>
+          <td>Loop points not supported in this application</td>
+        </tr>
+        <tr>
+          <td>WAV</td>
+          <td>✅ Yes</td>
+          <td>❌ No</td>
+          <td>Loop points not supported in this application</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>For best results with loop points, use OGG or FLAC formats.</p>
     <h2 id="audio-file-type-compatibility"><a class="anchor" aria-hidden="true" tabindex="-1" href="#audio-file-type-compatibility"><span class="octicon octicon-link"></span></a>Audio File Type Compatibility</h2>
     <h3 id="rpg-maker"><a class="anchor" aria-hidden="true" tabindex="-1" href="#rpg-maker"><span class="octicon octicon-link"></span></a>RPG Maker</h3>
     <table>
@@ -359,6 +415,28 @@ svg { z-index: 99; position: fixed; border: 0px; top: 0px; right: 0; }
       <li><a href="https://icon-icons.com/icon/audio-x-generic/36263">Icon Source</a></li>
       <li><a href="https://forums.rpgmakerweb.com/index.php?members/att_turan.41930/">Guy on forum who helped me a lot</a></li>
     </ul>
+    <h2 id="development"><a class="anchor" aria-hidden="true" tabindex="-1" href="#development"><span class="octicon octicon-link"></span></a>Development</h2>
+    <h3 id="testing"><a class="anchor" aria-hidden="true" tabindex="-1" href="#testing"><span class="octicon octicon-link"></span></a>Testing</h3>
+    <p>All tests are organized in the <code>src/__tests__/</code> directory with the following structure:</p>
+    <pre><code class="code-highlight"><span class="code-line line-number" line="1">src/__tests__/
+</span><span class="code-line line-number" line="2">├── integration/                  # Integration tests
+</span><span class="code-line line-number" line="3">├── test-utils/                   # Reusable test utilities
+</span><span class="code-line line-number" line="4">├── test-assets/                  # Location for test assets
+</span><span class="code-line line-number" line="5">└── unit tests                    # Various .test.js files
+</span></code><div onclick="copied(this)" data-code="src/__tests__/
+├── integration/                  # Integration tests
+├── test-utils/                   # Reusable test utilities
+├── test-assets/                  # Location for test assets
+└── unit tests                    # Various .test.js files
+" class="copied"><svg class="octicon-copy" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" height="12" width="12"><path fill-rule="evenodd" d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"></path><path fill-rule="evenodd" d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"></path></svg><svg class="octicon-check" aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" height="12" width="12"><path fill-rule="evenodd" d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"></path></svg></div></pre>
+    <p>To run tests:</p>
+    <ul>
+      <li><code>npm test</code> - Run all Jest tests</li>
+      <li><code>npm run test:unit</code> - Run only unit tests</li>
+      <li><code>npm run test:integration</code> - Run only integration tests</li>
+      <li><code>npm run test:formats</code> - Test just the format support</li>
+    </ul>
+    <p>For more details about testing, see <a href="TEST-README.md">TEST-README.md</a>.</p>
     <section data-footnotes="" class="footnotes">
       <h2 class="sr-only" id="footnote-label"><a class="anchor" aria-hidden="true" tabindex="-1" href="#footnote-label"><span class="octicon octicon-link"></span></a>Footnotes</h2>
       <ol>

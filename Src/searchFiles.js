@@ -13,6 +13,17 @@ const searchFiles = (settings) => {
 
   const allFiles = [];
 
+  // If we're in single file mode, just return the single file
+  if (settings.singleFileMode && settings.singleFilePath) {
+    const fileExtension = extname(settings.singleFilePath).toLowerCase();
+    console.log("File extension:", fileExtension);
+
+    allFiles.push(settings.singleFilePath);
+    console.log(chalk.whiteBright.bold("\n🔍 Processing single file:\n"));
+    console.log(chalk.white(" 🎶 ", settings.singleFilePath));
+    return Promise.resolve(allFiles);
+  }
+
   const walk = (dir) => {
     const files = readdirSync(dir);
 

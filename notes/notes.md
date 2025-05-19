@@ -15,4 +15,10 @@ You can use the -ar option to set the sampling rate, and use -sample_fmt to "set
 
 Then you can get the details from the aiff files you created with find *.aiff -exec ffprobe -v error -select_streams a:0 -show_entries stream {} \; to ensure they're of the correct sampling_rate and bit_depth.
 
-https://gamejolt.com/@Fooney 
+https://gamejolt.com/@Fooney
+
+https://github.com/wez/atomicparsley
+AtomicParsley is a lightweight command line program for reading, parsing and setting metadata into MPEG-4 files, in particular, iTunes-style metadata.
+it can also handel artwork, set special itune tags, tv tags.
+
+amix merges audio sources. for when user wants one channnel instead of two.

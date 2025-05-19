@@ -1,6 +1,6 @@
 {
   "name": "ez-game-audio-conversion",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.",
   "main": "app.js",
   "bin": {
@@ -11,7 +11,14 @@
     "build:unix": ".\\build\\build.shno",
     "build:win": ".\\build\\build.bat",
     "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:win || npm run build:unix",
-    "test": "jest"
+    "test": "jest \"src/__tests__/\" --runInBand --forceExit",
+    "test:old": "jest --testPathPattern=\"__tests__/(?!format-loop-test).+\\.js$\" --testPathIgnorePatterns=integration,test-utils --runInBand --forceExit",
+    "test:new": "jest \"src/__tests__/\" --runInBand --forceExit",
+    "test:core": "jest __tests__/metadataService.test.js __tests__/utils.test.js __tests__/deleteDuplicateFiles.test.js __tests__/searchFiles.test.js --runInBand --forceExit",
+    "test:integration": "jest src/__tests__/integration --runInBand --forceExit",
+    "test:all": "jest --testPathIgnorePatterns=test-utils/index.js,test-utils/run-tests.js,test-utils/run-all-tests.js --runInBand --forceExit",
+    "test:formats": "node __tests__/format-loop-test.js",
+    "test:loops": "jest src/__tests__/integration/loopPointHandling.test.js --runInBand --forceExit"
   },
   "pkg": {
     "scripts": [
@@ -24,6 +31,7 @@
   "dependencies": {
     "cfonts": "^3.2.0",
     "chalk": "^4.1.2",
+    "dotenv": "^16.5.0",
     "fs": "^0.0.1-security",
     "moment": "^2.30.1",
     "path": "^0.12.7",
@@ -50,5 +58,23 @@
     "md-to-pdf": "^5.2.4",
     "pkg": "^5.8.1",
     "resedit": "^2.0.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/__tests__/test-utils/",
+      "/src/__tests__/test-utils/",
+      "/__tests__/run-tests.js",
+      "/__tests__/format-loop-test.js",
+      "/__tests__/test-utils/run-all-tests.js"
+    ],
+    "modulePathIgnorePatterns": [
+      "<rootDir>/dist/",
+      "<rootDir>/build/",
+      "<rootDir>/release/"
+    ],
+    "verbose": true
   }
 }
+
