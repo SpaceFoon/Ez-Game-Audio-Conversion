@@ -5,7 +5,7 @@ const {
   existsSync,
   appendFileSync,
   writeFileSync,
-  statSync,
+  stat,
 } = require("fs");
 const moment = require("moment");
 const chalk = require("chalk");
@@ -46,25 +46,33 @@ console.warn = function (...args) {
   originalConsolWarn.apply(console, coloredArgs);
 };
 
-// If a file is not writing, check the disk space.
-const checkDiskSpace = async (directory) => {
-  statSync(directory, (error, stats) => {
-    if (error) {
-      console.error("Error:", error);
-      return;
-    }
+/**
+ * Check the available disk space for the given directory.
+ *
+ * @param {string} directory - Path to test.
+ * @returns {Promise<number>} Resolves with the free space in megabytes (MB).
+ */
+const checkDiskSpace = (directory) => {
+  return new Promise((resolve, reject) => {
+    stat(directory, (error, stats) => {
+      if (error) {
+        console.error("Error reading disk stats:", error);
+        return reject(error);
+      }
 
-    const availableSpaceMB = (stats["blksize"] * stats["blocks"]) / 1024 / 1024;
+      // Calculate available space in megabytes
+      const availableSpaceMB = (stats.blksize * stats.blocks) / 1024 / 1024;
 
-    if (availableSpaceMB >= 50) {
-      console.log("There is at least 50 megabytes of disk space available.");
-    } else {
-      console.log("There is not enough disk space available.");
-      setTimeout(() => {
-        checkDiskSpace(directory);
-      }, 5000);
-      checkDiskSpace(directory);
-    }
+      if (availableSpaceMB >= 50) {
+        console.log("There is at least 50 megabytes of disk space available.");
+      } else {
+        console.log("There is not enough disk space available.");
+        setTimeout(() => {
+          checkDiskSpace(directory);
+        }, 5000);
+      }
+      resolve(availableSpaceMB);
+    });
   });
 };
 

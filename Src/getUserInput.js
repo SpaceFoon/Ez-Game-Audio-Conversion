@@ -54,7 +54,8 @@ const getUserInput = (settings) => {
           console.log(
             chalk.green.italic(`\n📝 Output Filepath: ${outputFilePath} ✅`)
           );
-          checkDiskSpace(outputFilePath);
+          // Log disk space but don't interrupt user input on failure
+          checkDiskSpace(outputFilePath).catch(() => {});
           askInputFormats();
         }
       );

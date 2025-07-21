@@ -32,7 +32,8 @@ const convertFiles = async (files) => {
 
   const processFile = async (file, workerCounter, task, tasksLeft) => {
     const workerStartTime = performance.now();
-    checkDiskSpace(settings.outputFilePath);
+    // Check available disk space before processing
+    checkDiskSpace(settings.outputFilePath).catch(() => {});
     console.log(
       chalk.cyanBright(
         `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left on output file:\n   ${file.outputFile}📤`
