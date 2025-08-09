@@ -41,7 +41,7 @@ const getMetaData = async (inputFile) => {
     return metaData;
   } catch (error) {
     addToLog(error.message || JSON.stringify(error), inputFile);
-    console.error("😅 Error running ffprobe.exe:", error.message);
+    console.error("😅 Error running ffprobe:", error.message);
     return null;
   }
 };

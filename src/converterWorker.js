@@ -1,5 +1,5 @@
 // converterWorker.js
-// Worker runs ffprobe.exe to get meta data then ffmpeg.exe to convert on one file.
+// Worker runs ffprobe to get meta data then ffmpeg to convert on one file.
 const { spawn } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
 const { join, dirname } = require("path");
@@ -164,21 +164,27 @@ const converterWorker = async ({
   }
 
   // Find ffmpeg executable (use cross-platform path handling)
-  let ffmpegPath = join(process.cwd(), "ffmpeg.exe");
+  const executableName = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  let ffmpegPath = join(process.cwd(), executableName);
 
   if (!existsSync(ffmpegPath)) {
-    ffmpegPath = join(process.cwd(), "bin", "ffmpeg.exe"); // prod path
+    ffmpegPath = join(process.cwd(), "bin", executableName); // prod path
+  }
+
+  // If still not found, try system PATH
+  if (!existsSync(ffmpegPath)) {
+    ffmpegPath = executableName; // Let system find it in PATH
   }
 
   // Skip the file existence check in test mode
   if (!existsSync(ffmpegPath) && process.env.NODE_ENV !== "test") {
-    console.error("😅 Error: ffmpeg.exe not found at paths tried:", {
+    console.error("😅 Error: ffmpeg executable not found at paths tried:", {
       paths: [
-        join(process.cwd(), "ffmpeg.exe"),
-        join(process.cwd(), "bin", "ffmpeg.exe"),
+        join(process.cwd(), executableName),
+        join(process.cwd(), "bin", executableName),
       ],
     });
-    throw new Error("ffmpeg.exe not found");
+    throw new Error(`ffmpeg executable not found (${executableName})`);
   }
 
   // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
