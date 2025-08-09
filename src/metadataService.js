@@ -8,8 +8,9 @@ const { addToLog } = require("./utils");
 const getMetaData = async (inputFile) => {
   try {
     // Determine executable name based on platform
-    const executableName = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
-    
+    const executableName =
+      process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+
     let ffprobePath = join(process.cwd(), executableName); // dev path
 
     if (!existsSync(ffprobePath)) {

@@ -17,7 +17,7 @@ function findFfmpegExecutables() {
   const isWindows = process.platform === "win32";
   const ffmpegExe = isWindows ? "ffmpeg.exe" : "ffmpeg";
   const ffprobeExe = isWindows ? "ffprobe.exe" : "ffprobe";
-  
+
   let ffmpegPath = ffmpegExe;
   let ffprobePath = ffprobeExe;
 
