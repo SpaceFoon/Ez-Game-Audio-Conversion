@@ -3,8 +3,8 @@
 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.WindowTitle = 'EZ GAME EZ BUILDER'"
 color 0A
 @REM Change Color of text and background to something cooler. Redundant for reliability.
-@REM Go to the following file path and delete the file to get your terminal colors back.
-@REM Don't worry, your old ones are somewhere else.
+@REM Go to the following file path and delete the file to get your terminal colors back: %USERPROFILE%\Documents\WindowsPowerShell
+@REM Don't worry, your old files  are still there.
 @REM echo $Host.UI.RawUI.BackgroundColor = 'DarkGreen' > "%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
 @REM echo $Host.UI.RawUI.ForegroundColor = 'White' >> "%USERPROFILE%\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1"
 @REM powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$Host.UI.RawUI.BackgroundColor = 'DarkGreen'"
