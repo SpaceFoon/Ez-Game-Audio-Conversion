@@ -1,10 +1,19 @@
 const fs = require("fs");
+const path = require("path");
+
+// Only run on Windows platforms
+if (process.platform !== "win32") {
+  console.log("Icon generation skipped - not running on Windows");
+  process.exit(0);
+}
+
 const { load } = require("resedit/cjs");
 load().then((ResEdit) => {
   try {
-    fs.existsSync("././dist/EZ-Game-Audio.exe");
+    const exePath = path.join(".", "dist", "EZ-Game-Audio.exe");
+    fs.existsSync(exePath);
   } catch {
-    console.log("can't find ././dist/EZ-Game-Audio.exe");
+    console.log("can't find ./dist/EZ-Game-Audio.exe");
   }
 
   console.log("resedit started generating icon and meta data...");
@@ -14,7 +23,7 @@ load().then((ResEdit) => {
     const exe = ResEdit.NtExecutable.from(fs.readFileSync(output));
     const res = ResEdit.NtExecutableResource.from(exe);
     const iconFile = ResEdit.Data.IconFile.from(
-      fs.readFileSync("./src/ico/icon.ico")
+      fs.readFileSync(path.join(".", "src", "ico", "icon.ico"))
     );
 
     ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
@@ -45,5 +54,5 @@ load().then((ResEdit) => {
     console.log("resedit finished.");
   }
 
-  windowsPostBuild("././dist/EZ-Game-Audio.exe");
+  windowsPostBuild(path.join(".", "dist", "EZ-Game-Audio.exe"));
 });

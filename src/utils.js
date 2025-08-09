@@ -9,6 +9,7 @@ const {
 } = require("fs");
 const moment = require("moment");
 const chalk = require("chalk");
+const { join } = require("path");
 
 let settings = {
   inputFilePath: "",
@@ -118,10 +119,10 @@ const initializeFileNames = () => {
 
 const initFileName = (basePath, fileName) => {
   let num = 1;
-  let fullFileName = `${basePath}/${fileName}.csv`;
+  let fullFileName = join(basePath || "", `${fileName}.csv`);
 
   while (existsSync(fullFileName)) {
-    fullFileName = `${basePath}/${fileName}(${num}).csv`;
+    fullFileName = join(basePath || "", `${fileName}(${num}).csv`);
     num++;
   }
 

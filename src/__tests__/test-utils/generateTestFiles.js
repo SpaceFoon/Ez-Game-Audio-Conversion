@@ -14,18 +14,22 @@ const { execSync, spawnSync } = require("child_process");
  * @returns {Object} - Paths to ffmpeg and ffprobe
  */
 function findFfmpegExecutables() {
-  let ffmpegPath = "ffmpeg";
-  let ffprobePath = "ffprobe";
+  const isWindows = process.platform === "win32";
+  const ffmpegExe = isWindows ? "ffmpeg.exe" : "ffmpeg";
+  const ffprobeExe = isWindows ? "ffprobe.exe" : "ffprobe";
+  
+  let ffmpegPath = ffmpegExe;
+  let ffprobePath = ffprobeExe;
 
   // Look in project root
-  if (fs.existsSync(path.join(process.cwd(), "ffmpeg.exe"))) {
-    ffmpegPath = path.join(process.cwd(), "ffmpeg.exe");
-    ffprobePath = path.join(process.cwd(), "ffprobe.exe");
+  if (fs.existsSync(path.join(process.cwd(), ffmpegExe))) {
+    ffmpegPath = path.join(process.cwd(), ffmpegExe);
+    ffprobePath = path.join(process.cwd(), ffprobeExe);
   }
   // Look in bin directory
-  else if (fs.existsSync(path.join(process.cwd(), "bin", "ffmpeg.exe"))) {
-    ffmpegPath = path.join(process.cwd(), "bin", "ffmpeg.exe");
-    ffprobePath = path.join(process.cwd(), "bin", "ffprobe.exe");
+  else if (fs.existsSync(path.join(process.cwd(), "bin", ffmpegExe))) {
+    ffmpegPath = path.join(process.cwd(), "bin", ffmpegExe);
+    ffprobePath = path.join(process.cwd(), "bin", ffprobeExe);
   }
 
   return { ffmpegPath, ffprobePath };

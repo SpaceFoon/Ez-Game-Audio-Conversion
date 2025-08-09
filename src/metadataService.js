@@ -7,10 +7,18 @@ const { addToLog } = require("./utils");
 // Get metaData from a file using ffprobe
 const getMetaData = async (inputFile) => {
   try {
-    let ffprobePath = join(process.cwd(), "ffprobe.exe"); // dev path
+    // Determine executable name based on platform
+    const executableName = process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+    
+    let ffprobePath = join(process.cwd(), executableName); // dev path
 
     if (!existsSync(ffprobePath)) {
-      ffprobePath = join(process.cwd(), "bin", "ffprobe.exe"); // prod path
+      ffprobePath = join(process.cwd(), "bin", executableName); // prod path
+    }
+
+    // If still not found, try system PATH
+    if (!existsSync(ffprobePath)) {
+      ffprobePath = executableName; // Let system find it in PATH
     }
 
     const output = spawnSync(

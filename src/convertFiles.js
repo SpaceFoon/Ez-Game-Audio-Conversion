@@ -3,6 +3,7 @@
 const { Worker } = require("worker_threads");
 const { performance } = require("perf_hooks");
 const { cpus } = require("os");
+const { join } = require("path");
 const chalk = require("chalk");
 const {
   initializeFileNames,
@@ -61,7 +62,7 @@ const convertFiles = async (files) => {
         //   `Creating worker for: ${file.inputFile} -> ${file.outputFile}`
         // );
 
-        const worker = new Worker(`${__dirname}/converterWorker.js`, {
+        const worker = new Worker(join(__dirname, "converterWorker.js"), {
           workerData,
         });
 
