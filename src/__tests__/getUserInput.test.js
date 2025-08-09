@@ -19,19 +19,30 @@ describe("getUserInput", () => {
   beforeEach(() => {
     settings = {};
     jest.clearAllMocks();
+    // Clear CLI args to force interactive mode in tests
+    process.argv = [process.argv[0], process.argv[1]];
   });
   it("handles valid input and output paths and formats", async () => {
+    // Mock path existence
     fs.existsSync.mockReturnValue(true);
+    // Mock statSync to be used when code checks CLI arg path; not used in this test but safe
+    fs.statSync = jest.fn(() => ({
+      isFile: () => false,
+      isDirectory: () => true,
+    }));
+
+    // Prompt sequence: input folder, output folder, input formats, output formats
     mockRl.question
       .mockResolvedValueOnce("/input/path")
       .mockResolvedValueOnce("/output/path")
       .mockResolvedValueOnce("mp3 wav")
       .mockResolvedValueOnce("ogg");
+
     const result = await getUserInput(settings);
-    expect(result.inputFilePath).toBe("D:/Music/ZClips");
-    expect(result.outputFilePath).toBe("e:/Music/ZClips/hhh");
-    expect(result.inputFormats).toContain("mp3");
-    expect(result.outputFormats).toContain("ogg");
+
+    expect(result.inputFilePath).toBe("/input/path");
+    expect(result.outputFilePath).toBe("/output/path");
+    expect(result.inputFormats).toEqual(["mp3", "wav"]);
+    expect(result.outputFormats).toEqual(["ogg"]);
   });
-  // Add more tests for invalid paths, folder creation, invalid formats, etc.
 });

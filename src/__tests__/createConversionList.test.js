@@ -4,18 +4,29 @@ const { getAnswer, settings } = require("../utils");
 const ExitProgramError = require("../exitProgramError");
 
 jest.mock("fs");
-jest.mock("chalk", () => ({
-  blue: { bold: jest.fn((...a) => a.join(" ")) },
-  blueBright: jest.fn((...a) => a.join(" ")),
-  green: { italic: jest.fn((a) => a) },
-  cyanBright: jest.fn((...a) => a.join(" ")),
-  redBright: { bold: jest.fn((a) => a) },
-  red: Object.assign(
-    jest.fn((a) => a),
-    { bold: jest.fn((a) => a) }
-  ),
-  yellow: jest.fn((a) => a),
-}));
+jest.mock("chalk", () => {
+  const makeFn = (impl = (a) => (Array.isArray(a) ? a.join(" ") : a)) => {
+    const fn = jest.fn((...args) => args.join(" "));
+    // allow chaining like chalk.green.italic
+    fn.italic = jest.fn((a) => a);
+    fn.bold = jest.fn((a) => a);
+    return fn;
+  };
+
+  return {
+    blue: { bold: jest.fn((...a) => a.join(" ")) },
+    blueBright: jest.fn((...a) => a.join(" ")),
+    green: makeFn(),
+    cyanBright: jest.fn((...a) => a.join(" ")),
+    cyan: jest.fn((...a) => a.join(" ")),
+    redBright: { bold: jest.fn((a) => a) },
+    red: Object.assign(
+      jest.fn((a) => a),
+      { bold: jest.fn((a) => a) }
+    ),
+    yellow: jest.fn((a) => a),
+  };
+});
 jest.mock("../utils", () => ({
   getAnswer: jest.fn(),
   settings: {},
@@ -79,16 +90,16 @@ describe("createConversionList", () => {
   it("cancels conversion if user says no at final prompt", async () => {
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
-    settings.outputFormats = ["mp3"];
-    let callCount = 0;
-    getAnswer.mockImplementation(() => {
-      callCount++;
-      if (callCount < 2) return Promise.resolve("yes");
-      return Promise.resolve("no");
-    });
+    settings.outputFormats = ["mp3"]; // ensure only one prompt occurs at the end
+
+    // Final confirmation should receive "no"
+    getAnswer.mockResolvedValueOnce("no");
+
     const files = ["/input/file1.wav"];
     const handleExit = require("../utils").handleExit;
+
     await createConversionList(files);
+
     expect(handleExit).toHaveBeenCalledWith(0);
   });
   it("handles directory creation error", async () => {
