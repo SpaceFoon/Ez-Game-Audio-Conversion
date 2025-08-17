@@ -1,5 +1,5 @@
 const { performance } = require("perf_hooks");
-const { settings } = require("../utils");
+const { settings } = require("./utils");
 const chalk = require("chalk");
 const { spawn } = require("child_process");
 const finalize = require("../finalize");

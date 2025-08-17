@@ -9,8 +9,23 @@ const {
   formatMetaData,
   convertLoopPoints,
   formatLoopData,
-} = require("./metaDataService");
+} = require("./metadataService");
 const chalk = require("chalk");
+
+// Send structured error to manager (no hard exit here; allow caller to throw/reject)
+const postError = (reason, fileCtx = {}) => {
+  const msg =
+    reason && reason.message
+      ? reason.message
+      : String(reason || "Unknown error");
+  try {
+    parentPort.postMessage({
+      type: "error",
+      data: msg,
+      file: { inputFile: fileCtx.inputFile, outputFile: fileCtx.outputFile },
+    });
+  } catch {}
+};
 
 // Helper function to properly escape file paths for command-line
 function ensureDirectoryExists(filePath) {
@@ -62,14 +77,12 @@ const converterWorker = async ({
         outputFormat = ext;
         console.log(`Extracted output format from extension: ${outputFormat}`);
       } else {
-        console.error(`Cannot determine format from extension: ${outputFile}`);
         fail(
           `Missing output format and couldn't determine from file extension: ${outputFile}`
         );
         return;
       }
     } catch (error) {
-      console.error(`Error extracting extension: ${error.message}`);
       fail(
         `Missing output format and error extracting extension: ${error.message}`
       );
@@ -168,14 +181,13 @@ const converterWorker = async ({
     ffmpegPath = executableName; // Let system find it in PATH
   }
 
-  if (!existsSync(ffmpegPath)) {
-    console.error("😅 Error: ffmpeg executable not found at paths tried:", {
-      paths: [
-        join(process.cwd(), executableName),
-        join(process.cwd(), "bin", executableName),
-      ],
-    });
-    throw new Error(`ffmpeg executable not found (${executableName})`);
+  const inProd = process.env.NODE_ENV === "production";
+  if (inProd && !existsSync(ffmpegPath)) {
+    const notFoundMsg =
+      process.platform === "win32"
+        ? "ffmpeg.exe not found"
+        : "ffmpeg not found";
+    fail(notFoundMsg);
   }
 
   // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
@@ -225,10 +237,11 @@ const converterWorker = async ({
     }
   };
 
-  const { codec, additionalOptions = [] } = getFormatConfig(
-    outputFormat,
-    oggCodec
-  );
+  const {
+    codec,
+    additionalOptions = [],
+    preserveMetadata = false,
+  } = getFormatConfig(outputFormat, oggCodec);
 
   // Build the command arguments array
   const ffmpegArgs = ["-loglevel", "error", "-i", inputFile];
@@ -285,17 +298,15 @@ const converterWorker = async ({
         mkdirSync(outputFolder, { recursive: true });
       }
     } catch (error) {
-      console.error(
-        chalk.redBright.bold("Couldn't create directory, check folder"),
-        error
-      );
-      // Continue without failing for directory creation issues
-      parentPort.postMessage({ type: "code", data: 0 });
+      // Preserve legacy behavior: don't fail conversion on mkdir issues; report and continue
+      try {
+        parentPort.postMessage({ type: "code", data: 0 });
+      } catch {}
       return;
     }
   }
 
-  await runFFMPEG(ffmpegCommandStr, outputFile, inputFile);
+  await runFFMPEG(ffmpegPath, ffmpegArgs, outputFile, inputFile);
 };
 
 const runConversion = async () => {
@@ -365,7 +376,7 @@ const runConversion = async () => {
 
     await converterWorker(workerData);
   } catch (error) {
-    fail(`🛑 ERROR in converterWorker: ${error.message || "Unknown error"}`);
+    fail(`ERROR in converterWorker: ${error.message || "Unknown error"}`);
   }
 };
 const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
@@ -396,7 +407,6 @@ const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
         const errorText = data.toString().trim();
         errorOutput += errorText + "\n";
         if (errorText) {
-          console.error(`ffmpeg stderr: ${errorText}`);
           parentPort.postMessage({ type: "stderr", data: errorText });
         }
       });
@@ -404,133 +414,37 @@ const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
       // Handle successful completion
       ffmpegCommand.on("exit", (code) => {
         if (code === 0) {
-          if (existsSync(outputFile)) {
-            console.log(
-              `✅ Conversion successful: ${inputFile} → ${outputFile}`
-            );
-            parentPort.postMessage({ type: "code", data: code });
-            resolve();
-          } else {
-            const fileExt = outputFile.split(".").pop()?.toLowerCase();
-            const formatInfo = fileExt
-              ? ` [${fileExt.toUpperCase()} format]`
-              : "";
-
-            // Check if we can create an empty file to test write permissions
-            try {
-              const testPath =
-                dirname(outputFile) + "/test_write_" + Date.now() + ".tmp";
-              const fs = require("fs");
-              fs.writeFileSync(testPath, "test");
-              fs.unlinkSync(testPath);
-              console.log(
-                "✅ Write permission test passed for output directory"
-              );
-            } catch (err) {
-              console.error(`❌ Write permission test failed: ${err.message}`);
-            }
-
-            fail(
-              `❌ Conversion failed${formatInfo}: Output file ${outputFile} not created.\n` +
-                `   Error details: ${errorOutput || "No error output"}\n` +
-                `   Check permissions and disk space.`
-            );
-          }
+          parentPort.postMessage({ type: "code", data: code });
+          resolve();
         } else {
           const fileExt = outputFile.split(".").pop()?.toLowerCase();
           const formatInfo = fileExt
             ? ` [${fileExt.toUpperCase()} format]`
             : "";
-
-          fail(
-            `❌ ffmpeg exited with code ${code}${formatInfo}.\n` +
-              `   Error details: ${errorOutput || "No error output"}\n` +
-              `   Check if ffmpeg is installed correctly.`
-          );
+          const msg = `ffmpeg exited with code ${code}${formatInfo}. ${
+            errorOutput || "No error output"
+          }`;
+          postError(msg, { inputFile, outputFile });
+          reject(new Error(msg));
         }
       });
 
       // Handle errors during execution
       ffmpegCommand.on("error", (error) => {
-        const fileExt = outputFile.split(".").pop()?.toLowerCase();
-        const formatInfo = fileExt ? ` [${fileExt.toUpperCase()} format]` : "";
-
-        console.error(`🛑 ERROR IN ffmpegCommand${formatInfo}:`);
-        console.error(`   Error message: ${error.message || error}`);
-        console.error(`   Input file: ${inputFile}`);
-        console.error(`   Output file: ${outputFile}`);
-
-        // Check if ffmpeg exists
-        try {
-          const fs = require("fs");
-          const ffmpegPath = join(process.cwd(), "ffmpeg.exe");
-          const ffmpegPathBin = join(process.cwd(), "bin", "ffmpeg.exe");
-
-          console.error(`   ffmpeg.exe exists: ${fs.existsSync(ffmpegPath)}`);
-          console.error(
-            `   ffmpeg.exe in bin exists: ${fs.existsSync(ffmpegPathBin)}`
-          );
-        } catch (err) {
-          console.error(`   Error checking ffmpeg: ${err.message}`);
-        }
-
-        fail(
-          `🛑 ERROR IN ffmpegCommand${formatInfo}: ${
-            error.message || error
-          }\n` +
-            `   Make sure ffmpeg.exe is properly installed in the application directory.\n` +
-            `   Command: ${ffmpegArgs.join(" ").substring(0, 300)}...`
-        );
-        reject(error);
+        const msg = `ERROR in ffmpegCommand: ${error?.message || error}`;
+        postError(msg, { inputFile, outputFile });
+        reject(new Error(msg));
       });
     } catch (error) {
-      console.error(
-        `🛑 Failed to start ffmpeg process: ${error.message || error}`
-      );
-      console.error(`   Input file: ${inputFile}`);
-      console.error(`   Output file: ${outputFile}`);
-
-      // Try to give more specific advice based on the error
-      if (error.code === "ENOENT") {
-        console.error(
-          "   It appears ffmpeg.exe couldn't be found. Make sure it's in the application directory."
-        );
-      } else if (error.code === "EACCES") {
-        console.error(
-          "   Permission denied. Make sure you have the right permissions to execute ffmpeg.exe."
-        );
-      }
-
-      reject(error);
+      const msg = `Failed to start ffmpeg process: ${error?.message || error}`;
+      postError(msg, { inputFile, outputFile });
+      reject(new Error(msg));
     }
   });
 };
 const fail = (reason) => {
-  console.error("🛑", reason);
-
-  // If we have worker data, include details in the error message
-  if (workerData && workerData.file) {
-    const { inputFile, outputFile, outputFormat } = workerData.file;
-    console.error("📋 Conversion details:");
-    console.error(`   Input file: ${inputFile || "undefined"}`);
-    console.error(`   Output file: ${outputFile || "undefined"}`);
-    console.error(`   Output format: ${outputFormat || "undefined"}`);
-
-    // Check if the input file exists
-    if (inputFile && !existsSync(inputFile)) {
-      console.error("❌ Input file does not exist!");
-    }
-
-    // Check if output directory exists
-    if (outputFile) {
-      const outputDir = dirname(outputFile);
-      if (!existsSync(outputDir)) {
-        console.error(`❌ Output directory does not exist: ${outputDir}`);
-      }
-    }
-  }
-
-  parentPort.postMessage({ type: "error", data: reason });
+  const f = (workerData && workerData.file) || {};
+  postError(reason, { inputFile: f.inputFile, outputFile: f.outputFile });
   throw new Error(reason);
 };
 

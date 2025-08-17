@@ -1,16 +1,14 @@
 const { performance } = require("perf_hooks");
-const { settings } = require("./utils");
+const { settings, rl } = require("./utils");
 const { spawn } = require("child_process");
 const chalk = require("chalk");
-const { rl } = require("./utils");
 
 const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
   const jobEndTime = performance.now();
   let totalTime = jobEndTime - jobStartTime;
   totalTime = totalTime / 1000;
-  let average =
-    (totalTime * 10) /
-    (successfulFiles && successfulFiles.length ? successfulFiles.length : 1);
+  const count = Array.isArray(successfulFiles) ? successfulFiles.length : 0;
+  const average = count > 0 ? totalTime / count : 0;
   console.log(
     `\n    📋 Total job duration: ${totalTime.toFixed(
       2

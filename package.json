@@ -1,6 +1,6 @@
 {
   "name": "ez-game-audio-conversion",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "description": "Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.",
   "main": "app.js",
   "bin": {
@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node ./src/app.js",
-    "build:unix": ".\\build\\build.shno",
+    "build:unix": ".\\build\\build.sh",
     "build:win": ".\\build\\build.bat",
     "build": "echo off && echo \"BASH SCRIPT NOT MADE YET\" && npm run build:win || npm run build:unix",
     "test": "jest \"src/__tests__/\" --runInBand --forceExit",
@@ -65,6 +65,7 @@
       "/node_modules/",
       "/__tests__/test-utils/",
       "/src/__tests__/test-utils/",
+  "/src/__tests__/utils\\.js$",
       "/__tests__/run-tests.js",
       "/__tests__/format-loop-test.js",
       "/__tests__/test-utils/run-all-tests.js"

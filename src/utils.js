@@ -6,6 +6,7 @@ const {
   appendFileSync,
   writeFileSync,
   statSync,
+  mkdirSync,
 } = require("fs");
 const moment = require("moment");
 const chalk = require("chalk");
@@ -44,19 +45,26 @@ const getAnswer = (question) =>
 // Override console.error with a custom function
 const originalConsoleError = console.error;
 console.error = function (...args) {
-  // Apply chalk.red to all arguments
-  const coloredArgs = args.map((arg) => chalk.red.bold(arg));
-  // Call the original console.error with colored arguments
+  const coloredArgs = args.map((arg) => {
+    if (arg instanceof Error) {
+      const txt = arg.stack || arg.message || String(arg);
+      return chalk.red.bold(txt);
+    }
+    return typeof arg === "string" ? chalk.red.bold(arg) : arg;
+  });
   originalConsoleError.apply(console, coloredArgs);
 };
-// Save the original console.error function
-const originalConsolWarn = console.warn;
-// Override console.error with a custom function
+// Save the original console.warn function
+const originalConsoleWarn = console.warn;
 console.warn = function (...args) {
-  // Apply chalk.red to all arguments
-  const coloredArgs = args.map((arg) => chalk.yellow.bold(arg));
-  // Call the original console.error with colored arguments
-  originalConsolWarn.apply(console, coloredArgs);
+  const coloredArgs = args.map((arg) => {
+    if (arg instanceof Error) {
+      const txt = arg.stack || arg.message || String(arg);
+      return chalk.yellow.bold(txt);
+    }
+    return typeof arg === "string" ? chalk.yellow.bold(arg) : arg;
+  });
+  originalConsoleWarn.apply(console, coloredArgs);
 };
 
 // If a file is not writing, check the disk space.
@@ -112,45 +120,56 @@ let fileNameL = null;
 let fileNameE = null;
 
 const initializeFileNames = () => {
-  const logPath = settings.outputFilePath;
-  fileNameL = initFileName(logPath, "logs");
-  fileNameE = initFileName(logPath, "error");
+  const basePath = settings.outputFilePath || "";
+  // Ensure output directory exists once (cross-platform)
+  if (basePath) {
+    try {
+      if (typeof mkdirSync === "function") {
+        mkdirSync(basePath, { recursive: true });
+      }
+    } catch (err) {
+      console.error("Error ensuring log directory exists:", err);
+    }
+  }
+  fileNameL = initFileName(basePath, "logs");
+  fileNameE = initFileName(basePath, "error");
 };
 
 const initFileName = (basePath, fileName) => {
   let num = 1;
-  let fullFileName = join(basePath || "", `${fileName}.csv`);
+  // Use OS-aware join and normalize to forward slashes for test stability on Windows
+  const norm = (p) => p.replace(/\\/g, "/");
+  let fullFileName = norm(join(basePath || "", `${fileName}.csv`));
 
   while (existsSync(fullFileName)) {
-    fullFileName = join(basePath || "", `${fileName}(${num}).csv`);
+    fullFileName = norm(join(basePath || "", `${fileName}(${num}).csv`));
     num++;
   }
 
   return fullFileName;
 };
 
-const addToLog = async (log, file, recursionCount = 0) => {
-  // Prevent infinite recursion
-  if (recursionCount > 2) {
-    console.error(
-      "Too many recursions in addToLog, stopping to prevent infinite loop"
-    );
-    return;
+const addToLog = async (log, file) => {
+  // Ensure log file names are set
+  if (!fileNameL || !fileNameE) {
+    initializeFileNames();
   }
-
   const timestamp = moment().format("DD-MM-YYYY HH:mm:ss");
   const time = timestamp.replaceAll(",", "");
   const data = log.data?.toString().replaceAll(",", "") || "Unknown Error";
-  const inputFile = file.inputFile?.replaceAll(",", "") || "Unknown Input File";
-  if (data === "Unknown Error") {
-    console.error("Unknown Error log, file: ", log, file);
-  }
+  const inputFile =
+    file?.inputFile?.replaceAll(",", "") || "Unknown Input File";
+  // Only warn on unknown error for error/stderr logs
   const outputFile =
-    file.outputFile?.replaceAll(",", "") || "Unknown Output File";
-  const logPath = settings.outputFilePath;
+    file?.outputFile?.replaceAll(",", "") || "Unknown Output File";
+  const isErr = log.type === "stderr" || log.type === "error";
+  if (isErr && data === "Unknown Error") {
+    console.error("Unknown Error log, details:", log, file);
+  }
+  // const logPath = settings.outputFilePath;
 
   // Determine if the log is an error or not.
-  if (log.type === "stderr" || log.type === "error") {
+  if (isErr) {
     // console.log("log in utils", log);
 
     await isFileBusy(fileNameE);
@@ -158,21 +177,15 @@ const addToLog = async (log, file, recursionCount = 0) => {
     // Create error log file and header if none exists.
     if (!existsSync(fileNameE)) {
       try {
-        writeFileSync(fileNameE, "Timestamp, Error, Input File, Output File\n");
-        return await addToLog(log, file, recursionCount + 1);
+        writeFileSync(
+          fileNameE,
+          "Timestamp, Error, Input File, Output File\n",
+          { encoding: "utf8" }
+        );
+        // Header created; continue to write the current log line below
       } catch (error) {
         console.error("Error creating Error CSV file: ", error);
-        if (recursionCount < 2) {
-          return await addToLog(
-            {
-              type: "Error",
-              data: "Error creating Error CSV file: " + error.message,
-            },
-            file,
-            recursionCount + 1
-          );
-        }
-        return;
+        return false; // bail out safely
       }
     }
 
@@ -185,17 +198,7 @@ const addToLog = async (log, file, recursionCount = 0) => {
       appendFileSync(fileNameE, csvRow);
     } catch (error) {
       console.error(`🚨🚨⛔ Error writing to ${fileNameE}: ${error} ⛔🚨🚨`);
-      if (recursionCount < 2) {
-        return await addToLog(
-          {
-            type: "Error",
-            data: "Error writing to Error CSV file: " + error.message,
-          },
-          file,
-          recursionCount + 1
-        );
-      }
-      return;
+      return false;
     }
     return;
   }
@@ -204,45 +207,26 @@ const addToLog = async (log, file, recursionCount = 0) => {
   if (!existsSync(fileNameL)) {
     await isFileBusy(fileNameL);
     try {
-      writeFileSync(fileNameL, "Timestamp,Exit Code, Input, Output\n");
-      return await addToLog(log, file, recursionCount + 1);
+      writeFileSync(fileNameL, "Timestamp, Exit Code, Input, Output\n", {
+        encoding: "utf8",
+      });
     } catch (error) {
       console.error(
         `🚨🚨⛔ Error creating file or making header to ${fileNameL}: ${error} ⛔🚨🚨`
       );
-      if (recursionCount < 2) {
-        return await addToLog(
-          {
-            type: "Error",
-            data: "Error writing to CSV file: " + error.message,
-          },
-          file,
-          recursionCount + 1
-        );
-      }
-      return;
+      return false;
     }
   }
   // Write log line
   try {
     await isFileBusy(fileNameL);
     const csvRow =
-      `${time},${data},${inputFile},${outputFile}\n`.replace(/[\r\n]+/g, "") +
+      `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, "") +
       "\n";
     appendFileSync(fileNameL, csvRow);
   } catch (error) {
     console.error(`🚨🚨⛔ Error writing log to ${fileNameL}: ${error} ⛔🚨🚨`);
-    if (recursionCount < 2) {
-      return await addToLog(
-        {
-          type: "Error",
-          data: "Error writing log to CSV file: " + error.message,
-        },
-        file,
-        recursionCount + 1
-      );
-    }
-    return;
+    return false;
   }
 };
 
