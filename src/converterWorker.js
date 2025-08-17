@@ -13,14 +13,6 @@ const {
 const chalk = require("chalk");
 
 // Helper function to properly escape file paths for command-line
-function escapePath(filePath) {
-  if (!filePath) return '""';
-
-  // Windows paths need special care for spaces and special characters
-  // Enclose the entire path in double quotes
-  return `"${filePath.replace(/"/g, '\\"')}"`;
-}
-
 function ensureDirectoryExists(filePath) {
   const dir = dirname(filePath);
   if (existsSync(dir)) return;
@@ -176,8 +168,7 @@ const converterWorker = async ({
     ffmpegPath = executableName; // Let system find it in PATH
   }
 
-  // Skip the file existence check in test mode
-  if (!existsSync(ffmpegPath) && process.env.NODE_ENV !== "test") {
+  if (!existsSync(ffmpegPath)) {
     console.error("😅 Error: ffmpeg executable not found at paths tried:", {
       paths: [
         join(process.cwd(), executableName),
@@ -239,40 +230,33 @@ const converterWorker = async ({
     oggCodec
   );
 
-  // Build the command as a single string
-  // Don't strip metadata for formats that need to preserve it
-  const preserveMetadata =
-    formatConfig[outputFormat]?.preserveMetadata || false;
-
-  // Use escapePath to properly handle file paths
-  let ffmpegCommandStr = `"${ffmpegPath}" -loglevel error -i ${escapePath(
-    inputFile
-  )}`;
+  // Build the command arguments array
+  const ffmpegArgs = ["-loglevel", "error", "-i", inputFile];
 
   // Only use -map_metadata -1 if we don't need to preserve original metadata
   if (!preserveMetadata) {
-    ffmpegCommandStr += " -map_metadata -1";
+    ffmpegArgs.push("-map_metadata", "-1");
   }
 
   // Add codec
-  ffmpegCommandStr += ` -c:a ${codec}`;
+  ffmpegArgs.push("-c:a", codec);
 
   // Add additional options
   if (additionalOptions && additionalOptions.length) {
-    ffmpegCommandStr += " " + additionalOptions.join(" ");
+    ffmpegArgs.push(...additionalOptions);
   }
 
   // Add sample rate if specified
   if (sampleString) {
-    ffmpegCommandStr += " " + sampleString;
+    ffmpegArgs.push(...sampleString.split(" "));
   }
 
   // Add basic options
-  ffmpegCommandStr += " -vn -y";
+  ffmpegArgs.push("-vn", "-y");
 
   // Add metadata - metaData is already formatted with escaped values from formatMetaData()
   if (metaData && metaData.trim()) {
-    ffmpegCommandStr += " " + metaData;
+    ffmpegArgs.push(...metaData.split(" "));
   }
 
   if (process.env.DEBUG) {
@@ -281,16 +265,17 @@ const converterWorker = async ({
 
   // Add loop data
   if (loopData && loopData.trim()) {
-    ffmpegCommandStr += " " + loopData;
+    ffmpegArgs.push(...loopData.split(" "));
   }
 
   // Add channels
-  ffmpegCommandStr += channels;
+  ffmpegArgs.push(...channels.split(" "));
 
-  // Add output file name with proper escaping
-  ffmpegCommandStr += ` ${escapePath(outputFile)}`;
+  // Add output file name
+  ffmpegArgs.push(outputFile);
 
-  if (process.env.DEBUG) console.log(`Running command: ${ffmpegCommandStr}`);
+  if (process.env.DEBUG)
+    console.log(`Running command: ${ffmpegPath}`, ffmpegArgs.join(" "));
 
   // Create output directory if it doesn't exist
   const outputFolder = dirname(outputFile);
@@ -305,7 +290,6 @@ const converterWorker = async ({
         error
       );
       // Continue without failing for directory creation issues
-      // This allows running in test environments where directories are mocked
       parentPort.postMessage({ type: "code", data: 0 });
       return;
     }
@@ -384,7 +368,7 @@ const runConversion = async () => {
     fail(`🛑 ERROR in converterWorker: ${error.message || "Unknown error"}`);
   }
 };
-const runFFMPEG = (ffmpegCommandStr, outputFile, inputFile) => {
+const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
   return new Promise((resolve, reject) => {
     try {
       // Make sure the output directory exists
@@ -394,15 +378,15 @@ const runFFMPEG = (ffmpegCommandStr, outputFile, inputFile) => {
 
       // For debugging, log a truncated version of the command
       const truncatedCommand =
-        ffmpegCommandStr.length > 300
-          ? ffmpegCommandStr.substring(0, 150) +
+        ffmpegArgs.join(" ").length > 300
+          ? ffmpegArgs.join(" ").substring(0, 150) +
             "..." +
-            ffmpegCommandStr.substring(ffmpegCommandStr.length - 150)
-          : ffmpegCommandStr;
+            ffmpegArgs.join(" ").substring(ffmpegArgs.join(" ").length - 150)
+          : ffmpegArgs.join(" ");
       console.log(`ffmpeg command (truncated): ${truncatedCommand}`);
 
       // Execute command
-      const ffmpegCommand = spawn(ffmpegCommandStr, { shell: true });
+      const ffmpegCommand = spawn(ffmpegPath, ffmpegArgs, { shell: false });
 
       // Collect error output for better diagnostics
       let errorOutput = "";
@@ -420,10 +404,7 @@ const runFFMPEG = (ffmpegCommandStr, outputFile, inputFile) => {
       // Handle successful completion
       ffmpegCommand.on("exit", (code) => {
         if (code === 0) {
-          // Pass in test environments.
-          const isTestEnvironment = process.env.NODE_ENV === "test";
-
-          if (isTestEnvironment || existsSync(outputFile)) {
+          if (existsSync(outputFile)) {
             console.log(
               `✅ Conversion successful: ${inputFile} → ${outputFile}`
             );
@@ -498,7 +479,7 @@ const runFFMPEG = (ffmpegCommandStr, outputFile, inputFile) => {
             error.message || error
           }\n` +
             `   Make sure ffmpeg.exe is properly installed in the application directory.\n` +
-            `   Command: ${ffmpegCommandStr.substring(0, 300)}...`
+            `   Command: ${ffmpegArgs.join(" ").substring(0, 300)}...`
         );
         reject(error);
       });
@@ -553,7 +534,6 @@ const fail = (reason) => {
   throw new Error(reason);
 };
 
-// Only run if executed directly, not when required for tests
 if (require.main === module) {
   runConversion();
 }

@@ -72,7 +72,7 @@ const checkDiskSpace = (directory) => {
 
     // Windows doesn't reliably provide blocks/blksize
     // Instead, use freespace directly if available, or a reasonable default
-    const availableSpaceMB = 500; // Default to .5GB available - enough for our test
+    const availableSpaceMB = 50; // Default to 50MB available - enough for conversions
     return true;
   } catch (error) {
     console.error(`Error checking disk space: ${error.message}`);
