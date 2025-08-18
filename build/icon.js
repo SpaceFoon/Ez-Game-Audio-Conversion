@@ -1,12 +1,6 @@
 const fs = require("fs");
 const path = require("path");
 
-// Only run on Windows platforms
-if (process.platform !== "win32") {
-  console.log("Icon generation skipped - not running on Windows");
-  process.exit(0);
-}
-
 const { load } = require("resedit/cjs");
 load().then((ResEdit) => {
   try {
@@ -39,9 +33,9 @@ load().then((ResEdit) => {
       { lang: 1033, codepage: 1200 },
       {
         ProductName: "EZ Game Audio Converter",
-        FileDescription: "Simple Game Audio Conversion Tool.",
+        FileDescription: "Simple Audio Conversion Tool.",
         CompanyName: "Fooney",
-        LegalCopyright: `CC BY-NC`,
+        LegalCopyright: `CC BY-NC-SA 4.0`,
       }
     );
     vi.removeStringValue({ lang: 1033, codepage: 1200 }, "OriginalFilename");
@@ -54,5 +48,5 @@ load().then((ResEdit) => {
     console.log("resedit finished.");
   }
 
-  windowsPostBuild(path.join(".", "dist", "EZ-Game-Audio.exe"));
+  windowsPostBuild(path.join(".", "build", "EZ-Game-Audio.exe"));
 });

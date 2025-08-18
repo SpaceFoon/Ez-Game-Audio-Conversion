@@ -1,6 +1,6 @@
 <!-- # <span style="color:red">EZ Game Audio Conversion </span> -->
-![Title Image](dist/assets/title3.webp
-)
+
+![Title Image](dist/assets/title3.webp)
 
 <p align="center">
   <img src="https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total" alt="GitHub Downloads (all assets, all releases)">
@@ -15,7 +15,6 @@
   </a>
 </p>
 
-
 <!-- Pre-Headline -->
 <p style="font-size: 16px; color: yellow; text-align: center;">Boost your productivity and streamline your workflow today!</p>
 
@@ -28,7 +27,8 @@ The Problem: Game devs and anyone else who needs to convert audio files for what
 The Solution: A simple, easy to use tool that does all the heavy lifting for you. You don't need to know anything about audio files to use this tool. Just point it at your files and let it do the work. It will automatically select the best codec and bitrate for you. It will even handle loop tags for you. It's the easiest, fastest and most reliable solution available. And it's FREE!
 
 Please leave feedback on Itch.io or Github.
-<!-- 
+
+<!--
 ## Introduction
 
 EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags! -->
@@ -56,7 +56,7 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 ## Installation
 
 1. **Download** [Latest Release](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases)
-2. **Extract**  Folder "EZ-Game-Audio-Converter"
+2. **Extract** Folder "EZ-Game-Audio-Converter"
 3. **Run** File "EZ-Game-Audio.exe"
 
 ## Prerequisites
@@ -73,6 +73,7 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 3. **Duplicate Handling:** Duplicate file names with different extensions will be automatically resolved, retaining the best or lossless format.
 
 4. **Conflict Resolution:** Resolve conflicts for conflicting output files:
+
    - `O`: Overwrite file with the same name. File will not overwrite itself but will skip instead.
    - `R`: Rename the file.
    - `S`: Skip the conversion for this file.
@@ -89,17 +90,19 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 1. Clone the repository or download.
 
 2. In the project folder, run `npm i` then `npm run build` to build the executable.
- OR
-2. Run `npm i` then `npm run start` to run from your terminal.
+   OR
+3. Run `npm i` then `npm run start` to run from your terminal.
 
-3. Remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
-[FFMPEG Essentials Build Download](https://www.gyan.dev/ffmpeg/builds/#release-builds)
+4. Remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
+   [FFMPEG Essentials Build Download](https://www.gyan.dev/ffmpeg/builds/#release-builds)
 
 To change things like bitrate and codec, look in `converterWorker.js`.
 
 [On Github](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
+
 <!-- TODO
 add other links -->
+
 ### Additional Notes
 
 - M4A files are compressed using the 'AAC' lossy codec. For lossless quality, use WAV or FLAC formats.
@@ -112,14 +115,14 @@ add other links -->
 
 ### Loop Point Support in This App
 
-| Format | Can Read Loop Points | Can Write Loop Points | Notes |
-|--------|---------------------|----------------------|--------|
-| OGG    | ✅ Yes              | ✅ Yes               | Best choice for loop points |
-| FLAC   | ✅ Yes              | ✅ Yes               | Excellent lossless option |
-| MP3    | ✅ Yes              | ✅ Yes               | Good compatibility |
-| AIFF   | ✅ Yes              | ✅ Yes               | Limited player support |
-| M4A    | ✅ Yes              | ❌ No                | Loop points not supported in this application |
-| WAV    | ✅ Yes              | ❌ No                | Loop points not supported in this application |
+| Format | Can Read Loop Points | Can Write Loop Points | Notes                                         |
+| ------ | -------------------- | --------------------- | --------------------------------------------- |
+| OGG    | ✅ Yes               | ✅ Yes                | Best choice for loop points                   |
+| FLAC   | ✅ Yes               | ✅ Yes                | Excellent lossless option                     |
+| MP3    | ✅ Yes               | ✅ Yes                | Good compatibility                            |
+| AIFF   | ✅ Yes               | ✅ Yes                | Limited player support                        |
+| M4A    | ✅ Yes               | ❌ No                 | Loop points not supported in this application |
+| WAV    | ✅ Yes               | ❌ No                 | Loop points not supported in this application |
 
 For best results with loop points, use OGG or FLAC formats.
 
@@ -127,17 +130,17 @@ For best results with loop points, use OGG or FLAC formats.
 
 ### RPG Maker
 
-| Features |  MP3 |  OGG[^3] | WAV | M4A[^1] | MIDI |
-|--|--|--|--|--|--|
-| Loop OK | NO | YES | YES | YES | YES |
-| Loop Inside (Tags)[^4] | NO | YES | NO | YES | YES |
-| File Size Optimize | YES | YES | NO | YES[^2] | OMG YES |
-| Realistic Sound | YES | YES | YES | YES | NO |
-| RMVX/Ace Compatible| YES | YES | YES | NO | YES |
-| RMXP Compatible | YES | YES | YES | NO | YES |
-| RM2003 Compatible | YES | NO | YES | NO | YES |
-| RMMV Compatible | NO | YES | NO | YES | NO |
-| RMMZ Compatible | NO | YES | NO | NO | NO |
+| Features               | MP3 | OGG[^3] | WAV | M4A[^1] | MIDI    |
+| ---------------------- | --- | ------- | --- | ------- | ------- |
+| Loop OK                | NO  | YES     | YES | YES     | YES     |
+| Loop Inside (Tags)[^4] | NO  | YES     | NO  | YES     | YES     |
+| File Size Optimize     | YES | YES     | NO  | YES[^2] | OMG YES |
+| Realistic Sound        | YES | YES     | YES | YES     | NO      |
+| RMVX/Ace Compatible    | YES | YES     | YES | NO      | YES     |
+| RMXP Compatible        | YES | YES     | YES | NO      | YES     |
+| RM2003 Compatible      | YES | NO      | YES | NO      | YES     |
+| RMMV Compatible        | NO  | YES     | NO  | YES     | NO      |
+| RMMZ Compatible        | NO  | YES     | NO  | NO      | NO      |
 
 [^1]: Not needed in 2024? Update: I don't care what they say, it's not needed.
 [^2]: M4A can be lossless but isn't when converted by this software.
@@ -167,7 +170,7 @@ Source: [Godot Documentation](https://docs.godotengine.org/en/stable/tutorials/a
 
 - **Supported Format:** `WAV`
 - Unreal Engine currently imports uncompressed, little endian , 16-bit Wave (WAV) files at any sample rate (although, we recommend sample rates of 44.1 kHz or 22.05 kHz).
-Source: [Unreal Engine Documentation](https://docs.unrealengine.com/4.27/en-US/WorkingWithAudio/ImportingAudio/)
+  Source: [Unreal Engine Documentation](https://docs.unrealengine.com/4.27/en-US/WorkingWithAudio/ImportingAudio/)
 
 #### Ren'Py
 
@@ -178,7 +181,7 @@ Source: [Ren'Py Documentation](https://www.renpy.org/doc/html/audio.html)
 #### Game Maker Studio
 
 - **Supported Formats:** `OGG Vorbis, MP3 and WAV`
-Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Audio/Audio.htm)
+  Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Audio/Audio.htm)
 
 #### Additional Comparison
 
@@ -188,7 +191,7 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 
 [Some testing on performance](https://stsaz.github.io/fmedia/audio-formats/)
 
-[Comparison of coding efficiency between Opus and other popular audio formats](https://en.wikipedia.org/wiki/Opus_(audio_format)#Quality_comparison_and_low-latency_performance)
+[Comparison of coding efficiency between Opus and other popular audio formats](<https://en.wikipedia.org/wiki/Opus_(audio_format)#Quality_comparison_and_low-latency_performance>)
 
 ## **Find me on the web:**
 
@@ -205,7 +208,7 @@ Source: [Gamemaker.io](https://manual.gamemaker.io/monthly/en/GameMaker_Language
 
 ## License
 
-This project is licensed under the [Creative Commons Attribution-NonCommercial 4.0 International License.](http://creativecommons.org/licenses/by-nc/4.0/).
+This project is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 
 If you would like to use this software for commercial purposes, please contact me on [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion) or [GameJolt](https://gamejolt.com/@Fooney) for licensing options. I just want to get paid if you are selling my work.
 
