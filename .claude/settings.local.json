@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run build:ts:*)",
+      "Bash(mv:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

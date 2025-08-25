@@ -1,5 +1,21 @@
-const os = require("os");
-require("dotenv").config();
+import * as os from "os";
+import "dotenv/config";
+
+interface EnvConfig {
+  isDev: boolean;
+  isDebug: boolean;
+  isPkg: boolean;
+  isWindows: boolean;
+  isMac: boolean;
+  isLinux: boolean;
+  arch: string;
+  platform: string;
+  cpuCount: number;
+}
+
+declare global {
+  var env: EnvConfig;
+}
 
 if (typeof globalThis.env === "undefined") {
   globalThis.env = {

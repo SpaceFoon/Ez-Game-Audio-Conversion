@@ -3,17 +3,19 @@ const chalk = require("chalk");
 const { checkDiskSpace } = require("./utils");
 const readline = require("readline/promises");
 const path = require("path");
+import type { Settings } from "./types/settings";
+import type { AudioFormat } from "./types/audio";
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-const inputTypes = ["flac", "aiff", "wav", "mp3", "m4a", "ogg"];
-const outputTypes = ["flac", "aiff", "wav", "mp3", "m4a", "ogg"];
+const inputTypes: AudioFormat[] = ["flac", "aiff", "wav", "mp3", "m4a", "ogg"];
+const outputTypes: AudioFormat[] = ["flac", "aiff", "wav", "mp3", "m4a", "ogg"];
 
 //Entire input loop to get settings before converting.
-const getUserInput = async (settings) => {
+const getUserInput = async (settings: Settings): Promise<Settings> => {
   // Check if we have a command-line argument (either file or folder)
   if (process.argv.length > 2 && existsSync(process.argv[2])) {
     const pathStats = statSync(process.argv[2]);
@@ -23,7 +25,7 @@ const getUserInput = async (settings) => {
       const filePath = process.argv[2];
       const fileExt = path.extname(filePath).toLowerCase().substring(1); // Remove the dot
 
-      if (!inputTypes.includes(fileExt)) {
+      if (!inputTypes.includes(fileExt as AudioFormat)) {
         console.error(chalk.red.bold(`\n❌ Unsupported file type: ${fileExt}`));
         console.error(
           chalk.red(`Supported file types: ${inputTypes.join(", ")}`)
@@ -34,7 +36,7 @@ const getUserInput = async (settings) => {
       settings.inputFilePath = path.dirname(filePath);
       settings.singleFileMode = true;
       settings.singleFilePath = filePath;
-      settings.inputFormats = [fileExt];
+      settings.inputFormats = [fileExt as AudioFormat];
       console.log(
         chalk.green.italic(`\n📝 Processing single file: ${filePath} ✅`)
       );
@@ -91,7 +93,7 @@ const getUserInput = async (settings) => {
           ? inputFormatString
               .toLowerCase()
               .split(/\s*,\s*|\s+/)
-              .map((format) => format.trim())
+              .map((format: string) => format.trim())
           : [...inputTypes];
 
         if (
@@ -127,7 +129,7 @@ const getUserInput = async (settings) => {
         ? outputFormatString
             .toLowerCase()
             .split(/\s*,\s*|\s+/)
-            .map((format) => format.trim())
+            .map((format: string) => format.trim())
         : [...outputTypes];
 
       if (
@@ -215,7 +217,7 @@ const getUserInput = async (settings) => {
       ? inputFormatString
           .toLowerCase()
           .split(/\s*,\s*|\s+/)
-          .map((format) => format.trim())
+          .map((format: string) => format.trim())
       : [...inputTypes];
 
     if (
@@ -250,12 +252,13 @@ const getUserInput = async (settings) => {
       ? outputFormatString
           .toLowerCase()
           .split(/\s*,\s*|\s+/)
-          .map((format) => format.trim())
+          .map((format: string) => format.trim())
+          .filter((format: string): format is AudioFormat => outputTypes.includes(format as AudioFormat))
       : [...outputTypes];
 
     if (
       settings.outputFormats.length === 0 ||
-      !settings.outputFormats.every((format) => outputTypes.includes(format))
+      !settings.outputFormats.every((format) => outputTypes.includes(format as AudioFormat))
     ) {
       console.warn(
         "\n🛑🙊Invalid output format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed!"

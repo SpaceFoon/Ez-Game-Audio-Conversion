@@ -1,26 +1,27 @@
-// app.js
-// Description: Prints title then runs a simple promise chain that runs the entire application.
-// Uses require instead of module imports for compatibility with pkg which version locks chalk. Aww well...
+const cfonts = require("cfonts");
+const { platform } = require("os");
+const os = require("os");
+const getUserInput = require("./getUserInput");
+const searchFiles = require("./searchFiles");
+const createConversionList = require("./createConversionList");
+const { convertFiles } = require("./convertFiles");
+const { settings } = require("./utils");
+const finalize = require("./finalize");
+const ExitProgramError = require("./exitProgramError");
+require("dotenv").config();
+// Ensure global type augmentation is loaded for ts-node/tsc
+import "./types/global";
 
-function runApp() {
-  const getUserInput = require("./getUserInput");
-  const searchFiles = require("./searchFiles");
-  // const deleteDuplicateFiles = require("./deleteDuplicateFiles");
-  const createConversionList = require("./createConversionList");
-  const { convertFiles } = require("./convertFiles");
-  const { settings } = require("./utils");
-  const finalize = require("./finalize");
-  const cfonts = require("cfonts");
-  const { platform } = require("os");
-  const os = require("os");
-  const ExitProgramError = require("./exitProgramError");
-  require("dotenv").config();
+import type { Settings } from "./types/settings";
+import type { ConversionJob } from "./types/audio";
+
+function runApp(): Promise<void> {
 
   if (typeof globalThis.env === "undefined") {
     globalThis.env = {
-      isDev: process.env.NODE_ENV === "dev",
-      isDebug: process.env.DEBUG === "true",
-      isPkg: process.env.PKG_ENV === "packaging",
+      isDev: process.env['NODE_ENV'] === "dev",
+      isDebug: process.env['DEBUG'] === "true",
+      isPkg: process.env['PKG_ENV'] === "packaging",
 
       // OS info
       isWindows: os.platform() === "win32",
@@ -32,19 +33,19 @@ function runApp() {
     };
   }
 
-  // This only runs when packaging the file with pkg.js
-  // It's to force the worker to be included in the package
-  if (process.env.PKG_ENV === "packaging") {
-    require("./converterWorker");
+  // No need to require the worker at runtime; pkg bundles it via pkg.assets
+  // However, during packaging (and for tests expecting this), require it once.
+  if (process.env['PKG_ENV'] === 'packaging') {
+    try { require("./converterWorker"); } catch {}
   }
-  if (env.isDebug) {
+  if (globalThis.env.isDebug) {
     console.log("debug mode");
   }
-  if (env.isDev) {
+  if (globalThis.env.isDev) {
     console.log("in dev mode");
   }
 
-  if (env.isDebug) {
+  if (globalThis.env.isDebug) {
     console.log("stdin is TTY:", process.stdin.isTTY);
     console.log("stdout is TTY:", process.stdout.isTTY);
   }
@@ -67,27 +68,27 @@ function runApp() {
   settings.userOS = userOS;
 
   return (
-    getUserInput(settings)
+    getUserInput(settings as Settings)
       // find all files of specified type in provided folder and all subfolders
-      .then((settings) => searchFiles(settings))
+      .then((settings: Settings) => searchFiles(settings))
       //delete files from the list that have the same name but different file extensions.
       //save the file that has the best format. Flac > wav > m4a > mp3
       // .then((files) => deleteDuplicateFiles(files))
       //go through list of input files and make output list.
       //there can be multiple outputs and user input is needed here for conflicting output files
       // that already exist.
-      .then((files) => {
+      .then((files: any) => {
         return createConversionList(files);
       })
       // Manages workers threads in a pool.
-      .then((files) => {
+      .then((files: any) => {
         return convertFiles(files);
       })
       // Print the final results of all conversions.
-      .then(({ failedFiles, successfulFiles, jobStartTime }) => {
+      .then(({ failedFiles, successfulFiles, jobStartTime }: ConversionJob) => {
         finalize(failedFiles, successfulFiles, jobStartTime);
       })
-      .catch((error) => {
+      .catch((error: any) => {
         if (error instanceof ExitProgramError) {
           // Silent exit, do nothing
           return;

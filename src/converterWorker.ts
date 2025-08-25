@@ -1,4 +1,4 @@
-// converterWorker.js
+// converterWorker.ts
 // Worker runs ffprobe to get meta data then ffmpeg to convert on one file.
 const { spawn } = require("child_process");
 const { workerData, parentPort } = require("worker_threads");
@@ -6,14 +6,20 @@ const { join, dirname } = require("path");
 const { existsSync, mkdirSync } = require("fs");
 const {
   getMetaData,
-  formatMetaData,
+  formatMetaDataArgs,
   convertLoopPoints,
   formatLoopData,
 } = require("./metadataService");
-const chalk = require("chalk");
+
+// Helper function for failures
+const failWorker = (reason: any) => {
+  const f = (workerData && workerData.file) || {};
+  postError(reason, { inputFile: f.inputFile, outputFile: f.outputFile });
+  throw new Error(reason);
+};
 
 // Send structured error to manager (no hard exit here; allow caller to throw/reject)
-const postError = (reason, fileCtx = {}) => {
+const postError = (reason: any, fileCtx: any = {}) => {
   const msg =
     reason && reason.message
       ? reason.message
@@ -22,13 +28,13 @@ const postError = (reason, fileCtx = {}) => {
     parentPort.postMessage({
       type: "error",
       data: msg,
-      file: { inputFile: fileCtx.inputFile, outputFile: fileCtx.outputFile },
+      file: { inputFile: fileCtx?.inputFile, outputFile: fileCtx?.outputFile },
     });
   } catch {}
 };
 
 // Helper function to properly escape file paths for command-line
-function ensureDirectoryExists(filePath) {
+function ensureDirectoryExists(filePath: string): void {
   const dir = dirname(filePath);
   if (existsSync(dir)) return;
 
@@ -36,7 +42,7 @@ function ensureDirectoryExists(filePath) {
     mkdirSync(dir, { recursive: true });
     console.log(`Created directory: ${dir}`);
   } catch (err) {
-    console.error(`Failed to create directory: ${err.message}`);
+    console.error(`Failed to create directory: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -50,7 +56,10 @@ if (process.env.DEBUG) {
 const converterWorker = async ({
   file: { inputFile, outputFile, outputFormat },
   settings: { oggCodec },
-}) => {
+}: {
+  file: { inputFile: string; outputFile: string; outputFormat: string };
+  settings: { oggCodec: string };
+}): Promise<void> => {
   console.log("converterWorker started with:", {
     inputFile,
     outputFile,
@@ -60,12 +69,12 @@ const converterWorker = async ({
 
   // Basic validation to prevent crashes
   if (!inputFile) {
-    fail("Missing input file");
+    failWorker("Missing input file");
     return;
   }
 
   if (!outputFile) {
-    fail("Missing output file");
+    failWorker("Missing output file");
     return;
   }
 
@@ -77,14 +86,14 @@ const converterWorker = async ({
         outputFormat = ext;
         console.log(`Extracted output format from extension: ${outputFormat}`);
       } else {
-        fail(
+        failWorker(
           `Missing output format and couldn't determine from file extension: ${outputFile}`
         );
         return;
       }
     } catch (error) {
-      fail(
-        `Missing output format and error extracting extension: ${error.message}`
+      failWorker(
+        `Missing output format and error extracting extension: ${error instanceof Error ? error.message : String(error)}`
       );
       return;
     }
@@ -92,19 +101,19 @@ const converterWorker = async ({
 
   // Validate output file path
   if (outputFile.includes('"')) {
-    fail(
+    failWorker(
       `Output file path contains quotes which will cause problems: ${outputFile}`
     );
     return;
   }
 
   if (outputFile.includes("\n") || outputFile.includes("\r")) {
-    fail(`Output file path contains line breaks: ${outputFile}`);
+    failWorker(`Output file path contains line breaks: ${outputFile}`);
     return;
   }
 
   if (!/^[\x00-\x7F]*$/.test(outputFile)) {
-    fail(`⚠️ Non-ASCII character in output path: ${outputFile}`);
+    failWorker(`⚠️ Non-ASCII character in output path: ${outputFile}`);
     return;
   }
 
@@ -118,10 +127,28 @@ const converterWorker = async ({
   // Get metadata from input file
   const metadata = await getMetaData(inputFile);
 
-  // Get formatted metadata and channels
-  const { metaData, channels } = formatMetaData(metadata);
+  // Get formatted metadata and channels as arrays (safe for spawn).
+  // Fallback to legacy formatMetaData when the new function is not present (e.g., tests mocking the module).
+  let metaDataArgs: string[] = [];
+  let channelsArgs: string[] = [];
+  try {
+    const mds = require("./metadataService");
+    if (typeof mds.formatMetaDataArgs === "function") {
+      const res = mds.formatMetaDataArgs(metadata, inputFile);
+      metaDataArgs = res?.metaDataArgs || [];
+      channelsArgs = res?.channelsArgs || [];
+    } else if (typeof mds.formatMetaData === "function") {
+      const legacy = mds.formatMetaData(metadata, inputFile) || {};
+      metaDataArgs = legacy.metaData ? String(legacy.metaData).trim().split(/\s+/) : [];
+      channelsArgs = legacy.channels ? String(legacy.channels).trim().split(/\s+/) : ["-ac", "2"];
+    }
+  } catch {
+    // Last resort: default to stereo channels
+    metaDataArgs = [];
+    channelsArgs = ["-ac", "2"];
+  }
   if (process.env.DEBUG) {
-    console.log("12 metadataarray: ", metaData);
+    console.log("12 metaDataArgs: ", JSON.stringify(metaDataArgs));
   }
 
   // Get sample rate from metadata
@@ -141,8 +168,8 @@ const converterWorker = async ({
 
   // console.log("Loop points after conversion:", { loopStart, loopLength });
 
-  // Set sample rate string for ffmpeg command
-  let sampleString = newSampleRate ? `-ar ${newSampleRate}` : "";
+  // Build sample rate args for ffmpeg command
+  const sampleRateArgs = newSampleRate ? ["-ar", String(newSampleRate)] : [];
 
   // Format loop data for ffmpeg command - handle M4A format specifically for RPG Maker compatibility
   let loopData = "";
@@ -187,7 +214,7 @@ const converterWorker = async ({
       process.platform === "win32"
         ? "ffmpeg.exe not found"
         : "ffmpeg not found";
-    fail(notFoundMsg);
+    failWorker(notFoundMsg);
   }
 
   // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
@@ -229,11 +256,11 @@ const converterWorker = async ({
     flac: { codec: "flac", additionalOptions: ["-compression_level", "9"] }, //Minimal compression but 30% smaller than without.
   };
 
-  const getFormatConfig = (outputFormat, oggCodec) => {
+  const getFormatConfig = (outputFormat: string, oggCodec: string): any => {
     if (outputFormat === "ogg") {
-      return formatConfig.ogg[oggCodec];
+      return (formatConfig.ogg as any)[oggCodec];
     } else {
-      return formatConfig[outputFormat];
+      return (formatConfig as any)[outputFormat];
     }
   };
 
@@ -244,7 +271,7 @@ const converterWorker = async ({
   } = getFormatConfig(outputFormat, oggCodec);
 
   // Build the command arguments array
-  const ffmpegArgs = ["-loglevel", "error", "-i", inputFile];
+  const ffmpegArgs: string[] = ["-loglevel", "error", "-i", inputFile];
 
   // Only use -map_metadata -1 if we don't need to preserve original metadata
   if (!preserveMetadata) {
@@ -260,29 +287,31 @@ const converterWorker = async ({
   }
 
   // Add sample rate if specified
-  if (sampleString) {
-    ffmpegArgs.push(...sampleString.split(" "));
+  if (sampleRateArgs.length) {
+    ffmpegArgs.push(...sampleRateArgs);
   }
 
   // Add basic options
   ffmpegArgs.push("-vn", "-y");
 
-  // Add metadata - metaData is already formatted with escaped values from formatMetaData()
-  if (metaData && metaData.trim()) {
-    ffmpegArgs.push(...metaData.split(" "));
+  // Add metadata args
+  if (metaDataArgs && metaDataArgs.length) {
+    ffmpegArgs.push(...metaDataArgs);
   }
 
   if (process.env.DEBUG) {
-    console.log("13 metaData: ", metaData);
+    console.log("13 metaDataArgs (count): ", (metaDataArgs && metaDataArgs.length) || 0);
   }
 
-  // Add loop data
-  if (loopData && loopData.trim()) {
-    ffmpegArgs.push(...loopData.split(" "));
+  // Add loop data (numeric values only; safe to split)
+  if (loopData && typeof loopData === 'string' && loopData.trim()) {
+    ffmpegArgs.push(...loopData.trim().split(/\s+/));
   }
 
-  // Add channels
-  ffmpegArgs.push(...channels.split(" "));
+  // Add channels args
+  if (channelsArgs && channelsArgs.length) {
+    ffmpegArgs.push(...channelsArgs);
+  }
 
   // Add output file name
   ffmpegArgs.push(outputFile);
@@ -309,18 +338,18 @@ const converterWorker = async ({
   await runFFMPEG(ffmpegPath, ffmpegArgs, outputFile, inputFile);
 };
 
-const runConversion = async () => {
+const runConversion = async (): Promise<void> => {
   try {
     console.log("Worker data received:", JSON.stringify(workerData, null, 2));
 
     // Detailed validation of worker data
     if (!workerData) {
-      fail("Worker data is completely missing");
+      failWorker("Worker data is completely missing");
       return;
     }
 
     if (!workerData.file) {
-      fail("Worker data missing file object");
+      failWorker("Worker data missing file object");
       return;
     }
 
@@ -328,24 +357,24 @@ const runConversion = async () => {
 
     // Validate input file
     if (!inputFile) {
-      fail("Missing input file path");
+      failWorker("Missing input file path");
       return;
     }
 
     if (!existsSync(inputFile)) {
-      fail(`Input file does not exist: ${inputFile}`);
+      failWorker(`Input file does not exist: ${inputFile}`);
       return;
     }
 
     // Validate output file
     if (!outputFile) {
-      fail("Missing output file path");
+      failWorker("Missing output file path");
       return;
     }
 
     // Check for "Skipped" tag that might cause issues
     if (outputFile.includes("Skipped!")) {
-      fail(`Output file appears to be marked as skipped: ${outputFile}`);
+      failWorker(`Output file appears to be marked as skipped: ${outputFile}`);
       return;
     }
 
@@ -354,7 +383,7 @@ const runConversion = async () => {
       // Try to infer from output file extension
       const ext = outputFile.split(".").pop()?.toLowerCase();
       if (!ext || !["mp3", "wav", "ogg", "flac", "m4a", "aiff"].includes(ext)) {
-        fail(
+        failWorker(
           `Missing output format and couldn't determine from extension: ${outputFile}`
         );
         return;
@@ -376,10 +405,10 @@ const runConversion = async () => {
 
     await converterWorker(workerData);
   } catch (error) {
-    fail(`ERROR in converterWorker: ${error.message || "Unknown error"}`);
+    failWorker(`ERROR in converterWorker: ${error instanceof Error ? error.message : String(error) || "Unknown error"}`);
   }
 };
-const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
+const runFFMPEG = (ffmpegPath: string, ffmpegArgs: string[], outputFile: string, inputFile: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
       // Make sure the output directory exists
@@ -397,13 +426,17 @@ const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
       console.log(`ffmpeg command (truncated): ${truncatedCommand}`);
 
       // Execute command
-      const ffmpegCommand = spawn(ffmpegPath, ffmpegArgs, { shell: false });
+      const ffmpegCommand = spawn(ffmpegPath, ffmpegArgs, {
+        shell: false,
+        windowsVerbatimArguments: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
 
       // Collect error output for better diagnostics
       let errorOutput = "";
 
       // Capture and forward any error stderr output
-      ffmpegCommand.stderr.on("data", (data) => {
+      ffmpegCommand.stderr.on("data", (data: any) => {
         const errorText = data.toString().trim();
         errorOutput += errorText + "\n";
         if (errorText) {
@@ -412,10 +445,10 @@ const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
       });
 
       // Handle successful completion
-      ffmpegCommand.on("exit", (code) => {
+      ffmpegCommand.on("exit", (code: any) => {
         if (code === 0) {
           parentPort.postMessage({ type: "code", data: code });
-          resolve();
+          resolve(undefined);
         } else {
           const fileExt = outputFile.split(".").pop()?.toLowerCase();
           const formatInfo = fileExt
@@ -430,24 +463,18 @@ const runFFMPEG = (ffmpegPath, ffmpegArgs, outputFile, inputFile) => {
       });
 
       // Handle errors during execution
-      ffmpegCommand.on("error", (error) => {
+      ffmpegCommand.on("error", (error: any) => {
         const msg = `ERROR in ffmpegCommand: ${error?.message || error}`;
         postError(msg, { inputFile, outputFile });
         reject(new Error(msg));
       });
     } catch (error) {
-      const msg = `Failed to start ffmpeg process: ${error?.message || error}`;
+      const msg = `Failed to start ffmpeg process: ${error instanceof Error ? error.message : String(error)}`;
       postError(msg, { inputFile, outputFile });
       reject(new Error(msg));
     }
   });
 };
-const fail = (reason) => {
-  const f = (workerData && workerData.file) || {};
-  postError(reason, { inputFile: f.inputFile, outputFile: f.outputFile });
-  throw new Error(reason);
-};
-
 if (require.main === module) {
   runConversion();
 }

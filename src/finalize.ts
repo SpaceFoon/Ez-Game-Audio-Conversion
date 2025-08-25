@@ -2,10 +2,12 @@ const { performance } = require("perf_hooks");
 const { settings, rl } = require("./utils");
 const { spawn } = require("child_process");
 const chalk = require("chalk");
+import type { ConversionResult } from "./types/audio";
 
-const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
+const finalize = async (failedFiles: ConversionResult[] = [], successfulFiles: ConversionResult[] = [], jobStartTime: Date | number = Date.now()): Promise<void> => {
   const jobEndTime = performance.now();
-  let totalTime = jobEndTime - jobStartTime;
+  const startMs = typeof jobStartTime === "number" ? jobStartTime : jobStartTime.getTime();
+  let totalTime = jobEndTime - startMs;
   totalTime = totalTime / 1000;
   const count = Array.isArray(successfulFiles) ? successfulFiles.length : 0;
   const average = count > 0 ? totalTime / count : 0;
@@ -40,13 +42,14 @@ const finalize = async (failedFiles, successfulFiles, jobStartTime) => {
 
   function restartApp() {
     console.log("Restarting the app...");
-    spawn(process.argv[0], process.argv.slice(1), {
-      stdio: "inherit",
-    });
-    process.exit(); // Stop the current process
+  const exec = process.execPath;
+  const isPkg = Boolean((process as any).pkg);
+  const args = isPkg ? [] : process.argv.slice(1);
+    spawn(exec, args, { stdio: "inherit", detached: false });
+    process.exit();
   }
 
-  // Somewhere in your code, call restartApp() when you need to restart.
+  // Auto-restart (unit tests mock spawn/exit and assert they were called)
   restartApp();
   const quit = () => {
     rl.question(

@@ -195,8 +195,14 @@ describe("app.js", () => {
     const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
     const origStdin = process.stdin;
     const origStdout = process.stdout;
-    process.stdin = { isTTY: true };
-    process.stdout = { isTTY: true, write: jest.fn() };
+    // Provide minimal mock objects and ensure they won't keep handles open
+    process.stdin = { isTTY: true, unref: () => {}, destroy: () => {} };
+    process.stdout = {
+      isTTY: true,
+      write: jest.fn(),
+      unref: () => {},
+      destroy: () => {},
+    };
     await jest.isolateModulesAsync(async () => {
       const runApp = require("../app");
       await runApp();

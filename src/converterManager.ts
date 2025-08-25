@@ -1,5 +1,7 @@
 //Creates workers to convert files
 
+import type { ConversionItem, ConversionJob, ConversionResult } from "./types/audio";
+
 const { Worker } = require("worker_threads");
 const { performance } = require("perf_hooks");
 const { cpus } = require("os");
@@ -13,7 +15,7 @@ const {
   rl,
 } = require("./utils");
 
-const convertFiles = async (files) => {
+const convertFiles = async (files: ConversionItem[]): Promise<ConversionJob> => {
   initializeFileNames();
   const jobStartTime = performance.now();
   let cpuNumber;
@@ -29,12 +31,12 @@ const convertFiles = async (files) => {
   const maxConcurrentWorkers = Math.round(
     Math.min(cpuNumber, Array.isArray(files) ? files.length : 0)
   );
-  const failedFiles = [];
-  const successfulFiles = [];
+  const failedFiles: ConversionResult[] = [];
+  const successfulFiles: ConversionResult[] = [];
   console.info("\n   Detected 🕵️‍♂️", cpuNumber, "CPU Cores 🖥");
   console.log("   Using", cpuNumber, "concurrent 🧵 threads");
 
-  const processFile = async (file, workerCounter, task, tasksLeft) => {
+  const processFile = async (file: ConversionItem, workerCounter: number, task: number, tasksLeft: number): Promise<void> => {
     const workerStartTime = performance.now();
     checkDiskSpace(settings.outputFilePath);
     console.log(
@@ -61,11 +63,20 @@ const convertFiles = async (files) => {
 
         const workerData = JSON.parse(workerDataJson);
 
-        const worker = new Worker(join(__dirname, "converterWorker.js"), {
+        // Determine the correct path for the worker based on runtime environment
+        // When running from source (ts-node or node dist), worker is in dist/
+        // When running the packaged binary (pkg), __dirname points to a virtual fs, and the worker
+        // is placed next to the main file via pkg.assets.
+        const runningPkg = (process as any).pkg;
+        const workerPath = runningPkg
+          ? join(__dirname, "converterWorker.js")
+          : join(__dirname, "..", "dist", "converterWorker.js");
+
+        const worker = new Worker(workerPath, {
           workerData,
         });
 
-        worker.on("message", (message) => {
+        worker.on("message", (message: any) => {
           // Errors messages
           if (message.type === "error" || message.type === "stderr") {
             console.error(
@@ -92,7 +103,7 @@ const convertFiles = async (files) => {
             const workerCompTime = workerEndTime - workerStartTime;
             addToLog(message, file);
             if (message.data === 0) {
-              successfulFiles.push(file);
+              successfulFiles.push({ success: true, inputFile: file.inputFile, outputFile: file.outputFile });
               console.log(
                 chalk.greenBright(
                   `\n🛠️👷‍♂️ Worker`,
@@ -108,7 +119,7 @@ const convertFiles = async (files) => {
               // File Failure code
             } else if (message.data !== 0) {
               if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-                failedFiles.push(file);
+                failedFiles.push({ success: false, inputFile: file.inputFile, outputFile: file.outputFile });
               }
               console.error(
                 chalk.bgRed(
@@ -123,19 +134,19 @@ const convertFiles = async (files) => {
           }
         });
 
-        worker.on("error", (error) => {
+        worker.on("error", (error: any) => {
           console.error(
             `🚨🚨⛔ Worker had an error:`,
             error.toString(),
             "⛔🚨🚨"
           );
           if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-            failedFiles.push(file);
+            failedFiles.push({ success: false, inputFile: file.inputFile, outputFile: file.outputFile });
           }
           reject(error);
         });
 
-        worker.on("exit", (code) => {
+        worker.on("exit", (code: any) => {
           if (code !== 0) {
             console.error(`Worker stopped with exit code ${code}`);
           }
@@ -161,7 +172,7 @@ const convertFiles = async (files) => {
             task++;
             workerCounter++;
             if (workerCounter > 8) workerCounter = workerCounter - 8;
-            await processFile(file, workerCounter, task, tasksLeft);
+            if (file) await processFile(file, workerCounter, task, tasksLeft);
           } catch (error) {
             console.error(error);
           }
@@ -171,7 +182,7 @@ const convertFiles = async (files) => {
   }
 
   await Promise.all(workerPromises);
-  return { failedFiles, successfulFiles, jobStartTime };
+  return { failedFiles, successfulFiles, jobStartTime: new Date(jobStartTime) };
 };
 
 module.exports = { convertFiles };

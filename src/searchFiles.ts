@@ -1,17 +1,18 @@
 const { readdirSync, statSync } = require("fs");
 const { join, extname } = require("path");
 const chalk = require("chalk");
+import type { Settings } from "./types/settings";
 
 //Searches for files that meet criteria
-const searchFiles = (settings) => {
+const searchFiles = (settings: Settings): Promise<string[]> => {
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.inputFilePath;
   //midi can have .mid or .midi extension
-  if (settings.inputFormats.includes("midi")) {
+  if (settings.inputFormats.includes("midi" as any)) {
     fileExtensions.push(".mid");
   }
 
-  const allFiles = [];
+  const allFiles: string[] = [];
 
   // If we're in single file mode, just return the single file
   if (settings.singleFileMode && settings.singleFilePath) {
@@ -24,7 +25,7 @@ const searchFiles = (settings) => {
     return Promise.resolve(allFiles);
   }
 
-  const walk = (dir) => {
+  const walk = (dir: string): void => {
     const files = readdirSync(dir);
 
     for (const file of files) {

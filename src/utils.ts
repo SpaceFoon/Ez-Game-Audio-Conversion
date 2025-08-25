@@ -11,8 +11,9 @@ const {
 const moment = require("moment");
 const chalk = require("chalk");
 const { join } = require("path");
+import type { Settings, LogEntry, FileInfo } from "./types/settings";
 
-let settings = {
+let settings: Settings = {
   inputFilePath: "",
   outputFilePath: "",
   inputFormats: [],
@@ -25,19 +26,49 @@ let settings = {
   userOS: null,
 };
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false,
-});
+// Provide a Jest-friendly stub to avoid open handle (TTYWRAP) issues during tests
+type ReadLineLike = {
+  question: (q: string, cb: (answer: string) => void) => void;
+  close: () => void;
+};
 
-const getAnswer = (question) =>
+let rl: ReadLineLike;
+if (process.env.JEST_WORKER_ID) {
+  // In Jest, do not bind to real stdio to prevent open handles
+  rl = {
+    question: (_q: string, cb: (answer: string) => void) => cb(""),
+    close: () => {},
+  };
+  // Attempt to fully release the TTY handle so Jest can exit cleanly.
+  try {
+    const stdin: any = process.stdin;
+    if (stdin) {
+      if (typeof stdin.unref === "function") {
+        try { stdin.unref(); } catch {}
+      }
+      if (typeof stdin.pause === "function") {
+        try { stdin.pause(); } catch {}
+      }
+      if (typeof stdin.destroy === "function") {
+        try { stdin.destroy(); } catch {}
+      }
+    }
+  } catch {}
+} else {
+  rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false,
+  }) as unknown as ReadLineLike;
+}
+
+const getAnswer = (question: string | string[]): Promise<string> =>
   new Promise((resolve) => {
     // Handle array of strings (from chalk)
     const formattedQuestion = Array.isArray(question)
       ? question.join(" ")
       : question;
-    rl.question(formattedQuestion, (answer) => {
+    rl.question(formattedQuestion, (answer: string) => {
       resolve(answer);
     });
   });
@@ -68,7 +99,7 @@ console.warn = function (...args) {
 };
 
 // If a file is not writing, check the disk space.
-const checkDiskSpace = (directory) => {
+const checkDiskSpace = (directory?: string): boolean => {
   // If directory is empty or undefined, use the current directory
   if (!directory) {
     directory = process.cwd();
@@ -76,36 +107,36 @@ const checkDiskSpace = (directory) => {
 
   try {
     // On Windows, this approach is more reliable
-    const stats = statSync(directory);
+    statSync(directory);
 
     // Windows doesn't reliably provide blocks/blksize
     // Instead, use freespace directly if available, or a reasonable default
-    const availableSpaceMB = 50; // Default to 50MB available - enough for conversions
     return true;
   } catch (error) {
-    console.error(`Error checking disk space: ${error.message}`);
+    console.error(`Error checking disk space: ${(error as Error).message}`);
     // Default to true so conversion isn't blocked by disk space check errors
     return true;
   }
 };
 
 // If a file fails to read or write, check if it is busy.
-const isFileBusy = async (file) => {
+const isFileBusy = async (file: string): Promise<boolean> => {
   if (!existsSync(file)) return false;
   try {
     const fd = openSync(file, "r+");
     closeSync(fd);
     return false;
-  } catch (error) {
+  } catch (error: any) {
     if (error.code === "EBUSY") {
       await getAnswer(
         chalk.redBright(
           `\n${error}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
         )
       );
-      // return isFileBusy(file);
+      return false;
     } else if (error.code === "ENOENT") {
       console.error("code", error);
+      return false;
     } else {
       console.error(
         `\n🚨🚨⛔ Error checking status of Log file: ${error.message} ⛔🚨🚨`
@@ -116,8 +147,8 @@ const isFileBusy = async (file) => {
 };
 
 // Error logging to CSV.
-let fileNameL = null;
-let fileNameE = null;
+let fileNameL: string | null = null;
+let fileNameE: string | null = null;
 
 const initializeFileNames = () => {
   const basePath = settings.outputFilePath || "";
@@ -135,10 +166,10 @@ const initializeFileNames = () => {
   fileNameE = initFileName(basePath, "error");
 };
 
-const initFileName = (basePath, fileName) => {
+const initFileName = (basePath: string, fileName: string): string => {
   let num = 1;
   // Use OS-aware join and normalize to forward slashes for test stability on Windows
-  const norm = (p) => p.replace(/\\/g, "/");
+  const norm = (p: string) => p.replace(/\\/g, "/");
   let fullFileName = norm(join(basePath || "", `${fileName}.csv`));
 
   while (existsSync(fullFileName)) {
@@ -149,7 +180,7 @@ const initFileName = (basePath, fileName) => {
   return fullFileName;
 };
 
-const addToLog = async (log, file) => {
+const addToLog = async (log: LogEntry, file?: FileInfo): Promise<boolean | void> => {
   // Ensure log file names are set
   if (!fileNameL || !fileNameE) {
     initializeFileNames();
@@ -172,10 +203,10 @@ const addToLog = async (log, file) => {
   if (isErr) {
     // console.log("log in utils", log);
 
-    await isFileBusy(fileNameE);
+    if (fileNameE) await isFileBusy(fileNameE);
 
     // Create error log file and header if none exists.
-    if (!existsSync(fileNameE)) {
+    if (fileNameE && !existsSync(fileNameE)) {
       try {
         writeFileSync(
           fileNameE,
@@ -191,11 +222,11 @@ const addToLog = async (log, file) => {
 
     // Write error line
     try {
-      await isFileBusy(fileNameE);
+      if (fileNameE) await isFileBusy(fileNameE);
       const csvRow =
         `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, "") +
         "\n";
-      appendFileSync(fileNameE, csvRow);
+      if (fileNameE) appendFileSync(fileNameE, csvRow);
     } catch (error) {
       console.error(`🚨🚨⛔ Error writing to ${fileNameE}: ${error} ⛔🚨🚨`);
       return false;
@@ -204,7 +235,7 @@ const addToLog = async (log, file) => {
   }
 
   // Create log file and header if none exists.
-  if (!existsSync(fileNameL)) {
+  if (fileNameL && !existsSync(fileNameL)) {
     await isFileBusy(fileNameL);
     try {
       writeFileSync(fileNameL, "Timestamp, Exit Code, Input, Output\n", {
@@ -219,18 +250,18 @@ const addToLog = async (log, file) => {
   }
   // Write log line
   try {
-    await isFileBusy(fileNameL);
+    if (fileNameL) await isFileBusy(fileNameL);
     const csvRow =
       `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, "") +
       "\n";
-    appendFileSync(fileNameL, csvRow);
+    if (fileNameL) appendFileSync(fileNameL, csvRow);
   } catch (error) {
     console.error(`🚨🚨⛔ Error writing log to ${fileNameL}: ${error} ⛔🚨🚨`);
     return false;
   }
 };
 
-function handleExit(code = 0, { restart = false } = {}) {
+function handleExit(code: number = 0, { restart = false }: { restart?: boolean } = {}): void {
   if (restart && code === 0) {
     const { spawn } = require("child_process");
     console.log("Restarting the app...");

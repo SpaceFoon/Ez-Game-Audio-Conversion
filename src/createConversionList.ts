@@ -2,20 +2,21 @@ const { existsSync, mkdirSync } = require("fs");
 const { join, basename, extname, dirname } = require("path");
 const chalk = require("chalk");
 const { getAnswer, settings, handleExit } = require("./utils");
+import type { AudioFormat, ConversionItem } from "./types/audio";
 
 // Get a unique output file name
 const getOutputFileCopy = async (
-  inputFile,
-  outputFormat,
-  outputFolder,
-  copyNumber = 1
-) => {
+  inputFile: string,
+  outputFormat: AudioFormat,
+  outputFolder: string,
+  copyNumber: number = 1
+): Promise<string> => {
   let baseNameCopy = basename(inputFile, extname(inputFile));
   let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
 
   if (match) {
     baseNameCopy = match[1];
-    copyNumber = parseInt(match[2], [10]);
+    copyNumber = parseInt(match[2], 10);
     copyNumber++;
   }
   let outputFileCopy = `${join(
@@ -34,7 +35,7 @@ const getOutputFileCopy = async (
   return outputFileCopy;
 };
 
-const askOggCodec = async () => {
+const askOggCodec = async (): Promise<string> => {
   //Choose codec for OGG
   const userResponse = await getAnswer(
     chalk.blue.bold(
@@ -60,7 +61,7 @@ const askOggCodec = async () => {
 };
 
 //Create final list of output files to convert
-const createConversionList = async (files) => {
+const createConversionList = async (files: string[]): Promise<ConversionItem[]> => {
   let {
     inputFilePath,
     outputFilePath,
@@ -68,12 +69,12 @@ const createConversionList = async (files) => {
     oggCodec,
     singleFileMode,
   } = settings;
-  let outputFolder = null;
+  let outputFolder: string | null = null;
 
-  let convertSelf = null;
-  const conversionList = [];
-  let response = null;
-  let relativePath = null;
+  let convertSelf: string | null = null;
+  const conversionList: ConversionItem[] = [];
+  let response: string | null = null;
+  let relativePath: string | null = null;
 
   // Ensure we have the ogg codec set
   if (!settings.oggCodec) {
@@ -107,7 +108,7 @@ const createConversionList = async (files) => {
     for (const outputFormat of outputFormats) {
       console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
 
-      let outputFile = null;
+      let outputFile: string;
       if (outputFormats.includes("ogg") && !oggCodec) {
         oggCodec = await askOggCodec();
       }
@@ -123,7 +124,7 @@ const createConversionList = async (files) => {
       } catch (error) {
         console.error(
           chalk.redBright(
-            `❌ Error calculating relative path: ${error.message}`
+            `❌ Error calculating relative path: ${error instanceof Error ? error.message : String(error)}`
           )
         );
         relativePath = "";
@@ -168,20 +169,20 @@ const createConversionList = async (files) => {
         );
 
         while (true) {
-          if (convertSelf === "" || /^no$/i.test(convertSelf)) {
+          if (convertSelf === "" || (convertSelf && /^no$/i.test(convertSelf))) {
             console.log("\n 🚫 Not converting files to own type! 🚫 \n");
             convertSelf = "no";
             outputFile = `${outputFile} "Skipped! ⏭️!"`;
             break;
           }
-          if (/^yes$/i.test(convertSelf)) {
+          if (convertSelf && /^yes$/i.test(convertSelf)) {
             convertSelf = "yes";
             console.log("\n 🔀 Converting files to own type! ✔");
             //Rename. Never overwrite input file.
             outputFile = await getOutputFileCopy(
               inputFile,
               outputFormat,
-              outputFolder
+              outputFolder || dirname(inputFile)
             );
             break;
           }
@@ -200,7 +201,7 @@ const createConversionList = async (files) => {
         }
       }
 
-      const responseActions = {
+      const responseActions: { [key: string]: () => Promise<void | null> } = {
         o: async () => {
           return (response = null);
         },
@@ -213,7 +214,7 @@ const createConversionList = async (files) => {
           outputFile = await getOutputFileCopy(
             inputFile,
             outputFormat,
-            outputFolder
+            outputFolder || dirname(inputFile)
           );
           return (response = null);
         },
@@ -222,7 +223,7 @@ const createConversionList = async (files) => {
           outputFile = await getOutputFileCopy(
             outputFile,
             outputFormat,
-            outputFolder
+            outputFolder || dirname(outputFile)
           );
         },
         s: async () => {
@@ -265,9 +266,9 @@ const createConversionList = async (files) => {
                     `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
                   )
                 );
-                response = await response.trim().toLowerCase();
+                response = response ? response.trim().toLowerCase() : "";
 
-                if (await responseActions[response]) {
+                if (response && responseActions[response]) {
                   await responseActions[response]();
                   break;
                 } else {
@@ -299,9 +300,9 @@ const createConversionList = async (files) => {
   // Process the conversion list
   while (true) {
     // Function to remove duplicates based on outputFile
-    const removeDuplicates = async (conversionList) => {
+    const removeDuplicates = async (conversionList: any[]) => {
       const seen = new Set();
-      return conversionList.filter((conversion) => {
+      return conversionList.filter((conversion: any) => {
         const duplicate = seen.has(conversion.outputFile);
         seen.add(conversion.outputFile);
         return !duplicate;
@@ -312,12 +313,12 @@ const createConversionList = async (files) => {
 
     // Filter out skipped files
     const filesToConvert = uniqueConversionList.filter(
-      (x) => !/Skipped!.*⏭️/g.test(x.outputFile)
+      (x: any) => !/Skipped!.*⏭️/g.test(x.outputFile)
     );
 
     // Display conversion list
     const numbered = await filesToConvert.map(
-      (x, index) => `🔊 ${index + 1} ${x.outputFile}`
+      (x: any, index: number) => `🔊 ${index + 1} ${x.outputFile}`
     );
 
     console.log(

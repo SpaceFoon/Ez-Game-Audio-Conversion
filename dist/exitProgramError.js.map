@@ -1,0 +1,1 @@
+{"version":3,"file":"exitProgramError.js","sourceRoot":"","sources":["../src/exitProgramError.ts"],"names":[],"mappings":";AAAA,MAAM,gBAAiB,SAAQ,KAAK;IAClC,YAAY,UAAkB,cAAc;QAC1C,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,IAAI,CAAC,IAAI,GAAG,kBAAkB,CAAC;IACjC,CAAC;CACF;AAED,MAAM,CAAC,OAAO,GAAG,gBAAgB,CAAC"}
