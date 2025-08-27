@@ -1,178 +1,192 @@
 //metaDataService.ts
-import type { AudioMetadata } from "./types/metadata";
+import type { AudioMetadata } from './types/metadata';
 
-const { spawnSync } = require("child_process");
-const { join } = require("path");
-const { existsSync } = require("fs");
+const { spawnSync } = require('child_process');
+const { join } = require('path');
+const { existsSync } = require('fs');
 
 // Get metaData from a file using ffprobe
-const getMetaData = async (inputFile: string): Promise<AudioMetadata | null> => {
+const getMetaData = async (
+  inputFile: string
+): Promise<AudioMetadata | null> => {
   try {
     // Determine executable name based on platform
     const executableName =
-      process.platform === "win32" ? "ffprobe.exe" : "ffprobe";
+      process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
 
     const devPath = join(process.cwd(), executableName);
-    const binPath = join(process.cwd(), "bin", executableName);
+    const binPath = join(process.cwd(), 'bin', executableName);
     // Prefer dev path if present, otherwise try bin path (do not gate on exists for test predictability)
     let ffprobePath = existsSync(devPath) ? devPath : binPath;
 
     const output = spawnSync(
       ffprobePath,
       [
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_format",
-        "-show_streams",
+        '-v',
+        'quiet',
+        '-print_format',
+        'json',
+        '-show_format',
+        '-show_streams',
         inputFile,
       ],
-      { encoding: "utf8" }
+      { encoding: 'utf8' }
     );
     if (output.error) throw output.error;
-    if (!output.stdout) throw new Error("ffprobe returned no output");
+    if (!output.stdout) throw new Error('ffprobe returned no output');
 
     const metaData: AudioMetadata = JSON.parse(output.stdout);
     return metaData;
   } catch (error: any) {
     // Keep this lightweight for tests: don't import utils/addToLog here
     // Standardize error message to match tests
-    console.error("Error running ffprobe.exe:", error.message || String(error));
+    console.error('Error running ffprobe.exe:', error.message || String(error));
     return null;
   }
 };
 
 // Extract metaData fields from tags
-const formatMetaDataField = (streamTags: Record<string, string> | undefined, formatTags: Record<string, string> | undefined, field: string): string => {
-  if (!streamTags && !formatTags) return "";
+const formatMetaDataField = (
+  streamTags: Record<string, string> | undefined,
+  formatTags: Record<string, string> | undefined,
+  field: string
+): string => {
+  if (!streamTags && !formatTags) return '';
 
   const tagVariants = [field.toLowerCase(), field.toUpperCase()];
   for (const tag of tagVariants) {
     if (streamTags && streamTags[tag]) return streamTags[tag];
     if (formatTags && formatTags[tag]) return formatTags[tag];
   }
-  return "";
+  return '';
 };
 
 // Format metaData for ffmpeg command (legacy string version)
-const formatMetaData = (metaData: AudioMetadata | null, inputFile?: string): { metaData: string; channels: string } => {
+const formatMetaData = (
+  metaData: AudioMetadata | null,
+  inputFile?: string
+): { metaData: string; channels: string } => {
   if (!metaData || !metaData.streams) {
     if (inputFile) {
       console.warn(`\n No meta data found in ${inputFile}`);
     }
-  // Maintain legacy spacing contract: channels string includes leading space
-  return { metaData: "", channels: " -ac 2" };
+    // Maintain legacy spacing contract: channels string includes leading space
+    return { metaData: '', channels: ' -ac 2' };
   }
   let streamTags = metaData.streams[0]?.tags || {};
   let formatTags = metaData.format?.tags || {};
 
   const metaDataFields = [
     // Basic fields
-    "title",
-    "artist",
-    "album",
-    "album_artist",
-    "track",
-    "tracknumber",
-    "tracktotal",
-    "disc",
-    "discnumber",
-    "disctotal",
-    "genre",
-    "date",
-    "year",
-    "composer",
-    "lyricist",
-    "lyrics",
-    "comment",
-    "description",
-    "subtitle",
-    "grouping",
-    "language",
-    "bpm",
-    "mood",
-    "rating",
-    "isrc",
-    "encoder",
-    "encoded_by",
-    "publisher",
-    "copyright",
-    "compilation",
+    'title',
+    'artist',
+    'album',
+    'album_artist',
+    'track',
+    'tracknumber',
+    'tracktotal',
+    'disc',
+    'discnumber',
+    'disctotal',
+    'genre',
+    'date',
+    'year',
+    'composer',
+    'lyricist',
+    'lyrics',
+    'comment',
+    'description',
+    'subtitle',
+    'grouping',
+    'language',
+    'bpm',
+    'mood',
+    'rating',
+    'isrc',
+    'encoder',
+    'encoded_by',
+    'publisher',
+    'copyright',
+    'compilation',
 
     // ReplayGain / loudness
-    "replaygain_track_gain",
-    "replaygain_track_peak",
-    "replaygain_album_gain",
-    "replaygain_album_peak",
+    'replaygain_track_gain',
+    'replaygain_track_peak',
+    'replaygain_album_gain',
+    'replaygain_album_peak',
 
     // iTunes-specific
-    "itunesadvisory", // explicit flag (0=none, 1=clean, 2=explicit)
-    "itunesalbumid",
-    "itunesartistid",
-    "itunescomposerid",
-    "itunesgenreid",
-    "itunespodcast", // "1" for podcast
-    "itunesseason",
-    "itunesepisode",
-    "itunesepisodetype", // full/trailer/bonus
-    "itunesauthor",
-    "itunescopyright",
-    "ituneskeywords",
-    "itunesu", // for iTunes U
+    'itunesadvisory', // explicit flag (0=none, 1=clean, 2=explicit)
+    'itunesalbumid',
+    'itunesartistid',
+    'itunescomposerid',
+    'itunesgenreid',
+    'itunespodcast', // "1" for podcast
+    'itunesseason',
+    'itunesepisode',
+    'itunesepisodetype', // full/trailer/bonus
+    'itunesauthor',
+    'itunescopyright',
+    'ituneskeywords',
+    'itunesu', // for iTunes U
 
     // Podcast-specific
-    "podcastid",
-    "podcasturl",
-    "podcastfeed",
-    "podcastdesc",
-    "podcastkeywords",
-    "podcastauthor",
-    "podcastsubtitle",
+    'podcastid',
+    'podcasturl',
+    'podcastfeed',
+    'podcastdesc',
+    'podcastkeywords',
+    'podcastauthor',
+    'podcastsubtitle',
 
     // Others
-    "media_type", // e.g. "audio"
-    "category",
-    "license",
-    "website",
-    "original_artist",
-    "original_album",
-    "original_year",
-    "source",
-    "label",
-    "encodedby",
-    "barcode",
-    "catalog_number",
-    "location", // GPS or descriptive
-    "performer",
-    "conductor",
-    "engineer",
-    "remixer",
-    "mixartist",
-    "arranger",
-    "producer",
-    "director",
-    "commenter",
+    'media_type', // e.g. "audio"
+    'category',
+    'license',
+    'website',
+    'original_artist',
+    'original_album',
+    'original_year',
+    'source',
+    'label',
+    'encodedby',
+    'barcode',
+    'catalog_number',
+    'location', // GPS or descriptive
+    'performer',
+    'conductor',
+    'engineer',
+    'remixer',
+    'mixartist',
+    'arranger',
+    'producer',
+    'director',
+    'commenter',
   ];
 
   const metaDataDataArray: string[] = [];
 
   metaDataFields.forEach((field) => {
     if (!field) return;
-    const rawValue = formatMetaDataField(streamTags as any, formatTags as any, field);
+    const rawValue = formatMetaDataField(
+      streamTags as any,
+      formatTags as any,
+      field
+    );
     // because you can break the entire ffmpegCommand with meta data
     const cleanValue = rawValue
-      .replace(/\u0000/g, "") // remove null bytes
-      .replace(/\\/g, "\\\\") // escape backslashes
+      .split('\u0000')
+      .join('') // remove null bytes
+      .replace(/\\/g, '\\\\') // escape backslashes
       .replace(/"/g, '\\"') // escape double quotes
-      .replace(/\r\n/g, "\\n") // replace Windows newlines with \n
-      .replace(/\n/g, "\\n") // replace Unix newlines with \n
-      .replace(/\r/g, "\\n") // replace Old Mac newlines with \n
+      .replace(/\r\n/g, '\\n') // replace Windows newlines with \n
+      .replace(/\n/g, '\\n') // replace Unix newlines with \n
+      .replace(/\r/g, '\\n') // replace Old Mac newlines with \n
       .trim();
 
     if (cleanValue) {
       // Normalize name of track to trackNumber
-      const adjustedField = field === "track" ? "trackNumber" : field;
+      const adjustedField = field === 'track' ? 'trackNumber' : field;
       // Format properly with proper quoting and escaping
       metaDataDataArray.push(`-metadata ${adjustedField}="${cleanValue}"`);
     }
@@ -180,11 +194,14 @@ const formatMetaData = (metaData: AudioMetadata | null, inputFile?: string): { m
 
   const channels = metaData.streams[0]
     ? ` -ac ${metaData.streams[0].channels}`
-    : " -ac 2";
-  const metaDataString = metaDataDataArray.join(" ");
-  
+    : ' -ac 2';
+  const metaDataString = metaDataDataArray.join(' ');
+
   if ((process.env as any)['DEBUG']) {
-    console.log("10 metaDataarray metadataService line 173: ", metaDataDataArray);
+    console.log(
+      '10 metaDataarray metadataService line 173: ',
+      metaDataDataArray
+    );
   }
   return { metaData: metaDataString, channels };
 };
@@ -196,43 +213,113 @@ export const formatMetaDataArgs = (
 ): { metaDataArgs: string[]; channelsArgs: string[] } => {
   if (!metaData || !metaData.streams) {
     if (inputFile) console.warn(`\n No meta data found in ${inputFile}`);
-    return { metaDataArgs: [], channelsArgs: ["-ac", "2"] };
+    return { metaDataArgs: [], channelsArgs: ['-ac', '2'] };
   }
 
   const streamTags = (metaData.streams[0] as any)?.tags || {};
   const formatTags = (metaData.format as any)?.tags || {};
 
   const fields = [
-    "title","artist","album","album_artist","track","tracknumber","tracktotal","disc","discnumber","disctotal",
-    "genre","date","year","composer","lyricist","lyrics","comment","description","subtitle","grouping","language",
-    "bpm","mood","rating","isrc","encoder","encoded_by","publisher","copyright","compilation",
-    "replaygain_track_gain","replaygain_track_peak","replaygain_album_gain","replaygain_album_peak",
-    "itunesadvisory","itunesalbumid","itunesartistid","itunescomposerid","itunesgenreid","itunespodcast",
-    "itunesseason","itunesepisode","itunesepisodetype","itunesauthor","itunescopyright","ituneskeywords","itunesu",
-    "podcastid","podcasturl","podcastfeed","podcastdesc","podcastkeywords","podcastauthor","podcastsubtitle",
-    "media_type","category","license","website","original_artist","original_album","original_year","source","label",
-    "encodedby","barcode","catalog_number","location","performer","conductor","engineer","remixer","mixartist",
-    "arranger","producer","director","commenter",
+    'title',
+    'artist',
+    'album',
+    'album_artist',
+    'track',
+    'tracknumber',
+    'tracktotal',
+    'disc',
+    'discnumber',
+    'disctotal',
+    'genre',
+    'date',
+    'year',
+    'composer',
+    'lyricist',
+    'lyrics',
+    'comment',
+    'description',
+    'subtitle',
+    'grouping',
+    'language',
+    'bpm',
+    'mood',
+    'rating',
+    'isrc',
+    'encoder',
+    'encoded_by',
+    'publisher',
+    'copyright',
+    'compilation',
+    'replaygain_track_gain',
+    'replaygain_track_peak',
+    'replaygain_album_gain',
+    'replaygain_album_peak',
+    'itunesadvisory',
+    'itunesalbumid',
+    'itunesartistid',
+    'itunescomposerid',
+    'itunesgenreid',
+    'itunespodcast',
+    'itunesseason',
+    'itunesepisode',
+    'itunesepisodetype',
+    'itunesauthor',
+    'itunescopyright',
+    'ituneskeywords',
+    'itunesu',
+    'podcastid',
+    'podcasturl',
+    'podcastfeed',
+    'podcastdesc',
+    'podcastkeywords',
+    'podcastauthor',
+    'podcastsubtitle',
+    'media_type',
+    'category',
+    'license',
+    'website',
+    'original_artist',
+    'original_album',
+    'original_year',
+    'source',
+    'label',
+    'encodedby',
+    'barcode',
+    'catalog_number',
+    'location',
+    'performer',
+    'conductor',
+    'engineer',
+    'remixer',
+    'mixartist',
+    'arranger',
+    'producer',
+    'director',
+    'commenter',
   ];
 
   const metaDataArgs: string[] = [];
   for (const field of fields) {
-    const raw = formatMetaDataField(streamTags as any, formatTags as any, field) || "";
+    const raw =
+      formatMetaDataField(streamTags as any, formatTags as any, field) || '';
     const clean = raw
-      .replace(/\u0000/g, "")
-      .replace(/\\/g, "\\\\")
+      .split('\u0000')
+      .join('')
+      .replace(/\\/g, '\\\\')
       .replace(/"/g, '\\"')
-      .replace(/\r\n/g, "\\n")
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\n")
+      .replace(/\r\n/g, '\\n')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\n')
       .trim();
     if (!clean) continue;
-    const key = field === "track" ? "trackNumber" : field;
-    metaDataArgs.push("-metadata", `${key}=${clean}`);
+    const key = field === 'track' ? 'trackNumber' : field;
+    metaDataArgs.push('-metadata', `${key}=${clean}`);
   }
 
-  const ch = (metaData.streams[0] as any)?.channels ? String((metaData.streams[0] as any).channels) : "2";
-  const channelsArgs = ["-ac", ch];
+  const ch = (metaData.streams[0] as any)?.channels
+    ? String((metaData.streams[0] as any).channels)
+    : '2';
+  const channelsArgs = ['-ac', ch];
   return { metaDataArgs, channelsArgs };
 };
 
@@ -245,8 +332,8 @@ export const getLoopPoints = (metaData: any) => {
     const variants = [
       tagName, // LOOPSTART
       tagName.toLowerCase(), // loopstart
-      `LOOP_${tagName.replace("LOOP", "")}`, // LOOP_START
-      `loop_${tagName.replace("loop", "")}`, // loop_start
+      `LOOP_${tagName.replace('LOOP', '')}`, // LOOP_START
+      `loop_${tagName.replace('loop', '')}`, // loop_start
       `iTunes_${tagName}`, // iTunes_LOOPSTART
       `itunes_${tagName}`, // itunes_loopstart
     ];
@@ -274,14 +361,18 @@ export const getLoopPoints = (metaData: any) => {
     return null;
   };
 
-  const loopStart = parseInt(getTagValue("LOOPSTART") || null);
-  const loopLength = parseInt(getTagValue("LOOPLENGTH") || null);
+  const loopStart = parseInt(getTagValue('LOOPSTART') || null);
+  const loopLength = parseInt(getTagValue('LOOPLENGTH') || null);
 
   return { loopStart, loopLength };
 };
 
 // Convert loop points for different sample rates
-export const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec: string) => {
+export const convertLoopPoints = (
+  metaData: any,
+  outputFormat: string,
+  oggCodec: string
+) => {
   if (!metaData || !metaData.streams) {
     return {
       newSampleRate: null,
@@ -302,8 +393,8 @@ export const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec:
 
   // If not converting to opus or no valid loop points, return original values
   if (
-    outputFormat !== "ogg" ||
-    oggCodec !== "opus" ||
+    outputFormat !== 'ogg' ||
+    oggCodec !== 'opus' ||
     isNaN(loopStart) ||
     isNaN(loopLength)
   ) {
@@ -337,7 +428,7 @@ export const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec:
   const convertedLoopStart = Math.round(loopStart * ratio);
   const convertedLoopLength = Math.round(loopLength * ratio);
   if (process.env.DEBUG) {
-    console.log("convertLoopPoints - Conversion:", {
+    console.log('convertLoopPoints - Conversion:', {
       oldSampleRate: sampleRateNumber,
       newSampleRate,
       ratio,
@@ -357,7 +448,7 @@ export const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec:
 
 // Format loop data for ffmpeg command
 export const formatLoopData = (loopStart: any, loopLength: any) => {
-  if (isNaN(loopStart) || isNaN(loopLength)) return "";
+  if (isNaN(loopStart) || isNaN(loopLength)) return '';
 
   // Only include the standard variants that are most widely supported
   return (

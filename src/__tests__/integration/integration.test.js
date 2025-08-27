@@ -1,16 +1,16 @@
-const path = require("path");
+const path = require('path');
 
 // Simplified version of deleteDuplicateFiles for test purposes only
 const handleDuplicateFiles = (files) => {
   const priorityList = [
-    ".midi",
-    ".mid",
-    ".ogg",
-    ".mp3",
-    ".m4a",
-    ".wav",
-    ".flac",
-    ".aiff",
+    '.midi',
+    '.mid',
+    '.ogg',
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.flac',
+    '.aiff',
   ];
   const fileobjs = files.map((file) => [
     path.join(path.dirname(file), path.basename(file, path.extname(file))),
@@ -46,7 +46,7 @@ const handleDuplicateFiles = (files) => {
   };
 };
 
-describe("Simple Integration Tests", () => {
+describe('Simple Integration Tests', () => {
   beforeEach(() => {
     // Suppress console output
     console.log = jest.fn();
@@ -55,12 +55,12 @@ describe("Simple Integration Tests", () => {
     console.warn = jest.fn();
   });
 
-  it("should handle duplicate files correctly", () => {
+  it('should handle duplicate files correctly', () => {
     // Create test data with duplicates (same name, different extensions)
-    const song1 = path.join("/test/input", "song.mp3");
-    const song2 = path.join("/test/input", "song.wav");
-    const song3 = path.join("/test/input", "song.flac");
-    const unique = path.join("/test/input", "unique.mp3");
+    const song1 = path.join('/test/input', 'song.mp3');
+    const song2 = path.join('/test/input', 'song.wav');
+    const song3 = path.join('/test/input', 'song.flac');
+    const unique = path.join('/test/input', 'unique.mp3');
 
     const filesWithDuplicates = [song1, song2, song3, unique];
 
@@ -76,14 +76,14 @@ describe("Simple Integration Tests", () => {
 
     // Use path.basename for more reliable assertions across platforms
     const basenames = uniqueFiles.map((f) => path.basename(f));
-    expect(basenames).toContain("song.flac");
-    expect(basenames).toContain("unique.mp3");
-    expect(basenames).not.toContain("song.mp3");
-    expect(basenames).not.toContain("song.wav");
+    expect(basenames).toContain('song.flac');
+    expect(basenames).toContain('unique.mp3');
+    expect(basenames).not.toContain('song.mp3');
+    expect(basenames).not.toContain('song.wav');
 
     // Check that the dropped files are the correct ones
     const droppedBasenames = droppedFiles.map((f) => path.basename(f));
-    expect(droppedBasenames).toContain("song.mp3");
-    expect(droppedBasenames).toContain("song.wav");
+    expect(droppedBasenames).toContain('song.mp3');
+    expect(droppedBasenames).toContain('song.wav');
   });
 });

@@ -1,18 +1,18 @@
-const { existsSync, mkdirSync, statSync } = require("fs");
-const chalk = require("chalk");
-const { checkDiskSpace } = require("./utils");
-const readline = require("readline/promises");
-const path = require("path");
-import type { Settings } from "./types/settings";
-import type { AudioFormat } from "./types/audio";
+const { existsSync, mkdirSync, statSync } = require('fs');
+const chalk = require('chalk');
+const { checkDiskSpace } = require('./utils');
+const readline = require('readline/promises');
+const path = require('path');
+import type { Settings } from './types/settings';
+import type { AudioFormat } from './types/audio';
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-const inputTypes: AudioFormat[] = ["flac", "aiff", "wav", "mp3", "m4a", "ogg"];
-const outputTypes: AudioFormat[] = ["flac", "aiff", "wav", "mp3", "m4a", "ogg"];
+const inputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
+const outputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 
 //Entire input loop to get settings before converting.
 const getUserInput = async (settings: Settings): Promise<Settings> => {
@@ -28,7 +28,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       if (!inputTypes.includes(fileExt as AudioFormat)) {
         console.error(chalk.red.bold(`\n❌ Unsupported file type: ${fileExt}`));
         console.error(
-          chalk.red(`Supported file types: ${inputTypes.join(", ")}`)
+          chalk.red(`Supported file types: ${inputTypes.join(', ')}`)
         );
         process.exit(1);
       }
@@ -55,18 +55,18 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     while (true) {
       let outputFilePath = await rl.question(
         chalk.blue.bold(
-          "\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input 📂:"
+          '\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input 📂:'
         )
       );
 
-      if (outputFilePath === "") outputFilePath = settings.inputFilePath;
+      if (outputFilePath === '') outputFilePath = settings.inputFilePath;
 
       if (!existsSync(outputFilePath)) {
-        console.warn("\n⚠️ File Path does not exist! 👨‍🏭 Creating folder... 🚧");
+        console.warn('\n⚠️ File Path does not exist! 👨‍🏭 Creating folder... 🚧');
         try {
           mkdirSync(outputFilePath, { recursive: true });
         } catch {
-          console.error("Failed to make folder at:", outputFilePath);
+          console.error('Failed to make folder at:', outputFilePath);
           continue;
         }
       }
@@ -85,7 +85,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       while (true) {
         const inputFormatString = await rl.question(
           chalk.blue.bold(
-            "\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
+            '\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
           )
         );
 
@@ -101,7 +101,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
           !settings.inputFormats.every((format) => inputTypes.includes(format))
         ) {
           console.warn(
-            "\n🛑🙊Invalid input format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed"
+            '\n🛑🙊Invalid input format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed'
           );
           continue;
         }
@@ -109,8 +109,8 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
         console.log(
           chalk.green.italic(
             `\n📝 Input formats: ${settings.inputFormats
-              .map((el) => el + "✅ ")
-              .join("")}`
+              .map((el) => el + '✅ ')
+              .join('')}`
           )
         );
         break;
@@ -121,7 +121,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     while (true) {
       const outputFormatString = await rl.question(
         chalk.blue.bold(
-          "\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
+          '\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
         )
       );
 
@@ -137,7 +137,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
         !settings.outputFormats.every((format) => outputTypes.includes(format))
       ) {
         console.warn(
-          "\n🛑🙊Invalid output format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed!"
+          '\n🛑🙊Invalid output format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed!'
         );
         continue;
       }
@@ -145,8 +145,8 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       console.log(
         chalk.green.italic(
           `\n📝 Output formats: ${settings.outputFormats
-            .map((el) => el + " ✅")
-            .join(" ")}`
+            .map((el) => el + ' ✅')
+            .join(' ')}`
         )
       );
       break;
@@ -159,15 +159,15 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
   while (true) {
     let inputFilePath = await rl.question(
       chalk.blue.bold(
-        "\n 📁 Choose the folder to search for files to convert. ",
-        "\n 🔍 This will recursively search, ie: all subfolders ",
-        "\n 🐭 Right-click to paste. ",
-        "\n ✏️  Input Folder Path: "
+        '\n 📁 Choose the folder to search for files to convert. ',
+        '\n 🔍 This will recursively search, ie: all subfolders ',
+        '\n 🐭 Right-click to paste. ',
+        '\n ✏️  Input Folder Path: '
       )
     );
 
     if (!existsSync(inputFilePath)) {
-      console.warn("\n⚠️  File Path does not exist! 🤣😊😂");
+      console.warn('\n⚠️  File Path does not exist! 🤣😊😂');
       continue;
     }
 
@@ -183,18 +183,18 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
   while (true) {
     let outputFilePath = await rl.question(
       chalk.blue.bold(
-        "\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input files 📂:"
+        '\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input files 📂:'
       )
     );
 
-    if (outputFilePath === "") outputFilePath = settings.inputFilePath;
+    if (outputFilePath === '') outputFilePath = settings.inputFilePath;
 
     if (!existsSync(outputFilePath)) {
-      console.warn("\n⚠️ File Path does not exist! 👨‍🏭 Creating folder... 🚧");
+      console.warn('\n⚠️ File Path does not exist! 👨‍🏭 Creating folder... 🚧');
       try {
         mkdirSync(outputFilePath, { recursive: true });
       } catch {
-        console.error("Failed to make folder at:", outputFilePath);
+        console.error('Failed to make folder at:', outputFilePath);
         continue;
       }
     }
@@ -209,7 +209,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
   while (true) {
     const inputFormatString = await rl.question(
       chalk.blue.bold(
-        "\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
+        '\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
       )
     );
 
@@ -225,7 +225,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       !settings.inputFormats.every((format) => inputTypes.includes(format))
     ) {
       console.warn(
-        "\n🛑🙊Invalid input format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed"
+        '\n🛑🙊Invalid input format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed'
       );
       continue;
     }
@@ -233,8 +233,8 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     console.log(
       chalk.green.italic(
         `\n📝 Input formats: ${settings.inputFormats
-          .map((el) => el + "✅ ")
-          .join("")}`
+          .map((el) => el + '✅ ')
+          .join('')}`
       )
     );
     break;
@@ -244,7 +244,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
   while (true) {
     const outputFormatString = await rl.question(
       chalk.blue.bold(
-        "\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): "
+        '\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
       )
     );
 
@@ -253,15 +253,19 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
           .toLowerCase()
           .split(/\s*,\s*|\s+/)
           .map((format: string) => format.trim())
-          .filter((format: string): format is AudioFormat => outputTypes.includes(format as AudioFormat))
+          .filter((format: string): format is AudioFormat =>
+            outputTypes.includes(format as AudioFormat)
+          )
       : [...outputTypes];
 
     if (
       settings.outputFormats.length === 0 ||
-      !settings.outputFormats.every((format) => outputTypes.includes(format as AudioFormat))
+      !settings.outputFormats.every((format) =>
+        outputTypes.includes(format as AudioFormat)
+      )
     ) {
       console.warn(
-        "\n🛑🙊Invalid output format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed!"
+        '\n🛑🙊Invalid output format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed!'
       );
       continue;
     }
@@ -269,8 +273,8 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     console.log(
       chalk.green.italic(
         `\n📝 Output formats: ${settings.outputFormats
-          .map((el) => el + " ✅")
-          .join(" ")}`
+          .map((el) => el + ' ✅')
+          .join(' ')}`
       )
     );
     break;

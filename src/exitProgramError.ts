@@ -1,7 +1,7 @@
 class ExitProgramError extends Error {
-  constructor(message: string = "EXIT_PROGRAM") {
+  constructor(message: string = 'EXIT_PROGRAM') {
     super(message);
-    this.name = "ExitProgramError";
+    this.name = 'ExitProgramError';
   }
 }
 

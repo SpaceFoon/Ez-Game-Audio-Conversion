@@ -1,15 +1,15 @@
-const { readdirSync, statSync } = require("fs");
-const { join, extname } = require("path");
-const chalk = require("chalk");
-import type { Settings } from "./types/settings";
+const { readdirSync, statSync } = require('fs');
+const { join, extname } = require('path');
+const chalk = require('chalk');
+import type { Settings } from './types/settings';
 
 //Searches for files that meet criteria
 const searchFiles = (settings: Settings): Promise<string[]> => {
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.inputFilePath;
   //midi can have .mid or .midi extension
-  if (settings.inputFormats.includes("midi" as any)) {
-    fileExtensions.push(".mid");
+  if (settings.inputFormats.includes('midi' as any)) {
+    fileExtensions.push('.mid');
   }
 
   const allFiles: string[] = [];
@@ -17,11 +17,11 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   // If we're in single file mode, just return the single file
   if (settings.singleFileMode && settings.singleFilePath) {
     const fileExtension = extname(settings.singleFilePath).toLowerCase();
-    console.log("File extension:", fileExtension);
+    console.log('File extension:', fileExtension);
 
     allFiles.push(settings.singleFilePath);
-    console.log(chalk.whiteBright.bold("\n🔍 Processing single file:\n"));
-    console.log(chalk.white(" 🎶 ", settings.singleFilePath));
+    console.log(chalk.whiteBright.bold('\n🔍 Processing single file:\n'));
+    console.log(chalk.white(' 🎶 ', settings.singleFilePath));
     return Promise.resolve(allFiles);
   }
 
@@ -47,10 +47,10 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
 
   walk(searchPath);
   console.log(
-    chalk.whiteBright.bold("\n🔍 Matched", allFiles.length, "Input Files:\n")
+    chalk.whiteBright.bold('\n🔍 Matched', allFiles.length, 'Input Files:\n')
   );
   allFiles.forEach((inputFile) => {
-    console.log(chalk.white(" 🎶 ", inputFile));
+    console.log(chalk.white(' 🎶 ', inputFile));
   });
 
   return Promise.resolve(allFiles);

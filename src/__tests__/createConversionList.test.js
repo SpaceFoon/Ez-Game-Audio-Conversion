@@ -1,12 +1,12 @@
-const fs = require("fs");
-const chalk = require("chalk");
-const { getAnswer, settings } = require("../utils");
-const ExitProgramError = require("../exitProgramError");
+const fs = require('fs');
+// const chalk = require('chalk'); // Unused, mock handles this
+const { getAnswer, settings } = require('../utils');
+const ExitProgramError = require('../exitProgramError');
 
-jest.mock("fs");
-jest.mock("chalk", () => {
-  const makeFn = (impl = (a) => (Array.isArray(a) ? a.join(" ") : a)) => {
-    const fn = jest.fn((...args) => args.join(" "));
+jest.mock('fs');
+jest.mock('chalk', () => {
+  const makeFn = (_impl = (a) => (Array.isArray(a) ? a.join(' ') : a)) => {
+    const fn = jest.fn((...args) => args.join(' '));
     // allow chaining like chalk.green.italic
     fn.italic = jest.fn((a) => a);
     fn.bold = jest.fn((a) => a);
@@ -14,11 +14,11 @@ jest.mock("chalk", () => {
   };
 
   return {
-    blue: { bold: jest.fn((...a) => a.join(" ")) },
-    blueBright: jest.fn((...a) => a.join(" ")),
+    blue: { bold: jest.fn((...a) => a.join(' ')) },
+    blueBright: jest.fn((...a) => a.join(' ')),
     green: makeFn(),
-    cyanBright: jest.fn((...a) => a.join(" ")),
-    cyan: jest.fn((...a) => a.join(" ")),
+    cyanBright: jest.fn((...a) => a.join(' ')),
+    cyan: jest.fn((...a) => a.join(' ')),
     redBright: { bold: jest.fn((a) => a) },
     red: Object.assign(
       jest.fn((a) => a),
@@ -27,90 +27,90 @@ jest.mock("chalk", () => {
     yellow: jest.fn((a) => a),
   };
 });
-jest.mock("../utils", () => ({
+jest.mock('../utils', () => ({
   getAnswer: jest.fn(),
   settings: {},
   handleExit: jest.fn(),
 }));
 
-const createConversionList = require("../createConversionList");
+const createConversionList = require('../createConversionList');
 
-describe("createConversionList", () => {
+describe('createConversionList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    require("../utils").handleExit.mockClear();
-    settings.inputFilePath = "/input";
-    settings.outputFilePath = "/output";
-    settings.outputFormats = ["mp3", "ogg"];
-    settings.oggCodec = "vorbis";
+    require('../utils').handleExit.mockClear();
+    settings.inputFilePath = '/input';
+    settings.outputFilePath = '/output';
+    settings.outputFormats = ['mp3', 'ogg'];
+    settings.oggCodec = 'vorbis';
   });
-  it("creates conversion list for unique files", async () => {
+  it('creates conversion list for unique files', async () => {
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
-    getAnswer.mockResolvedValue("yes");
-    const files = ["/input/file1.wav", "/input/file2.wav"];
+    getAnswer.mockResolvedValue('yes');
+    const files = ['/input/file1.wav', '/input/file2.wav'];
     const result = await createConversionList(files);
     expect(result.length).toBeGreaterThan(0);
   });
-  it("handles duplicate output file and renames", async () => {
-    fs.existsSync.mockImplementation((path) => path.includes("file1.mp3"));
+  it('handles duplicate output file and renames', async () => {
+    fs.existsSync.mockImplementation((path) => path.includes('file1.mp3'));
     fs.mkdirSync.mockImplementation(() => {});
     getAnswer
-      .mockResolvedValueOnce("yes")
-      .mockResolvedValueOnce("r")
-      .mockResolvedValue("yes");
-    const files = ["/input/file1.wav", "/input/file2.wav"];
+      .mockResolvedValueOnce('yes')
+      .mockResolvedValueOnce('r')
+      .mockResolvedValue('yes');
+    const files = ['/input/file1.wav', '/input/file2.wav'];
     const result = await createConversionList(files);
-    expect(result.some((x) => x.outputFile.includes("-copy"))).toBe(true);
+    expect(result.some((x) => x.outputFile.includes('-copy'))).toBe(true);
   });
-  it("prompts for ogg codec and handles invalid then valid input", async () => {
+  it('prompts for ogg codec and handles invalid then valid input', async () => {
     settings.oggCodec = undefined;
     getAnswer
-      .mockResolvedValueOnce("invalid")
-      .mockResolvedValueOnce("") // fallback to vorbis
-      .mockResolvedValue("yes");
+      .mockResolvedValueOnce('invalid')
+      .mockResolvedValueOnce('') // fallback to vorbis
+      .mockResolvedValue('yes');
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
-    const files = ["/input/file1.wav"];
+    const files = ['/input/file1.wav'];
     const result = await createConversionList(files);
-    expect(settings.oggCodec).toBe("vorbis");
+    expect(settings.oggCodec).toBe('vorbis');
     expect(result.length).toBe(2); // mp3 and ogg
   });
-  it("skips conversion to same file type when user says no", async () => {
-    settings.inputFilePath = "/input";
-    settings.outputFilePath = "/input";
-    getAnswer.mockResolvedValueOnce("no").mockResolvedValue("yes");
+  it('skips conversion to same file type when user says no', async () => {
+    settings.inputFilePath = '/input';
+    settings.outputFilePath = '/input';
+    getAnswer.mockResolvedValueOnce('no').mockResolvedValue('yes');
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
-    const files = ["/input/file1.mp3"];
-    const handleExit = require("../utils").handleExit;
+    const files = ['/input/file1.mp3'];
+    const handleExit = require('../utils').handleExit;
     await createConversionList(files);
     expect(handleExit).toHaveBeenCalledWith(0);
   });
-  it("cancels conversion if user says no at final prompt", async () => {
+  it('cancels conversion if user says no at final prompt', async () => {
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
-    settings.outputFormats = ["mp3"]; // ensure only one prompt occurs at the end
+    settings.outputFormats = ['mp3']; // ensure only one prompt occurs at the end
 
     // Final confirmation should receive "no"
-    getAnswer.mockResolvedValueOnce("no");
+    getAnswer.mockResolvedValueOnce('no');
 
-    const files = ["/input/file1.wav"];
-    const handleExit = require("../utils").handleExit;
+    const files = ['/input/file1.wav'];
+    const handleExit = require('../utils').handleExit;
 
     await createConversionList(files);
 
     expect(handleExit).toHaveBeenCalledWith(0);
   });
-  it("handles directory creation error", async () => {
+  it('handles directory creation error', async () => {
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {
-      throw new Error("mkdir error");
+      throw new Error('mkdir error');
     });
-    getAnswer.mockResolvedValue("yes");
-    const files = ["/input/file1.wav"];
-    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
-    const handleExit = require("../utils").handleExit;
+    getAnswer.mockResolvedValue('yes');
+    const files = ['/input/file1.wav'];
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const handleExit = require('../utils').handleExit;
     try {
       await createConversionList(files);
     } catch (e) {
@@ -120,14 +120,14 @@ describe("createConversionList", () => {
     expect(handleExit).toHaveBeenCalledWith(1);
     errorSpy.mockRestore();
   });
-  it("filters out skipped files from the final list", async () => {
+  it('filters out skipped files from the final list', async () => {
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
-    getAnswer.mockResolvedValueOnce("no").mockResolvedValueOnce("yes");
-    settings.inputFilePath = "/input";
-    settings.outputFilePath = "/input";
-    const files = ["/input/file1.mp3"];
-    const handleExit = require("../utils").handleExit;
+    getAnswer.mockResolvedValueOnce('no').mockResolvedValueOnce('yes');
+    settings.inputFilePath = '/input';
+    settings.outputFilePath = '/input';
+    const files = ['/input/file1.mp3'];
+    const handleExit = require('../utils').handleExit;
     try {
       await createConversionList(files);
     } catch (e) {

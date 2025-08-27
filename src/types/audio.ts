@@ -1,6 +1,6 @@
-export type AudioFormat = "flac" | "aiff" | "wav" | "mp3" | "m4a" | "ogg";
+export type AudioFormat = 'flac' | 'aiff' | 'wav' | 'mp3' | 'm4a' | 'ogg';
 
-export type OggCodec = "vorbis" | "opus" | null;
+export type OggCodec = 'vorbis' | 'opus' | null;
 
 export interface AudioFile {
   inputFile: string;

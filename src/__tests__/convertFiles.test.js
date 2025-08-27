@@ -1,25 +1,25 @@
 // src/__tests__/convertFiles.test.js
-const { Worker } = require("worker_threads");
-const { convertFiles } = require("../../src/convertFiles");
-const { performance } = require("perf_hooks");
-const events = require("events");
+const { Worker } = require('worker_threads');
+const { convertFiles } = require('../../src/convertFiles');
+// const { performance } = require('perf_hooks'); // Unused, commented out
+const events = require('events');
 events.defaultMaxListeners = 20;
 
 // Remove fake timers - they're causing the tests to hang
 // jest.useFakeTimers();
 
 // Mock dependencies
-jest.mock("perf_hooks", () => ({
+jest.mock('perf_hooks', () => ({
   performance: {
     now: jest.fn().mockReturnValue(1000),
   },
 }));
 
-jest.mock("worker_threads", () => ({
+jest.mock('worker_threads', () => ({
   Worker: jest.fn(),
 }));
 
-jest.mock("chalk", () => ({
+jest.mock('chalk', () => ({
   cyanBright: jest.fn((text) => text),
   greenBright: jest.fn((text) => text),
   bgRed: jest.fn((text) => text),
@@ -29,17 +29,17 @@ jest.mock("chalk", () => ({
 const createUtilsMock = (overrides = {}) => ({
   isFileBusy: jest.fn(),
   addToLog: jest.fn(),
-  settings: { oggCodec: "vorbis" },
+  settings: { oggCodec: 'vorbis' },
   checkDiskSpace: jest.fn(),
   initializeFileNames: jest.fn(),
   rl: { question: jest.fn((question, callback) => callback()) },
   ...overrides,
 });
 
-jest.mock("../../src/utils", () => createUtilsMock());
+jest.mock('../../src/utils', () => createUtilsMock());
 
 // Mock os module
-jest.mock("os", () => ({
+jest.mock('os', () => ({
   cpus: jest.fn().mockReturnValue([{}, {}, {}, {}]), // Mock 4 CPUs
 }));
 
@@ -50,11 +50,11 @@ const withTimeout = (promise, timeoutMs, errorMessage) => {
   const timeoutPromise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
       console.error(
-        `TIMEOUT: ${errorMessage || "Test took too long to complete"}`
+        `TIMEOUT: ${errorMessage || 'Test took too long to complete'}`
       );
       reject(
         new Error(
-          `TIMEOUT: ${errorMessage || "Test took too long to complete"}`
+          `TIMEOUT: ${errorMessage || 'Test took too long to complete'}`
         )
       );
     }, timeoutMs);
@@ -65,7 +65,7 @@ const withTimeout = (promise, timeoutMs, errorMessage) => {
   });
 };
 
-describe("convertFiles", () => {
+describe('convertFiles', () => {
   // Save original console methods
   const originalConsole = {
     log: console.log,
@@ -98,7 +98,7 @@ describe("convertFiles", () => {
       files.push({
         inputFile: `C:/Music/testfile${i}.mp3`,
         outputFile: `C:/Music/testfile${i}.ogg`,
-        outputFormat: "ogg",
+        outputFormat: 'ogg',
       });
     }
     return files;
@@ -126,23 +126,23 @@ describe("convertFiles", () => {
         }
 
         // Synchronously trigger events for test cleanliness
-        if (event === "message" && handlers.message) {
+        if (event === 'message' && handlers.message) {
           if (triggerStderr) {
             const errorMessage = noSpaceLeft
-              ? "no space left on device"
-              : "Some error from ffmpeg";
+              ? 'no space left on device'
+              : 'Some error from ffmpeg';
             handlers.message({
-              type: "stderr",
+              type: 'stderr',
               data: errorMessage,
             });
             return worker;
           }
-          handlers.message({ type: "code", data: exitCode });
+          handlers.message({ type: 'code', data: exitCode });
         }
-        if (event === "error" && handlers.error && triggerError) {
-          handlers.error(new Error("Worker thread error"));
+        if (event === 'error' && handlers.error && triggerError) {
+          handlers.error(new Error('Worker thread error'));
         }
-        if (event === "exit" && handlers.exit) {
+        if (event === 'exit' && handlers.exit) {
           handlers.exit(exitCode);
         }
         return worker;
@@ -154,7 +154,7 @@ describe("convertFiles", () => {
     return worker;
   }
 
-  it("should process files successfully", async () => {
+  it('should process files successfully', async () => {
     // Create a simple mock worker that auto-completes successfully
     console.log("Starting 'should process files successfully' test");
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
@@ -171,7 +171,7 @@ describe("convertFiles", () => {
     expect(result.successfulFiles.length).toBeGreaterThan(0);
   }, 30000);
 
-  it("should handle failed conversions (non-zero exit code)", async () => {
+  it('should handle failed conversions (non-zero exit code)', async () => {
     // Create a worker that exits with non-zero code
     console.log("Starting 'should handle failed conversions' test");
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 1 }));
@@ -189,7 +189,7 @@ describe("convertFiles", () => {
     expect(console.error).toHaveBeenCalled();
   }, 30000);
 
-  it("should handle worker errors", async () => {
+  it('should handle worker errors', async () => {
     // Mock a worker that triggers an error
     console.log("Starting 'should handle worker errors' test");
 
@@ -199,8 +199,8 @@ describe("convertFiles", () => {
       const worker = {
         on: jest.fn((event, handler) => {
           handlers[event] = handler;
-          if (event === "error") {
-            handler(new Error("Worker thread error"));
+          if (event === 'error') {
+            handler(new Error('Worker thread error'));
           }
           return worker;
         }),
@@ -216,13 +216,13 @@ describe("convertFiles", () => {
     console.log("Test 'should handle worker errors' completed");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("Worker had an error"),
+      expect.stringContaining('Worker had an error'),
       expect.any(String),
       expect.any(String)
     );
   }, 30000);
 
-  it("should handle stderr messages from workers", async () => {
+  it('should handle stderr messages from workers', async () => {
     // Mock a worker that sends stderr messages
     console.log("Starting 'should handle stderr messages from workers' test");
 
@@ -240,14 +240,14 @@ describe("convertFiles", () => {
     console.log("Test 'should handle stderr messages from workers' completed");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("ERROR MESSAGE FROM FFMPEG"),
+      expect.stringContaining('ERROR MESSAGE FROM FFMPEG'),
       expect.any(String),
       expect.any(String),
       expect.any(String)
     );
   }, 30000);
 
-  it("should detect disk space errors and exit the process", async () => {
+  it('should detect disk space errors and exit the process', async () => {
     // Mock a worker that sends a 'no space left' error
     console.log("Starting 'should detect disk space errors' test");
 
@@ -270,14 +270,14 @@ describe("convertFiles", () => {
     console.log("Test 'should detect disk space errors' completed");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("Stopping due to insufficient disk space")
+      expect.stringContaining('Stopping due to insufficient disk space')
     );
 
     // Restore process.exit
     process.exit = originalExit;
   }, 30000);
 
-  it("should handle multiple workers and files properly", async () => {
+  it('should handle multiple workers and files properly', async () => {
     // Create a mix of successful and failing workers
     console.log(
       "Starting 'should handle multiple workers and files properly' test"
@@ -306,12 +306,12 @@ describe("convertFiles", () => {
   }, 30000);
 
   // Test for CPU count fallback
-  it("should handle CPU detection failure", async () => {
+  it('should handle CPU detection failure', async () => {
     // Mock os.cpus to throw an error
     console.log("Starting 'should handle CPU detection failure' test");
 
-    require("os").cpus.mockImplementationOnce(() => {
-      throw new Error("CPU detection failed");
+    require('os').cpus.mockImplementationOnce(() => {
+      throw new Error('CPU detection failed');
     });
 
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
@@ -325,16 +325,16 @@ describe("convertFiles", () => {
 
     // Update to match the actual format of the warning
     expect(console.warn).toHaveBeenCalledWith(
-      "🚨🚨⛔ Could not detect amount of CPU cores!!! Setting to 8 ⛔🚨🚨"
+      '🚨🚨⛔ Could not detect amount of CPU cores!!! Setting to 8 ⛔🚨🚨'
     );
     expect(result.failedFiles).toHaveLength(0);
   }, 30000);
 
-  it("should limit concurrent workers based on CPU count and file count", async () => {
+  it('should limit concurrent workers based on CPU count and file count', async () => {
     // Set up 10 CPUs but only 2 files
     console.log("Starting 'should limit concurrent workers' test");
 
-    require("os").cpus.mockReturnValueOnce(Array(10).fill({}));
+    require('os').cpus.mockReturnValueOnce(Array(10).fill({}));
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
 
     await withTimeout(
@@ -347,14 +347,14 @@ describe("convertFiles", () => {
     expect(Worker).toHaveBeenCalledTimes(2); // Should create only 2 workers
   }, 30000);
 
-  it("should properly handle worker creation errors", async () => {
+  it('should properly handle worker creation errors', async () => {
     // Mock Worker constructor to throw an error
     console.log(
       "Starting 'should properly handle worker creation errors' test"
     );
 
     Worker.mockImplementationOnce(() => {
-      throw new Error("Failed to create worker");
+      throw new Error('Failed to create worker');
     });
 
     // Should not throw but log the error
@@ -368,12 +368,12 @@ describe("convertFiles", () => {
     );
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("Error creating worker"),
+      expect.stringContaining('Error creating worker'),
       expect.any(Object)
     );
   }, 30000);
 
-  it("should handle an empty file list", async () => {
+  it('should handle an empty file list', async () => {
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
     const result = await withTimeout(
       convertFiles([]),
@@ -384,7 +384,7 @@ describe("convertFiles", () => {
     expect(result.successfulFiles).toHaveLength(0);
   });
 
-  it("should handle file with missing properties gracefully", async () => {
+  it('should handle file with missing properties gracefully', async () => {
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
     const files = [
       { inputFile: undefined, outputFile: undefined, outputFormat: undefined },
@@ -397,7 +397,7 @@ describe("convertFiles", () => {
     expect(result.failedFiles.length + result.successfulFiles.length).toBe(1);
   });
 
-  it("should put all files in failedFiles if all workers fail", async () => {
+  it('should put all files in failedFiles if all workers fail', async () => {
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 1 }));
     const files = createTestFiles(3);
     const result = await withTimeout(

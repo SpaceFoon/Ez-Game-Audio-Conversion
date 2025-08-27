@@ -1,8 +1,8 @@
-const { existsSync, mkdirSync } = require("fs");
-const { join, basename, extname, dirname } = require("path");
-const chalk = require("chalk");
-const { getAnswer, settings, handleExit } = require("./utils");
-import type { AudioFormat, ConversionItem } from "./types/audio";
+const { existsSync, mkdirSync } = require('fs');
+const { join, basename, extname, dirname } = require('path');
+const chalk = require('chalk');
+const { getAnswer, settings, handleExit } = require('./utils');
+import type { AudioFormat, ConversionItem } from './types/audio';
 
 // Get a unique output file name
 const getOutputFileCopy = async (
@@ -39,18 +39,18 @@ const askOggCodec = async (): Promise<string> => {
   //Choose codec for OGG
   const userResponse = await getAnswer(
     chalk.blue.bold(
-      "\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?",
-      "\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮 🚗",
-      "\n\n💡 If you are unsure, leave blank for Vorbis: "
+      '\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?',
+      '\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮 🚗',
+      '\n\n💡 If you are unsure, leave blank for Vorbis: '
     )
   );
 
   // Process the user input
   const input = userResponse.trim().toLowerCase();
 
-  if (input === "") return "vorbis";
-  if (input !== "vorbis" && input !== "opus") {
-    console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
+  if (input === '') return 'vorbis';
+  if (input !== 'vorbis' && input !== 'opus') {
+    console.warn('\n⚠️ Did not enter Vorbis or Opus! 😧😓😯');
     return await askOggCodec(); // Keep asking until a valid input is provided
   }
 
@@ -61,7 +61,9 @@ const askOggCodec = async (): Promise<string> => {
 };
 
 //Create final list of output files to convert
-const createConversionList = async (files: string[]): Promise<ConversionItem[]> => {
+const createConversionList = async (
+  files: string[]
+): Promise<ConversionItem[]> => {
   let {
     inputFilePath,
     outputFilePath,
@@ -78,25 +80,25 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
 
   // Ensure we have the ogg codec set
   if (!settings.oggCodec) {
-    settings.oggCodec = "vorbis";
+    settings.oggCodec = 'vorbis';
   }
 
   // Debug information
-  console.log(chalk.blueBright("\n📝 Conversion parameters:"));
+  console.log(chalk.blueBright('\n📝 Conversion parameters:'));
   console.log(chalk.blueBright(`  Files to process: ${files.length}`));
   console.log(
-    chalk.blueBright(`  Single file mode: ${singleFileMode ? "Yes" : "No"}`)
+    chalk.blueBright(`  Single file mode: ${singleFileMode ? 'Yes' : 'No'}`)
   );
   console.log(chalk.blueBright(`  Input path: ${inputFilePath}`));
   console.log(chalk.blueBright(`  Output path: ${outputFilePath}`));
   console.log(
-    chalk.blueBright(`  Output formats: ${outputFormats.join(", ")}`)
+    chalk.blueBright(`  Output formats: ${outputFormats.join(', ')}`)
   );
 
   // Validate we have files to process
   if (!files.length) {
     console.error(
-      chalk.redBright("\n❌ Error: No input files found to process.")
+      chalk.redBright('\n❌ Error: No input files found to process.')
     );
     handleExit(1);
   }
@@ -109,7 +111,7 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
       console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
 
       let outputFile: string;
-      if (outputFormats.includes("ogg") && !oggCodec) {
+      if (outputFormats.includes('ogg') && !oggCodec) {
         oggCodec = await askOggCodec();
       }
 
@@ -127,7 +129,7 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
             `❌ Error calculating relative path: ${error instanceof Error ? error.message : String(error)}`
           )
         );
-        relativePath = "";
+        relativePath = '';
       }
 
       if (inputFilePath !== outputFilePath) {
@@ -169,15 +171,18 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
         );
 
         while (true) {
-          if (convertSelf === "" || (convertSelf && /^no$/i.test(convertSelf))) {
-            console.log("\n 🚫 Not converting files to own type! 🚫 \n");
-            convertSelf = "no";
+          if (
+            convertSelf === '' ||
+            (convertSelf && /^no$/i.test(convertSelf))
+          ) {
+            console.log('\n 🚫 Not converting files to own type! 🚫 \n');
+            convertSelf = 'no';
             outputFile = `${outputFile} "Skipped! ⏭️!"`;
             break;
           }
           if (convertSelf && /^yes$/i.test(convertSelf)) {
-            convertSelf = "yes";
-            console.log("\n 🔀 Converting files to own type! ✔");
+            convertSelf = 'yes';
+            console.log('\n 🔀 Converting files to own type! ✔');
             //Rename. Never overwrite input file.
             outputFile = await getOutputFileCopy(
               inputFile,
@@ -192,9 +197,9 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
             )
           );
           if (
-            convertSelf !== "" &&
-            convertSelf !== "yes" &&
-            convertSelf !== "no"
+            convertSelf !== '' &&
+            convertSelf !== 'yes' &&
+            convertSelf !== 'no'
           ) {
             console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
           }
@@ -238,19 +243,19 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
 
       // Handle file exists responses
       switch (response) {
-        case "":
-          console.error("response was empty:", response);
+        case '':
+          console.error('response was empty:', response);
           break;
-        case "ra":
-          await responseActions["ra"]();
+        case 'ra':
+          await responseActions['ra']();
           break;
-        case "sa":
-          await responseActions["sa"]();
+        case 'sa':
+          await responseActions['sa']();
           break;
-        case "oa":
+        case 'oa':
           console.log(
-            chalk.red("🔺🚩OVERWRITE FILE🚩"),
-            chalk.yellow(outputFile, " 🔺")
+            chalk.red('🔺🚩OVERWRITE FILE🚩'),
+            chalk.yellow(outputFile, ' 🔺')
           );
           break;
         default:
@@ -266,14 +271,14 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
                     `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
                   )
                 );
-                response = response ? response.trim().toLowerCase() : "";
+                response = response ? response.trim().toLowerCase() : '';
 
                 if (response && responseActions[response]) {
                   await responseActions[response]();
                   break;
                 } else {
                   response = null;
-                  console.warn("\n⚠️ Invalid selection! Try again ⚠️");
+                  console.warn('\n⚠️ Invalid selection! Try again ⚠️');
                 }
               } else {
                 break;
@@ -323,17 +328,17 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
 
     console.log(
       chalk.cyanBright(
-        "\n🔄 Pending Conversion 🔄",
+        '\n🔄 Pending Conversion 🔄',
         numbered.length,
-        "Output Files \n\n",
-        numbered.join("\n")
+        'Output Files \n\n',
+        numbered.join('\n')
       )
     );
 
     // No files to convert
     if (numbered.length === 0) {
       console.log(
-        chalk.yellow("\n⚠️ No files to convert after filtering! Exiting.")
+        chalk.yellow('\n⚠️ No files to convert after filtering! Exiting.')
       );
       handleExit(0);
     }
@@ -346,7 +351,7 @@ const createConversionList = async (files: string[]): Promise<ConversionItem[]> 
     );
 
     if (/^no$/i.test(accept_answer)) {
-      console.log("\n🚫 Conversion cancelled. Exiting program 🚫");
+      console.log('\n🚫 Conversion cancelled. Exiting program 🚫');
       handleExit(0);
     } else if (!/^yes$/i.test(accept_answer)) {
       console.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');

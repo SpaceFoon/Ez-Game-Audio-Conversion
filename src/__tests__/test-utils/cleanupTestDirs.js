@@ -5,19 +5,19 @@
  * after tests have been run. It can be run manually or on a schedule.
  */
 
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
 // Add directories to clean up here
 const TEST_DIRECTORIES = [
-  path.join(__dirname, "..", "test-assets"),
-  path.join(process.cwd(), "format-test"),
-  path.join(process.cwd(), "loop-test"),
-  path.join(process.cwd(), "test-audio"),
-  path.join(process.cwd(), "tag-test"),
-  path.join(process.cwd(), "direct-test"),
-  path.join(process.cwd(), "test-samplerates"),
-  path.join(process.cwd(), "final-test"),
+  path.join(__dirname, '..', 'test-assets'),
+  path.join(process.cwd(), 'format-test'),
+  path.join(process.cwd(), 'loop-test'),
+  path.join(process.cwd(), 'test-audio'),
+  path.join(process.cwd(), 'tag-test'),
+  path.join(process.cwd(), 'direct-test'),
+  path.join(process.cwd(), 'test-samplerates'),
+  path.join(process.cwd(), 'final-test'),
 ];
 
 /**
@@ -93,7 +93,7 @@ function cleanupDirectory(dirPath) {
  * @returns {number} - Number of directories successfully cleaned
  */
 function cleanupAllDirectories() {
-  console.log("Starting test directory cleanup...");
+  console.log('Starting test directory cleanup...');
 
   let successCount = 0;
   let failCount = 0;

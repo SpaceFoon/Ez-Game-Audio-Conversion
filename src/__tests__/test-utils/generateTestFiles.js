@@ -5,18 +5,19 @@
  * and loop points for use in tests.
  */
 
-const fs = require("fs");
-const path = require("path");
-const { execSync, spawnSync } = require("child_process");
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+// const { execSync, spawnSync } = require('child_process'); // spawnSync unused
 
 /**
  * Find ffmpeg executable (cross-platform)
  * @returns {Object} - Paths to ffmpeg and ffprobe
  */
 function findFfmpegExecutables() {
-  const isWindows = process.platform === "win32";
-  const ffmpegExe = isWindows ? "ffmpeg.exe" : "ffmpeg";
-  const ffprobeExe = isWindows ? "ffprobe.exe" : "ffprobe";
+  const isWindows = process.platform === 'win32';
+  const ffmpegExe = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
+  const ffprobeExe = isWindows ? 'ffprobe.exe' : 'ffprobe';
 
   let ffmpegPath = ffmpegExe;
   let ffprobePath = ffprobeExe;
@@ -27,9 +28,9 @@ function findFfmpegExecutables() {
     ffprobePath = path.join(process.cwd(), ffprobeExe);
   }
   // Look in bin directory
-  else if (fs.existsSync(path.join(process.cwd(), "bin", ffmpegExe))) {
-    ffmpegPath = path.join(process.cwd(), "bin", ffmpegExe);
-    ffprobePath = path.join(process.cwd(), "bin", ffprobeExe);
+  else if (fs.existsSync(path.join(process.cwd(), 'bin', ffmpegExe))) {
+    ffmpegPath = path.join(process.cwd(), 'bin', ffmpegExe);
+    ffprobePath = path.join(process.cwd(), 'bin', ffprobeExe);
   }
 
   return { ffmpegPath, ffprobePath };
@@ -41,8 +42,8 @@ function findFfmpegExecutables() {
  * @returns {Object} - Directory paths
  */
 function createTestDirectories(testDir) {
-  const inputDir = path.join(testDir, "input");
-  const outputDir = path.join(testDir, "output");
+  const inputDir = path.join(testDir, 'input');
+  const outputDir = path.join(testDir, 'output');
 
   if (!fs.existsSync(testDir)) {
     fs.mkdirSync(testDir, { recursive: true });
@@ -89,9 +90,9 @@ function generateTestAudioFiles(inputDir, options = {}) {
     loopLength = 88200, // 2 sec @ 44.1kHz
     duration = 5,
     frequency = 440,
-    title = "Test Audio",
-    artist = "Test Artist",
-    formats = ["wav", "mp3", "ogg", "flac", "m4a"],
+    title = 'Test Audio',
+    artist = 'Test Artist',
+    formats = ['wav', 'mp3', 'ogg', 'flac', 'm4a'],
   } = options;
 
   const { ffmpegPath } = findFfmpegExecutables();
@@ -116,7 +117,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
     generatedFiles.wav = baseWavFile;
 
     // Generate other formats if requested
-    if (formats.includes("ogg")) {
+    if (formats.includes('ogg')) {
       const oggFile = path.join(inputDir, `loop_${sampleRate}.ogg`);
       const oggCmd =
         `"${ffmpegPath}" -y -i "${baseWavFile}" ` +
@@ -135,7 +136,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
     }
 
     // Generate other formats
-    const remainingFormats = formats.filter((f) => f !== "wav" && f !== "ogg");
+    const remainingFormats = formats.filter((f) => f !== 'wav' && f !== 'ogg');
     remainingFormats.forEach((format) => {
       const outputFile = path.join(inputDir, `loop_${sampleRate}.${format}`);
       const cmd =
@@ -156,7 +157,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
       }
     });
   } catch (error) {
-    console.error("Error generating test files:", error.message);
+    console.error('Error generating test files:', error.message);
   }
 
   return generatedFiles;

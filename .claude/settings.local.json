@@ -6,7 +6,13 @@
       "Bash(mv:*)",
       "Bash(npm run dev:*)",
       "Bash(npx ts-node:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx husky init:*)",
+      "Bash(mkdir:*)",
+      "Bash(bash)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run format:*)"
     ],
     "deny": [],
     "ask": []

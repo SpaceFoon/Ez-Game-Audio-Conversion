@@ -1,20 +1,20 @@
-const { existsSync } = require("fs");
-const { execSync } = require("child_process");
+const { existsSync } = require('fs');
+// const { execSync } = require('child_process'); // Unused, mock handles this
 // Mock path.join to return predictable paths
-jest.mock("path", () => ({
-  join: jest.fn((...args) => args.join("/")),
+jest.mock('path', () => ({
+  join: jest.fn((...args) => args.join('/')),
   extname: jest.fn((file) => {
-    const parts = file.split(".");
-    return parts.length > 1 ? `.${parts[parts.length - 1]}` : "";
+    const parts = file.split('.');
+    return parts.length > 1 ? `.${parts[parts.length - 1]}` : '';
   }),
 }));
 
 // Mock the modules needed by metadataService
-jest.mock("fs", () => ({
+jest.mock('fs', () => ({
   existsSync: jest.fn(),
 }));
 
-jest.mock("child_process", () => ({
+jest.mock('child_process', () => ({
   spawnSync: jest.fn(),
   execSync: jest.fn(),
 }));
@@ -27,9 +27,9 @@ const {
   getLoopPoints,
   convertLoopPoints,
   formatLoopData,
-} = require("../../src/metaDataService");
+} = require('../../src/metaDataService');
 
-describe("metadataService", () => {
+describe('metadataService', () => {
   // Save original console methods
   const originalConsole = {
     log: console.log,
@@ -52,7 +52,7 @@ describe("metadataService", () => {
     console.warn = originalConsole.warn;
   });
 
-  describe("getMetaData", () => {
+  describe('getMetaData', () => {
     beforeEach(() => {
       // Reset mocks before each test
       jest.clearAllMocks();
@@ -61,146 +61,146 @@ describe("metadataService", () => {
       existsSync.mockReturnValue(true);
     });
 
-    it("should extract metadata from a file using ffprobe", async () => {
+    it('should extract metadata from a file using ffprobe', async () => {
       // Mock successful ffprobe execution
       const mockMetadata = {
-        streams: [{ codec_type: "audio", channels: 2 }],
-        format: { tags: { title: "Test Song" } },
+        streams: [{ codec_type: 'audio', channels: 2 }],
+        format: { tags: { title: 'Test Song' } },
       };
 
-      const { spawnSync } = require("child_process");
+      const { spawnSync } = require('child_process');
       spawnSync.mockReturnValue({
         stdout: JSON.stringify(mockMetadata),
         error: null,
       });
 
-      const result = await getMetaData("test.mp3");
+      const result = await getMetaData('test.mp3');
 
       expect(result).toEqual(mockMetadata);
       expect(spawnSync).toHaveBeenCalledWith(
-        expect.stringContaining("ffprobe"),
+        expect.stringContaining('ffprobe'),
         expect.any(Array),
-        expect.objectContaining({ encoding: "utf8" })
+        expect.objectContaining({ encoding: 'utf8' })
       );
     });
 
-    it("should handle errors gracefully", async () => {
+    it('should handle errors gracefully', async () => {
       // Mock spawnSync to throw an error
-      const { spawnSync } = require("child_process");
+      const { spawnSync } = require('child_process');
       spawnSync.mockReturnValue({
-        error: new Error("Command failed"),
+        error: new Error('Command failed'),
         stdout: null,
       });
 
-      const result = await getMetaData("test.mp3");
+      const result = await getMetaData('test.mp3');
 
       expect(result).toBeNull();
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("Error running ffprobe.exe"),
+        expect.stringContaining('Error running ffprobe.exe'),
         expect.any(String)
       );
     });
 
-    it("should handle file not found errors", async () => {
+    it('should handle file not found errors', async () => {
       // Mock file doesn't exist
       existsSync.mockReturnValue(false);
 
       // Mock spawnSync to still return something
-      const { spawnSync } = require("child_process");
+      const { spawnSync } = require('child_process');
       spawnSync.mockReturnValue({
         stdout: JSON.stringify({}),
         error: null,
       });
 
-      const result = await getMetaData("nonexistent.mp3");
+      await getMetaData('nonexistent.mp3');
 
       // Function should still work, but with different ffprobe path
       expect(spawnSync).toHaveBeenCalledWith(
-        expect.stringContaining("bin/ffprobe"),
+        expect.stringContaining('bin/ffprobe'),
         expect.any(Array),
-        expect.objectContaining({ encoding: "utf8" })
+        expect.objectContaining({ encoding: 'utf8' })
       );
     });
 
-    it("should handle malformed JSON response", async () => {
+    it('should handle malformed JSON response', async () => {
       // Mock invalid JSON response
-      const { spawnSync } = require("child_process");
+      const { spawnSync } = require('child_process');
       spawnSync.mockReturnValue({
-        stdout: "Not valid JSON",
+        stdout: 'Not valid JSON',
         error: null,
       });
 
-      const result = await getMetaData("test.mp3");
+      const result = await getMetaData('test.mp3');
 
       expect(result).toBeNull();
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("Error running ffprobe.exe"),
+        expect.stringContaining('Error running ffprobe.exe'),
         expect.any(String)
       );
     });
   });
 
-  describe("formatMetaDataField", () => {
-    it("should get metadata field from streamTags", () => {
-      const streamTags = { title: "Test Title" };
+  describe('formatMetaDataField', () => {
+    it('should get metadata field from streamTags', () => {
+      const streamTags = { title: 'Test Title' };
       const formatTags = {};
 
-      const result = formatMetaDataField(streamTags, formatTags, "title");
+      const result = formatMetaDataField(streamTags, formatTags, 'title');
 
-      expect(result).toBe("Test Title");
+      expect(result).toBe('Test Title');
     });
 
-    it("should get metadata field from formatTags if not in streamTags", () => {
-      const streamTags = { title: "Test Title" };
-      const formatTags = { artist: "Test Artist" };
+    it('should get metadata field from formatTags if not in streamTags', () => {
+      const streamTags = { title: 'Test Title' };
+      const formatTags = { artist: 'Test Artist' };
 
-      const result = formatMetaDataField(streamTags, formatTags, "artist");
+      const result = formatMetaDataField(streamTags, formatTags, 'artist');
 
-      expect(result).toBe("Test Artist");
+      expect(result).toBe('Test Artist');
     });
 
-    it("should handle case insensitive searches", () => {
-      const streamTags = { TITLE: "Test Title" };
-      const formatTags = { ARTIST: "Test Artist" };
+    it('should handle case insensitive searches', () => {
+      const streamTags = { TITLE: 'Test Title' };
+      const formatTags = { ARTIST: 'Test Artist' };
 
-      expect(formatMetaDataField(streamTags, formatTags, "title")).toBe(
-        "Test Title"
+      expect(formatMetaDataField(streamTags, formatTags, 'title')).toBe(
+        'Test Title'
       );
-      expect(formatMetaDataField(streamTags, formatTags, "artist")).toBe(
-        "Test Artist"
+      expect(formatMetaDataField(streamTags, formatTags, 'artist')).toBe(
+        'Test Artist'
       );
     });
 
-    it("should return empty string if field not found", () => {
-      const streamTags = { title: "Test Title" };
-      const formatTags = { artist: "Test Artist" };
+    it('should return empty string if field not found', () => {
+      const streamTags = { title: 'Test Title' };
+      const formatTags = { artist: 'Test Artist' };
 
-      const result = formatMetaDataField(streamTags, formatTags, "album");
+      const result = formatMetaDataField(streamTags, formatTags, 'album');
 
-      expect(result).toBe("");
+      expect(result).toBe('');
     });
 
-    it("should handle null/undefined tags", () => {
-      expect(formatMetaDataField(null, null, "title")).toBe("");
-      expect(formatMetaDataField(undefined, undefined, "title")).toBe("");
+    it('should handle null/undefined tags', () => {
+      expect(formatMetaDataField(null, null, 'title')).toBe('');
+      expect(formatMetaDataField(undefined, undefined, 'title')).toBe('');
     });
   });
 
-  describe("formatMetaData", () => {
-    it("should format metadata correctly", () => {
+  describe('formatMetaData', () => {
+    it('should format metadata correctly', () => {
       const metadata = {
         streams: [
           {
             tags: {
-              title: "Test Title",
-              artist: "Test Artist",
+              title: 'Test Title',
+              artist: 'Test Artist',
             },
             channels: 2,
           },
         ],
         format: {
           tags: {
-            album: "Test Album",
+            album: 'Test Album',
           },
         },
       };
@@ -210,16 +210,16 @@ describe("metadataService", () => {
       expect(metaData).toContain('-metadata title="Test Title"');
       expect(metaData).toContain('-metadata artist="Test Artist"');
       expect(metaData).toContain('-metadata album="Test Album"');
-      expect(channels).toBe(" -ac 2");
+      expect(channels).toBe(' -ac 2');
     });
 
-    it("should handle special characters in metadata", () => {
+    it('should handle special characters in metadata', () => {
       const metadata = {
         streams: [
           {
             tags: {
               title: 'Test "Title" with \\ backslash',
-              artist: "Artist\nWith\nNewlines",
+              artist: 'Artist\nWith\nNewlines',
             },
             channels: 2,
           },
@@ -236,18 +236,18 @@ describe("metadataService", () => {
       expect(metaData).toContain('-metadata artist="Artist\\nWith\\nNewlines"');
     });
 
-    it("should handle null/empty metadata", () => {
+    it('should handle null/empty metadata', () => {
       const result = formatMetaData(null);
-      expect(result.metaData).toBe("");
-      expect(result.channels).toBe(" -ac 2");
+      expect(result.metaData).toBe('');
+      expect(result.channels).toBe(' -ac 2');
     });
 
-    it("should normalize track to trackNumber", () => {
+    it('should normalize track to trackNumber', () => {
       const metadata = {
         streams: [
           {
             tags: {
-              track: "5",
+              track: '5',
             },
           },
         ],
@@ -260,13 +260,13 @@ describe("metadataService", () => {
     });
   });
 
-  describe("getLoopPoints", () => {
-    it("should extract loop points from metadata format tags", () => {
+  describe('getLoopPoints', () => {
+    it('should extract loop points from metadata format tags', () => {
       const metadata = {
         format: {
           tags: {
-            LOOPSTART: "1000",
-            LOOPLENGTH: "5000",
+            LOOPSTART: '1000',
+            LOOPLENGTH: '5000',
           },
         },
       };
@@ -276,13 +276,13 @@ describe("metadataService", () => {
       expect(loopLength).toBe(5000);
     });
 
-    it("should extract loop points from metadata stream tags", () => {
+    it('should extract loop points from metadata stream tags', () => {
       const metadata = {
         streams: [
           {
             tags: {
-              LOOPSTART: "1000",
-              LOOPLENGTH: "5000",
+              LOOPSTART: '1000',
+              LOOPLENGTH: '5000',
             },
           },
         ],
@@ -293,12 +293,12 @@ describe("metadataService", () => {
       expect(loopLength).toBe(5000);
     });
 
-    it("should handle alternative tag formats", () => {
+    it('should handle alternative tag formats', () => {
       const metadata = {
         format: {
           tags: {
-            LOOP_START: "1000",
-            LOOP_LENGTH: "5000",
+            LOOP_START: '1000',
+            LOOP_LENGTH: '5000',
           },
         },
       };
@@ -308,12 +308,12 @@ describe("metadataService", () => {
       expect(loopLength).toBe(5000);
     });
 
-    it("should handle iTunes metadata tags", () => {
+    it('should handle iTunes metadata tags', () => {
       const metadata = {
         format: {
           tags: {
-            iTunes_LOOPSTART: "1000",
-            iTunes_LOOPLENGTH: "5000",
+            iTunes_LOOPSTART: '1000',
+            iTunes_LOOPLENGTH: '5000',
           },
         },
       };
@@ -323,11 +323,11 @@ describe("metadataService", () => {
       expect(loopLength).toBe(5000);
     });
 
-    it("should return null if loop points not found", () => {
+    it('should return null if loop points not found', () => {
       const metadata = {
         format: {
           tags: {
-            ARTIST: "Test",
+            ARTIST: 'Test',
           },
         },
       };
@@ -338,21 +338,21 @@ describe("metadataService", () => {
     });
   });
 
-  describe("convertLoopPoints", () => {
-    it("should adjust loop points for opus format", () => {
+  describe('convertLoopPoints', () => {
+    it('should adjust loop points for opus format', () => {
       const metadata = {
         streams: [
           {
-            sample_rate: "44100",
+            sample_rate: '44100',
             tags: {
-              LOOPSTART: "1000",
-              LOOPLENGTH: "5000",
+              LOOPSTART: '1000',
+              LOOPLENGTH: '5000',
             },
           },
         ],
       };
 
-      const result = convertLoopPoints(metadata, "ogg", "opus");
+      const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
       // For 44.1kHz -> 48kHz conversion
       expect(result.newSampleRate).toBe(48000);
@@ -360,52 +360,52 @@ describe("metadataService", () => {
       expect(result.loopLength).toBeGreaterThan(5000); // Should be scaled up
     });
 
-    it("should not adjust loop points for non-opus formats", () => {
+    it('should not adjust loop points for non-opus formats', () => {
       const metadata = {
         streams: [
           {
-            sample_rate: "44100",
+            sample_rate: '44100',
             tags: {
-              LOOPSTART: "1000",
-              LOOPLENGTH: "5000",
+              LOOPSTART: '1000',
+              LOOPLENGTH: '5000',
             },
           },
         ],
       };
 
-      const result = convertLoopPoints(metadata, "mp3", null);
+      const result = convertLoopPoints(metadata, 'mp3', null);
 
       expect(result.newSampleRate).toBeNull();
       expect(result.loopStart).toBe(1000);
       expect(result.loopLength).toBe(5000);
     });
 
-    it("should handle different sample rates correctly", () => {
+    it('should handle different sample rates correctly', () => {
       // Test different sample rate bands - following the exact ranges in metadataService.js
       const testCases = [
         // if (sampleRateNumber < 8000)
-        { rate: "7000", expected: 8000 },
+        { rate: '7000', expected: 8000 },
 
         // else if (sampleRateNumber >= 8000)
-        { rate: "8000", expected: 12000 },
-        { rate: "10000", expected: 12000 },
+        { rate: '8000', expected: 12000 },
+        { rate: '10000', expected: 12000 },
 
         // else if (sampleRateNumber > 12000)
-        { rate: "12500", expected: 16000 },
-        { rate: "16000", expected: 16000 },
+        { rate: '12500', expected: 16000 },
+        { rate: '16000', expected: 16000 },
 
         // else if (sampleRateNumber > 16000)
-        { rate: "20000", expected: 24000 },
+        { rate: '20000', expected: 24000 },
 
         // else if (sampleRateNumber >= 22050)
-        { rate: "22050", expected: 24000 },
-        { rate: "24000", expected: 24000 },
+        { rate: '22050', expected: 24000 },
+        { rate: '24000', expected: 24000 },
 
         // if (sampleRateNumber >= 32000)
-        { rate: "32000", expected: 48000 },
-        { rate: "44100", expected: 48000 },
-        { rate: "48000", expected: 48000 },
-        { rate: "96000", expected: 48000 },
+        { rate: '32000', expected: 48000 },
+        { rate: '44100', expected: 48000 },
+        { rate: '48000', expected: 48000 },
+        { rate: '96000', expected: 48000 },
       ];
 
       testCases.forEach(({ rate, expected }) => {
@@ -414,60 +414,60 @@ describe("metadataService", () => {
             {
               sample_rate: rate,
               tags: {
-                LOOPSTART: "1000",
-                LOOPLENGTH: "5000",
+                LOOPSTART: '1000',
+                LOOPLENGTH: '5000',
               },
             },
           ],
         };
 
-        const result = convertLoopPoints(metadata, "ogg", "opus");
+        const result = convertLoopPoints(metadata, 'ogg', 'opus');
         expect(result.newSampleRate).toBe(expected);
       });
     });
   });
 
-  describe("formatLoopData", () => {
-    it("should format loop data correctly", () => {
+  describe('formatLoopData', () => {
+    it('should format loop data correctly', () => {
       const result = formatLoopData(1000, 5000);
 
       // Check that result is a string containing the expected metadata tags
-      expect(result).toContain("-metadata LOOPSTART=1000");
-      expect(result).toContain("-metadata loopstart=1000");
-      expect(result).toContain("-metadata LOOPLENGTH=5000");
-      expect(result).toContain("-metadata looplength=5000");
+      expect(result).toContain('-metadata LOOPSTART=1000');
+      expect(result).toContain('-metadata loopstart=1000');
+      expect(result).toContain('-metadata LOOPLENGTH=5000');
+      expect(result).toContain('-metadata looplength=5000');
 
       // Should not contain alternative/underscore formats we no longer use
-      expect(result).not.toContain("LOOP_START");
-      expect(result).not.toContain("LOOP_LENGTH");
+      expect(result).not.toContain('LOOP_START');
+      expect(result).not.toContain('LOOP_LENGTH');
 
       // Should not contain comment-based approaches
-      expect(result).not.toContain("COMMENT=");
-      expect(result).not.toContain("DESCRIPTION=");
+      expect(result).not.toContain('COMMENT=');
+      expect(result).not.toContain('DESCRIPTION=');
     });
 
-    it("should format loop data for OGG correctly", () => {
-      const result = formatLoopData(1000, 5000, "ogg");
+    it('should format loop data for OGG correctly', () => {
+      const result = formatLoopData(1000, 5000, 'ogg');
 
       // Check that result is a string containing the expected metadata tags
-      expect(result).toContain("-metadata LOOPSTART=1000");
-      expect(result).toContain("-metadata loopstart=1000");
-      expect(result).toContain("-metadata LOOPLENGTH=5000");
-      expect(result).toContain("-metadata looplength=5000");
+      expect(result).toContain('-metadata LOOPSTART=1000');
+      expect(result).toContain('-metadata loopstart=1000');
+      expect(result).toContain('-metadata LOOPLENGTH=5000');
+      expect(result).toContain('-metadata looplength=5000');
 
       // Should not contain alternative/underscore formats we no longer use
-      expect(result).not.toContain("LOOP_START");
-      expect(result).not.toContain("LOOP_LENGTH");
+      expect(result).not.toContain('LOOP_START');
+      expect(result).not.toContain('LOOP_LENGTH');
 
       // Should not contain comment-based approaches
-      expect(result).not.toContain("COMMENT=");
-      expect(result).not.toContain("DESCRIPTION=");
+      expect(result).not.toContain('COMMENT=');
+      expect(result).not.toContain('DESCRIPTION=');
     });
 
-    it("should return empty string for invalid loop points", () => {
-      expect(formatLoopData(NaN, 5000)).toBe("");
-      expect(formatLoopData(1000, NaN)).toBe("");
-      expect(formatLoopData(NaN, NaN)).toBe("");
+    it('should return empty string for invalid loop points', () => {
+      expect(formatLoopData(NaN, 5000)).toBe('');
+      expect(formatLoopData(1000, NaN)).toBe('');
+      expect(formatLoopData(NaN, NaN)).toBe('');
     });
   });
 });

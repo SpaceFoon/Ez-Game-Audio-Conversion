@@ -12,7 +12,7 @@ export interface GlobalEnv {
 
 declare global {
   // Allow direct global variable access: env
-  // eslint-disable-next-line no-var
+
   var env: GlobalEnv;
 
   // Make globalThis.env type-safe in Node

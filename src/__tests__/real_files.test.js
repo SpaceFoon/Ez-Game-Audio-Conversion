@@ -1,24 +1,24 @@
-const fs = require("fs");
-const path = require("path");
-const { convertFiles } = require("../../src/convertFiles");
-const { settings } = require("../../src/utils");
+const fs = require('fs');
+const path = require('path');
+const { convertFiles } = require('../../src/convertFiles');
+const { settings } = require('../../src/utils');
 
 // Constants for test directories
-const TEST_FILES_DIR = path.join(__dirname, "test_files");
-const TEST_INPUT_DIR = path.join(TEST_FILES_DIR, "input");
-const TEST_OUTPUT_DIR = path.join(TEST_FILES_DIR, "output");
+const TEST_FILES_DIR = path.join(__dirname, 'test_files');
+const TEST_INPUT_DIR = path.join(TEST_FILES_DIR, 'input');
+const TEST_OUTPUT_DIR = path.join(TEST_FILES_DIR, 'output');
 
 // Simplified version of deleteDuplicateFiles for test purposes only
 const handleDuplicateFiles = (files) => {
   const priorityList = [
-    ".midi",
-    ".mid",
-    ".ogg",
-    ".mp3",
-    ".m4a",
-    ".wav",
-    ".flac",
-    ".aiff",
+    '.midi',
+    '.mid',
+    '.ogg',
+    '.mp3',
+    '.m4a',
+    '.wav',
+    '.flac',
+    '.aiff',
   ];
   const fileobjs = files.map((file) => [
     path.join(path.dirname(file), path.basename(file, path.extname(file))),
@@ -58,7 +58,7 @@ const handleDuplicateFiles = (files) => {
 const shouldRunTests = () => {
   // Check if test input directory exists and has files
   if (!fs.existsSync(TEST_INPUT_DIR)) {
-    console.log("Test input directory not found, skipping real file tests");
+    console.log('Test input directory not found, skipping real file tests');
     return false;
   }
 
@@ -66,12 +66,12 @@ const shouldRunTests = () => {
   const files = fs.readdirSync(TEST_INPUT_DIR);
   const audioFiles = files.filter((file) => {
     const ext = path.extname(file).toLowerCase();
-    return [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aiff"].includes(ext);
+    return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
   });
 
   if (audioFiles.length === 0) {
     console.log(
-      "No audio files found in test directory, skipping real file tests"
+      'No audio files found in test directory, skipping real file tests'
     );
     return false;
   }
@@ -95,9 +95,9 @@ const setupTestEnvironment = () => {
   // Configure settings for testing
   settings.inputFilePath = TEST_INPUT_DIR;
   settings.outputFilePath = TEST_OUTPUT_DIR;
-  settings.inputFormats = ["mp3", "wav", "flac", "ogg", "m4a", "aiff"];
-  settings.outputFormats = ["mp3"]; // Convert to MP3 for testing
-  settings.oggCodec = "vorbis"; // Set a default codec for OGG
+  settings.inputFormats = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aiff'];
+  settings.outputFormats = ['mp3']; // Convert to MP3 for testing
+  settings.oggCodec = 'vorbis'; // Set a default codec for OGG
 
   return true;
 };
@@ -105,7 +105,7 @@ const setupTestEnvironment = () => {
 // Skip all tests if we don't have real files to test with
 const runTests = shouldRunTests();
 
-describe("Real file tests", () => {
+describe('Real file tests', () => {
   // Skip all tests if no audio files are available
   beforeAll(() => {
     if (runTests) {
@@ -118,9 +118,9 @@ describe("Real file tests", () => {
     if (!runTests) return;
 
     // Capture console output
-    jest.spyOn(console, "log").mockImplementation(() => {});
-    jest.spyOn(console, "error").mockImplementation(() => {});
-    jest.spyOn(console, "warn").mockImplementation(() => {});
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   // Cleanup after each test
@@ -133,7 +133,7 @@ describe("Real file tests", () => {
     console.warn.mockRestore();
   });
 
-  it("should find and process real audio files", async () => {
+  it('should find and process real audio files', async () => {
     // Skip if no real files
     if (!runTests) {
       return;
@@ -144,12 +144,12 @@ describe("Real file tests", () => {
       .readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
         const ext = path.extname(file).toLowerCase();
-        return [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aiff"].includes(ext);
+        return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
       })
       .map((file) => path.join(TEST_INPUT_DIR, file));
 
     // Log the files we found
-    console.log("Found audio files:", files);
+    console.log('Found audio files:', files);
 
     // Use our local implementation
     const result = handleDuplicateFiles(files);
@@ -163,7 +163,7 @@ describe("Real file tests", () => {
         TEST_OUTPUT_DIR,
         `${path.basename(inputFile, path.extname(inputFile))}.mp3`
       ),
-      outputFormat: "mp3",
+      outputFormat: 'mp3',
     }));
 
     // Only test conversion if we have files
@@ -172,11 +172,11 @@ describe("Real file tests", () => {
       const result = await convertFiles(conversionList);
 
       // Verify results
-      expect(result).toHaveProperty("successfulFiles");
-      expect(result).toHaveProperty("failedFiles");
+      expect(result).toHaveProperty('successfulFiles');
+      expect(result).toHaveProperty('failedFiles');
 
       // Log results
-      console.log("Conversion results:", {
+      console.log('Conversion results:', {
         success: result.successfulFiles.length,
         failed: result.failedFiles.length,
       });
@@ -188,26 +188,26 @@ describe("Real file tests", () => {
   }, 30000); // Increase timeout to 30 seconds for file processing
 
   // Add a new test that verifies metadata preservation
-  it("should preserve metadata during conversion", async () => {
+  it('should preserve metadata during conversion', async () => {
     // Skip if no real files
     if (!runTests) {
       return;
     }
 
     // For this test, we'll convert to multiple formats
-    settings.outputFormats = ["mp3", "ogg"];
+    settings.outputFormats = ['mp3', 'ogg'];
 
     // Get all audio files in the test input directory
     const files = fs
       .readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
         const ext = path.extname(file).toLowerCase();
-        return [".mp3", ".wav", ".flac", ".ogg"].includes(ext);
+        return ['.mp3', '.wav', '.flac', '.ogg'].includes(ext);
       })
       .map((file) => path.join(TEST_INPUT_DIR, file));
 
     if (files.length === 0) {
-      console.log("No suitable audio files for metadata test");
+      console.log('No suitable audio files for metadata test');
       return;
     }
 
@@ -217,12 +217,12 @@ describe("Real file tests", () => {
       {
         inputFile: testFile,
         outputFile: path.join(TEST_OUTPUT_DIR, `metadata_test_mp3.mp3`),
-        outputFormat: "mp3",
+        outputFormat: 'mp3',
       },
       {
         inputFile: testFile,
         outputFile: path.join(TEST_OUTPUT_DIR, `metadata_test_ogg.ogg`),
-        outputFormat: "ogg",
+        outputFormat: 'ogg',
       },
     ];
 
@@ -237,7 +237,7 @@ describe("Real file tests", () => {
   }, 30000); // 30 second timeout
 
   // Add a test for duplicate file handling
-  it("should correctly handle duplicate filenames with different extensions", async () => {
+  it('should correctly handle duplicate filenames with different extensions', async () => {
     // Skip if no real files
     if (!runTests) {
       return;
@@ -248,7 +248,7 @@ describe("Real file tests", () => {
       .readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
         const ext = path.extname(file).toLowerCase();
-        return [".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aiff"].includes(ext);
+        return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
       })
       .map((file) => path.join(TEST_INPUT_DIR, file));
 
@@ -275,11 +275,11 @@ describe("Real file tests", () => {
 
         duplicateFiles = [testFile1, testFile2];
       } catch (error) {
-        console.log("Could not create duplicate test files", error);
+        console.log('Could not create duplicate test files', error);
         return;
       }
     } else {
-      console.log("Not enough files for duplicate test");
+      console.log('Not enough files for duplicate test');
       return;
     }
 
@@ -298,7 +298,7 @@ describe("Real file tests", () => {
         }
       }
     } catch (error) {
-      console.error("Error cleaning up test files", error);
+      console.error('Error cleaning up test files', error);
     }
   }, 10000); // 10 second timeout
 });

@@ -4,8 +4,8 @@
  * Functions for extracting and verifying metadata from audio files.
  */
 
-const { spawnSync } = require("child_process");
-const { findFfmpegExecutables } = require("./generateTestFiles");
+const { spawnSync } = require('child_process');
+const { findFfmpegExecutables } = require('./generateTestFiles');
 
 /**
  * Extract metadata from an audio file
@@ -19,15 +19,15 @@ function extractMetadata(filePath) {
     const result = spawnSync(
       ffprobePath,
       [
-        "-v",
-        "quiet",
-        "-print_format",
-        "json",
-        "-show_format",
-        "-show_streams",
+        '-v',
+        'quiet',
+        '-print_format',
+        'json',
+        '-show_format',
+        '-show_streams',
         filePath,
       ],
-      { encoding: "utf8" }
+      { encoding: 'utf8' }
     );
 
     if (result.status !== 0) {
@@ -228,7 +228,7 @@ function verifyLoopPoints(filePath, expectedPoints) {
   const lengthMatches = actualPoints.loopLength === expectedPoints.loopLength;
 
   if (!startMatches || !lengthMatches) {
-    console.log("Loop points mismatch:");
+    console.log('Loop points mismatch:');
     console.log(
       `  Expected: start=${expectedPoints.loopStart}, length=${expectedPoints.loopLength}`
     );
