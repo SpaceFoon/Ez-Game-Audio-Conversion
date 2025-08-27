@@ -237,7 +237,7 @@ export const formatMetaDataArgs = (
 };
 
 // Get loop points from metaData
-const getLoopPoints = (metaData: any) => {
+export const getLoopPoints = (metaData: any) => {
   if (!metaData) return { loopStart: NaN, loopLength: NaN };
 
   // Helper function to check multiple tag variants
@@ -281,7 +281,7 @@ const getLoopPoints = (metaData: any) => {
 };
 
 // Convert loop points for different sample rates
-const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec: string) => {
+export const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec: string) => {
   if (!metaData || !metaData.streams) {
     return {
       newSampleRate: null,
@@ -356,7 +356,7 @@ const convertLoopPoints = (metaData: any, outputFormat: string, oggCodec: string
 };
 
 // Format loop data for ffmpeg command
-const formatLoopData = (loopStart: any, loopLength: any) => {
+export const formatLoopData = (loopStart: any, loopLength: any) => {
   if (isNaN(loopStart) || isNaN(loopLength)) return "";
 
   // Only include the standard variants that are most widely supported

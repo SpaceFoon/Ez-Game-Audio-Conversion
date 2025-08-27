@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+release/
+*.md
+*.json
+*.yml
+*.yaml

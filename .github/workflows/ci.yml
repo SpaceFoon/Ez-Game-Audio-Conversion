@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  build-test-package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check & build
+        run: npm run build:ts
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Package binaries
+        run: npm run package
+
+      - name: Run smoke test on packaged binary
+        run: npm run smoke:postpackage
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ez-game-audio-conversion-binaries
+          path: release/
+          if-no-files-found: error
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: ignore
