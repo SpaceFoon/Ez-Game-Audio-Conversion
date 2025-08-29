@@ -2,7 +2,7 @@ declare const spawn: any;
 declare const workerData: any, parentPort: any;
 declare const join: any, dirname: any;
 declare const existsSync: any, mkdirSync: any;
-declare const getMetaData: any, formatMetaDataArgs: any, convertLoopPoints: any, formatLoopData: any;
+declare const getMetaData: any, formatMetaDataArgs: any, convertLoopPoints: any, formatLoopData: any, formatMetaData: any;
 declare const failWorker: (reason: any) => never;
 declare const postError: (reason: any, fileCtx?: any) => void;
 declare function ensureDirectoryExists(filePath: string): void;

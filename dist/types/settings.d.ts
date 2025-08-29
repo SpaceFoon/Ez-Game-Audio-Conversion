@@ -1,4 +1,4 @@
-import type { AudioFormat, OggCodec } from "./audio";
+import type { AudioFormat, OggCodec } from './audio';
 export interface Settings {
     inputFilePath: string;
     outputFilePath: string;

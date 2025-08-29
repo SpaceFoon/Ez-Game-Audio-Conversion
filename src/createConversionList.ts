@@ -247,10 +247,10 @@ const createConversionList = async (
           console.error('response was empty:', response);
           break;
         case 'ra':
-          await responseActions['ra']();
+          await responseActions['ra']?.();
           break;
         case 'sa':
-          await responseActions['sa']();
+          await responseActions['sa']?.();
           break;
         case 'oa':
           console.log(
@@ -274,7 +274,7 @@ const createConversionList = async (
                 response = response ? response.trim().toLowerCase() : '';
 
                 if (response && responseActions[response]) {
-                  await responseActions[response]();
+                  await responseActions[response]?.();
                   break;
                 } else {
                   response = null;

@@ -1,12 +1,12 @@
 "use strict";
 //Creates workers to convert files
 Object.defineProperty(exports, "__esModule", { value: true });
-const { Worker } = require("worker_threads");
-const { performance } = require("perf_hooks");
-const { cpus } = require("os");
-const { join } = require("path");
-const chalk = require("chalk");
-const { initializeFileNames, addToLog, settings, checkDiskSpace, rl, } = require("./utils");
+const { Worker } = require('worker_threads');
+const { performance } = require('perf_hooks');
+const { cpus } = require('os');
+const { join } = require('path');
+const chalk = require('chalk');
+const { initializeFileNames, addToLog, settings, checkDiskSpace, rl, } = require('./utils');
 const convertFiles = async (files) => {
     initializeFileNames();
     const jobStartTime = performance.now();
@@ -16,13 +16,13 @@ const convertFiles = async (files) => {
     }
     catch {
         cpuNumber = 8;
-        console.warn("🚨🚨⛔ Could not detect amount of CPU cores!!! Setting to 8 ⛔🚨🚨");
+        console.warn('🚨🚨⛔ Could not detect amount of CPU cores!!! Setting to 8 ⛔🚨🚨');
     }
     const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, Array.isArray(files) ? files.length : 0));
     const failedFiles = [];
     const successfulFiles = [];
-    console.info("\n   Detected 🕵️‍♂️", cpuNumber, "CPU Cores 🖥");
-    console.log("   Using", cpuNumber, "concurrent 🧵 threads");
+    console.info('\n   Detected 🕵️‍♂️', cpuNumber, 'CPU Cores 🖥');
+    console.log('   Using', cpuNumber, 'concurrent 🧵 threads');
     const processFile = async (file, workerCounter, task, tasksLeft) => {
         const workerStartTime = performance.now();
         checkDiskSpace(settings.outputFilePath);
@@ -39,7 +39,7 @@ const convertFiles = async (files) => {
                         outputFormat: file.outputFormat,
                     },
                     settings: {
-                        oggCodec: settings.oggCodec || "vorbis", // Default to vorbis
+                        oggCodec: settings.oggCodec || 'vorbis', // Default to vorbis
                     },
                 });
                 const workerData = JSON.parse(workerDataJson);
@@ -49,59 +49,71 @@ const convertFiles = async (files) => {
                 // is placed next to the main file via pkg.assets.
                 const runningPkg = process.pkg;
                 const workerPath = runningPkg
-                    ? join(__dirname, "converterWorker.js")
-                    : join(__dirname, "..", "dist", "converterWorker.js");
+                    ? join(__dirname, 'converterWorker.js')
+                    : join(__dirname, '..', 'dist', 'converterWorker.js');
                 const worker = new Worker(workerPath, {
                     workerData,
                 });
-                worker.on("message", (message) => {
+                worker.on('message', (message) => {
                     // Errors messages
-                    if (message.type === "error" || message.type === "stderr") {
-                        console.error("ERROR MESSAGE FROM FFMPEG:", message.data, "Output file:", file.outputFile);
+                    if (message.type === 'error' || message.type === 'stderr') {
+                        console.error('ERROR MESSAGE FROM FFMPEG:', message.data, 'Output file:', file.outputFile);
                         // Catch disk space errors and stop a runaway process
                         if (/no space left/i.test(message.data)) {
-                            console.error("\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨");
-                            rl.question("Press ENTER to exit...", () => process.exit(1));
+                            console.error('\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨');
+                            rl.question('Press ENTER to exit...', () => process.exit(1));
                         }
                         addToLog(message, file);
                         reject(new Error(message.data));
                         return;
                     }
                     // File Success code
-                    if (message.type === "code") {
+                    if (message.type === 'code') {
                         const workerEndTime = performance.now();
                         const workerCompTime = workerEndTime - workerStartTime;
                         addToLog(message, file);
                         if (message.data === 0) {
-                            successfulFiles.push({ success: true, inputFile: file.inputFile, outputFile: file.outputFile });
+                            successfulFiles.push({
+                                success: true,
+                                inputFile: file.inputFile,
+                                outputFile: file.outputFile,
+                            });
                             console.log(chalk.greenBright(`\n🛠️👷‍♂️ Worker`, workerCounter, `finished task`, task, `\n   Input"${file.inputFile}\n   Output"${file.outputFile}✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`));
                             resolve();
                             // File Failure code
                         }
                         else if (message.data !== 0) {
                             if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-                                failedFiles.push({ success: false, inputFile: file.inputFile, outputFile: file.outputFile });
+                                failedFiles.push({
+                                    success: false,
+                                    inputFile: file.inputFile,
+                                    outputFile: file.outputFile,
+                                });
                             }
-                            console.error(chalk.bgRed("\n🚨🚨⛔ Worker", workerCounter, "did not finish file successfully ⛔🚨🚨: ", file.outputFile));
+                            console.error(chalk.bgRed('\n🚨🚨⛔ Worker', workerCounter, 'did not finish file successfully ⛔🚨🚨: ', file.outputFile));
                             resolve();
                         }
                     }
                 });
-                worker.on("error", (error) => {
-                    console.error(`🚨🚨⛔ Worker had an error:`, error.toString(), "⛔🚨🚨");
+                worker.on('error', (error) => {
+                    console.error(`🚨🚨⛔ Worker had an error:`, error.toString(), '⛔🚨🚨');
                     if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-                        failedFiles.push({ success: false, inputFile: file.inputFile, outputFile: file.outputFile });
+                        failedFiles.push({
+                            success: false,
+                            inputFile: file.inputFile,
+                            outputFile: file.outputFile,
+                        });
                     }
                     reject(error);
                 });
-                worker.on("exit", (code) => {
+                worker.on('exit', (code) => {
                     if (code !== 0) {
                         console.error(`Worker stopped with exit code ${code}`);
                     }
                 });
             }
             catch (error) {
-                console.error("Error creating worker:", error);
+                console.error('Error creating worker:', error);
                 reject(error);
             }
         });

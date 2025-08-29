@@ -35,7 +35,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
       settings.inputFilePath = path.dirname(filePath);
       settings.singleFileMode = true;
-      settings.singleFilePath = filePath;
+      settings.singleFilePath = filePath || '';
       settings.inputFormats = [fileExt as AudioFormat];
       console.log(
         chalk.green.italic(`\n📝 Processing single file: ${filePath} ✅`)
@@ -44,7 +44,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     }
     // Handle folder from context menu
     else if (pathStats.isDirectory()) {
-      settings.inputFilePath = process.argv[2];
+      settings.inputFilePath = process.argv[2] || '';
       settings.singleFileMode = false;
       console.log(
         chalk.green.italic(`\n📝 Input Folder: ${settings.inputFilePath} ✅`)

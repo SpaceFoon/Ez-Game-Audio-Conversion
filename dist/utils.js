@@ -1,31 +1,74 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const readline = require("readline");
-const { openSync, closeSync, existsSync, appendFileSync, writeFileSync, statSync, mkdirSync, } = require("fs");
-const moment = require("moment");
-const chalk = require("chalk");
-const { join } = require("path");
+const readline = require('readline');
+const { openSync, closeSync, existsSync, appendFileSync, writeFileSync, statSync, mkdirSync, } = require('fs');
+const moment = require('moment');
+const chalk = require('chalk');
+const { join } = require('path');
 let settings = {
-    inputFilePath: "",
-    outputFilePath: "",
+    inputFilePath: '',
+    outputFilePath: '',
     inputFormats: [],
     outputFormats: [],
     oggCodec: null,
     singleFileMode: false,
-    singleFilePath: "",
+    singleFilePath: '',
     //bitrate: 0, placeholder for future options
     //quality: 2,
     userOS: null,
 };
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: false,
-});
+let rl;
+if (process.env.JEST_WORKER_ID) {
+    // In Jest, do not bind to real stdio to prevent open handles
+    rl = {
+        question: (_q, cb) => cb(''),
+        close: () => { },
+    };
+    // Attempt to fully release the TTY handle so Jest can exit cleanly.
+    try {
+        const stdin = process.stdin;
+        if (stdin) {
+            if (typeof stdin.unref === 'function') {
+                try {
+                    stdin.unref();
+                }
+                catch {
+                    // Ignore cleanup errors
+                }
+            }
+            if (typeof stdin.pause === 'function') {
+                try {
+                    stdin.pause();
+                }
+                catch {
+                    // Ignore cleanup errors
+                }
+            }
+            if (typeof stdin.destroy === 'function') {
+                try {
+                    stdin.destroy();
+                }
+                catch {
+                    // Ignore cleanup errors
+                }
+            }
+        }
+    }
+    catch {
+        // Ignore stdin cleanup errors
+    }
+}
+else {
+    rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        terminal: false,
+    });
+}
 const getAnswer = (question) => new Promise((resolve) => {
     // Handle array of strings (from chalk)
     const formattedQuestion = Array.isArray(question)
-        ? question.join(" ")
+        ? question.join(' ')
         : question;
     rl.question(formattedQuestion, (answer) => {
         resolve(answer);
@@ -39,7 +82,7 @@ console.error = function (...args) {
             const txt = arg.stack || arg.message || String(arg);
             return chalk.red.bold(txt);
         }
-        return typeof arg === "string" ? chalk.red.bold(arg) : arg;
+        return typeof arg === 'string' ? chalk.red.bold(arg) : arg;
     });
     originalConsoleError.apply(console, coloredArgs);
 };
@@ -51,7 +94,7 @@ console.warn = function (...args) {
             const txt = arg.stack || arg.message || String(arg);
             return chalk.yellow.bold(txt);
         }
-        return typeof arg === "string" ? chalk.yellow.bold(arg) : arg;
+        return typeof arg === 'string' ? chalk.yellow.bold(arg) : arg;
     });
     originalConsoleWarn.apply(console, coloredArgs);
 };
@@ -79,17 +122,17 @@ const isFileBusy = async (file) => {
     if (!existsSync(file))
         return false;
     try {
-        const fd = openSync(file, "r+");
+        const fd = openSync(file, 'r+');
         closeSync(fd);
         return false;
     }
     catch (error) {
-        if (error.code === "EBUSY") {
+        if (error.code === 'EBUSY') {
             await getAnswer(chalk.redBright(`\n${error}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`));
             return false;
         }
-        else if (error.code === "ENOENT") {
-            console.error("code", error);
+        else if (error.code === 'ENOENT') {
+            console.error('code', error);
             return false;
         }
         else {
@@ -102,28 +145,28 @@ const isFileBusy = async (file) => {
 let fileNameL = null;
 let fileNameE = null;
 const initializeFileNames = () => {
-    const basePath = settings.outputFilePath || "";
+    const basePath = settings.outputFilePath || '';
     // Ensure output directory exists once (cross-platform)
     if (basePath) {
         try {
-            if (typeof mkdirSync === "function") {
+            if (typeof mkdirSync === 'function') {
                 mkdirSync(basePath, { recursive: true });
             }
         }
         catch (err) {
-            console.error("Error ensuring log directory exists:", err);
+            console.error('Error ensuring log directory exists:', err);
         }
     }
-    fileNameL = initFileName(basePath, "logs");
-    fileNameE = initFileName(basePath, "error");
+    fileNameL = initFileName(basePath, 'logs');
+    fileNameE = initFileName(basePath, 'error');
 };
 const initFileName = (basePath, fileName) => {
     let num = 1;
     // Use OS-aware join and normalize to forward slashes for test stability on Windows
-    const norm = (p) => p.replace(/\\/g, "/");
-    let fullFileName = norm(join(basePath || "", `${fileName}.csv`));
+    const norm = (p) => p.replace(/\\/g, '/');
+    let fullFileName = norm(join(basePath || '', `${fileName}.csv`));
     while (existsSync(fullFileName)) {
-        fullFileName = norm(join(basePath || "", `${fileName}(${num}).csv`));
+        fullFileName = norm(join(basePath || '', `${fileName}(${num}).csv`));
         num++;
     }
     return fullFileName;
@@ -133,15 +176,15 @@ const addToLog = async (log, file) => {
     if (!fileNameL || !fileNameE) {
         initializeFileNames();
     }
-    const timestamp = moment().format("DD-MM-YYYY HH:mm:ss");
-    const time = timestamp.replaceAll(",", "");
-    const data = log.data?.toString().replaceAll(",", "") || "Unknown Error";
-    const inputFile = file?.inputFile?.replaceAll(",", "") || "Unknown Input File";
+    const timestamp = moment().format('DD-MM-YYYY HH:mm:ss');
+    const time = timestamp.replaceAll(',', '');
+    const data = log.data?.toString().replaceAll(',', '') || 'Unknown Error';
+    const inputFile = file?.inputFile?.replaceAll(',', '') || 'Unknown Input File';
     // Only warn on unknown error for error/stderr logs
-    const outputFile = file?.outputFile?.replaceAll(",", "") || "Unknown Output File";
-    const isErr = log.type === "stderr" || log.type === "error";
-    if (isErr && data === "Unknown Error") {
-        console.error("Unknown Error log, details:", log, file);
+    const outputFile = file?.outputFile?.replaceAll(',', '') || 'Unknown Output File';
+    const isErr = log.type === 'stderr' || log.type === 'error';
+    if (isErr && data === 'Unknown Error') {
+        console.error('Unknown Error log, details:', log, file);
     }
     // const logPath = settings.outputFilePath;
     // Determine if the log is an error or not.
@@ -152,11 +195,11 @@ const addToLog = async (log, file) => {
         // Create error log file and header if none exists.
         if (fileNameE && !existsSync(fileNameE)) {
             try {
-                writeFileSync(fileNameE, "Timestamp, Error, Input File, Output File\n", { encoding: "utf8" });
+                writeFileSync(fileNameE, 'Timestamp, Error, Input File, Output File\n', { encoding: 'utf8' });
                 // Header created; continue to write the current log line below
             }
             catch (error) {
-                console.error("Error creating Error CSV file: ", error);
+                console.error('Error creating Error CSV file: ', error);
                 return false; // bail out safely
             }
         }
@@ -164,8 +207,8 @@ const addToLog = async (log, file) => {
         try {
             if (fileNameE)
                 await isFileBusy(fileNameE);
-            const csvRow = `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, "") +
-                "\n";
+            const csvRow = `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, '') +
+                '\n';
             if (fileNameE)
                 appendFileSync(fileNameE, csvRow);
         }
@@ -179,8 +222,8 @@ const addToLog = async (log, file) => {
     if (fileNameL && !existsSync(fileNameL)) {
         await isFileBusy(fileNameL);
         try {
-            writeFileSync(fileNameL, "Timestamp, Exit Code, Input, Output\n", {
-                encoding: "utf8",
+            writeFileSync(fileNameL, 'Timestamp, Exit Code, Input, Output\n', {
+                encoding: 'utf8',
             });
         }
         catch (error) {
@@ -192,8 +235,8 @@ const addToLog = async (log, file) => {
     try {
         if (fileNameL)
             await isFileBusy(fileNameL);
-        const csvRow = `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, "") +
-            "\n";
+        const csvRow = `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, '') +
+            '\n';
         if (fileNameL)
             appendFileSync(fileNameL, csvRow);
     }
@@ -204,9 +247,9 @@ const addToLog = async (log, file) => {
 };
 function handleExit(code = 0, { restart = false } = {}) {
     if (restart && code === 0) {
-        const { spawn } = require("child_process");
-        console.log("Restarting the app...");
-        spawn(process.argv[0], process.argv.slice(1), { stdio: "inherit" });
+        const { spawn } = require('child_process');
+        console.log('Restarting the app...');
+        spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' });
     }
     process.exit(code);
 }

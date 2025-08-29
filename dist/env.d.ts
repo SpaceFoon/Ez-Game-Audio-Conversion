@@ -1,4 +1,4 @@
-import "dotenv/config";
+import 'dotenv/config';
 interface EnvConfig {
     isDev: boolean;
     isDebug: boolean;

@@ -1,8 +1,8 @@
 "use strict";
 class ExitProgramError extends Error {
-    constructor(message = "EXIT_PROGRAM") {
+    constructor(message = 'EXIT_PROGRAM') {
         super(message);
-        this.name = "ExitProgramError";
+        this.name = 'ExitProgramError';
     }
 }
 module.exports = ExitProgramError;

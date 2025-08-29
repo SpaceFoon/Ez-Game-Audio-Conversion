@@ -1,9 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const { existsSync, mkdirSync } = require("fs");
-const { join, basename, extname, dirname } = require("path");
-const chalk = require("chalk");
-const { getAnswer, settings, handleExit } = require("./utils");
+const { existsSync, mkdirSync } = require('fs');
+const { join, basename, extname, dirname } = require('path');
+const chalk = require('chalk');
+const { getAnswer, settings, handleExit } = require('./utils');
 // Get a unique output file name
 const getOutputFileCopy = async (inputFile, outputFormat, outputFolder, copyNumber = 1) => {
     let baseNameCopy = basename(inputFile, extname(inputFile));
@@ -21,13 +21,13 @@ const getOutputFileCopy = async (inputFile, outputFormat, outputFolder, copyNumb
 };
 const askOggCodec = async () => {
     //Choose codec for OGG
-    const userResponse = await getAnswer(chalk.blue.bold("\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?", "\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮 🚗", "\n\n💡 If you are unsure, leave blank for Vorbis: "));
+    const userResponse = await getAnswer(chalk.blue.bold('\n🔊 Which codec would you like to use for Ogg files? 🎼 Vorbis or Opus?', '\n🎵 Note: Opus is better 💪 but Vorbis works with more game engines. 🎮 🚗', '\n\n💡 If you are unsure, leave blank for Vorbis: '));
     // Process the user input
     const input = userResponse.trim().toLowerCase();
-    if (input === "")
-        return "vorbis";
-    if (input !== "vorbis" && input !== "opus") {
-        console.warn("\n⚠️ Did not enter Vorbis or Opus! 😧😓😯");
+    if (input === '')
+        return 'vorbis';
+    if (input !== 'vorbis' && input !== 'opus') {
+        console.warn('\n⚠️ Did not enter Vorbis or Opus! 😧😓😯');
         return await askOggCodec(); // Keep asking until a valid input is provided
     }
     // Save the selection to settings and return
@@ -45,18 +45,18 @@ const createConversionList = async (files) => {
     let relativePath = null;
     // Ensure we have the ogg codec set
     if (!settings.oggCodec) {
-        settings.oggCodec = "vorbis";
+        settings.oggCodec = 'vorbis';
     }
     // Debug information
-    console.log(chalk.blueBright("\n📝 Conversion parameters:"));
+    console.log(chalk.blueBright('\n📝 Conversion parameters:'));
     console.log(chalk.blueBright(`  Files to process: ${files.length}`));
-    console.log(chalk.blueBright(`  Single file mode: ${singleFileMode ? "Yes" : "No"}`));
+    console.log(chalk.blueBright(`  Single file mode: ${singleFileMode ? 'Yes' : 'No'}`));
     console.log(chalk.blueBright(`  Input path: ${inputFilePath}`));
     console.log(chalk.blueBright(`  Output path: ${outputFilePath}`));
-    console.log(chalk.blueBright(`  Output formats: ${outputFormats.join(", ")}`));
+    console.log(chalk.blueBright(`  Output formats: ${outputFormats.join(', ')}`));
     // Validate we have files to process
     if (!files.length) {
-        console.error(chalk.redBright("\n❌ Error: No input files found to process."));
+        console.error(chalk.redBright('\n❌ Error: No input files found to process.'));
         handleExit(1);
     }
     for (const inputFile of files) {
@@ -65,7 +65,7 @@ const createConversionList = async (files) => {
         for (const outputFormat of outputFormats) {
             console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
             let outputFile;
-            if (outputFormats.includes("ogg") && !oggCodec) {
+            if (outputFormats.includes('ogg') && !oggCodec) {
                 oggCodec = await askOggCodec();
             }
             outputFile = `${join(dirname(inputFile), basename(inputFile, extname(inputFile)))}.${outputFormat}`;
@@ -75,7 +75,7 @@ const createConversionList = async (files) => {
             }
             catch (error) {
                 console.error(chalk.redBright(`❌ Error calculating relative path: ${error instanceof Error ? error.message : String(error)}`));
-                relativePath = "";
+                relativePath = '';
             }
             if (inputFilePath !== outputFilePath) {
                 outputFolder = join(outputFilePath, relativePath);
@@ -102,23 +102,24 @@ const createConversionList = async (files) => {
                 inputFile === outputFile) {
                 console.log(chalk.yellow(`  ⚠️ Input file and output file are the same: ${inputFile}`));
                 while (true) {
-                    if (convertSelf === "" || (convertSelf && /^no$/i.test(convertSelf))) {
-                        console.log("\n 🚫 Not converting files to own type! 🚫 \n");
-                        convertSelf = "no";
+                    if (convertSelf === '' ||
+                        (convertSelf && /^no$/i.test(convertSelf))) {
+                        console.log('\n 🚫 Not converting files to own type! 🚫 \n');
+                        convertSelf = 'no';
                         outputFile = `${outputFile} "Skipped! ⏭️!"`;
                         break;
                     }
                     if (convertSelf && /^yes$/i.test(convertSelf)) {
-                        convertSelf = "yes";
-                        console.log("\n 🔀 Converting files to own type! ✔");
+                        convertSelf = 'yes';
+                        console.log('\n 🔀 Converting files to own type! ✔');
                         //Rename. Never overwrite input file.
                         outputFile = await getOutputFileCopy(inputFile, outputFormat, outputFolder || dirname(inputFile));
                         break;
                     }
                     convertSelf = await getAnswer(chalk.blueBright('\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file(1).ogg).\n\n Type "yes" or "no": '));
-                    if (convertSelf !== "" &&
-                        convertSelf !== "yes" &&
-                        convertSelf !== "no") {
+                    if (convertSelf !== '' &&
+                        convertSelf !== 'yes' &&
+                        convertSelf !== 'no') {
                         console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
                     }
                 }
@@ -154,17 +155,17 @@ const createConversionList = async (files) => {
             };
             // Handle file exists responses
             switch (response) {
-                case "":
-                    console.error("response was empty:", response);
+                case '':
+                    console.error('response was empty:', response);
                     break;
-                case "ra":
-                    await responseActions["ra"]();
+                case 'ra':
+                    await responseActions['ra']?.();
                     break;
-                case "sa":
-                    await responseActions["sa"]();
+                case 'sa':
+                    await responseActions['sa']?.();
                     break;
-                case "oa":
-                    console.log(chalk.red("🔺🚩OVERWRITE FILE🚩"), chalk.yellow(outputFile, " 🔺"));
+                case 'oa':
+                    console.log(chalk.red('🔺🚩OVERWRITE FILE🚩'), chalk.yellow(outputFile, ' 🔺'));
                     break;
                 default:
                     while (true) {
@@ -172,14 +173,14 @@ const createConversionList = async (files) => {
                             if (existsSync(outputFile)) {
                                 console.log(chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`));
                                 response = await getAnswer(chalk.blue.bold(`\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`));
-                                response = response ? response.trim().toLowerCase() : "";
+                                response = response ? response.trim().toLowerCase() : '';
                                 if (response && responseActions[response]) {
-                                    await responseActions[response]();
+                                    await responseActions[response]?.();
                                     break;
                                 }
                                 else {
                                     response = null;
-                                    console.warn("\n⚠️ Invalid selection! Try again ⚠️");
+                                    console.warn('\n⚠️ Invalid selection! Try again ⚠️');
                                 }
                             }
                             else {
@@ -213,16 +214,16 @@ const createConversionList = async (files) => {
         const filesToConvert = uniqueConversionList.filter((x) => !/Skipped!.*⏭️/g.test(x.outputFile));
         // Display conversion list
         const numbered = await filesToConvert.map((x, index) => `🔊 ${index + 1} ${x.outputFile}`);
-        console.log(chalk.cyanBright("\n🔄 Pending Conversion 🔄", numbered.length, "Output Files \n\n", numbered.join("\n")));
+        console.log(chalk.cyanBright('\n🔄 Pending Conversion 🔄', numbered.length, 'Output Files \n\n', numbered.join('\n')));
         // No files to convert
         if (numbered.length === 0) {
-            console.log(chalk.yellow("\n⚠️ No files to convert after filtering! Exiting."));
+            console.log(chalk.yellow('\n⚠️ No files to convert after filtering! Exiting.'));
             handleExit(0);
         }
         // Final confirmation
         const accept_answer = await getAnswer(chalk.blueBright('\n✏️ This is the list of files to be converted. Start now? Type "yes" ✅ or "no" ❌:  '));
         if (/^no$/i.test(accept_answer)) {
-            console.log("\n🚫 Conversion cancelled. Exiting program 🚫");
+            console.log('\n🚫 Conversion cancelled. Exiting program 🚫');
             handleExit(0);
         }
         else if (!/^yes$/i.test(accept_answer)) {
