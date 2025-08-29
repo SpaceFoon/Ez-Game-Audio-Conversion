@@ -2,6 +2,7 @@
   "name": "ez-game-audio-conversion",
   "version": "1.6.0",
   "description": "Unattended batch conversion for game audio file types with loop tag support! Powered by ffmpeg.",
+  "type": "module",
   "main": "dist/app.js",
   "bin": {
     "ez-game-audio-conversion": "dist/app.js"
@@ -31,8 +32,8 @@
       "dist/converterWorker.js"
     ],
     "targets": [
-      "node22-win-x64",
-      "node22-linux-x64"
+      "node18-win-x64",
+      "node18-linux-x64"
     ],
     "outputPath": "release"
   },
