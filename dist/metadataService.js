@@ -1,9 +1,6 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.formatLoopData = exports.convertLoopPoints = exports.getLoopPoints = exports.formatMetaDataArgs = void 0;
-const { spawnSync } = require('child_process');
-const { join } = require('path');
-const { existsSync } = require('fs');
+import { spawnSync } from 'child_process';
+import { join } from 'path';
+import { existsSync } from 'fs';
 // Get metaData from a file using ffprobe
 const getMetaData = async (inputFile) => {
     try {
@@ -175,7 +172,7 @@ const formatMetaData = (metaData, inputFile) => {
     return { metaData: metaDataString, channels };
 };
 // New: Build metadata/channel args as arrays to avoid shell splitting issues
-const formatMetaDataArgs = (metaData, inputFile) => {
+export const formatMetaDataArgs = (metaData, inputFile) => {
     if (!metaData || !metaData.streams) {
         if (inputFile)
             console.warn(`\n No meta data found in ${inputFile}`);
@@ -284,9 +281,8 @@ const formatMetaDataArgs = (metaData, inputFile) => {
     const channelsArgs = ['-ac', ch];
     return { metaDataArgs, channelsArgs };
 };
-exports.formatMetaDataArgs = formatMetaDataArgs;
 // Get loop points from metaData
-const getLoopPoints = (metaData) => {
+export const getLoopPoints = (metaData) => {
     if (!metaData)
         return { loopStart: NaN, loopLength: NaN };
     // Helper function to check multiple tag variants
@@ -319,9 +315,8 @@ const getLoopPoints = (metaData) => {
     const loopLength = parseInt(getTagValue('LOOPLENGTH') || null);
     return { loopStart, loopLength };
 };
-exports.getLoopPoints = getLoopPoints;
 // Convert loop points for different sample rates
-const convertLoopPoints = (metaData, outputFormat, oggCodec) => {
+export const convertLoopPoints = (metaData, outputFormat, oggCodec) => {
     if (!metaData || !metaData.streams) {
         return {
             newSampleRate: null,
@@ -331,7 +326,7 @@ const convertLoopPoints = (metaData, outputFormat, oggCodec) => {
     }
     // Get original values
     const sampleRate = metaData.streams[0].sample_rate;
-    const { loopStart, loopLength } = (0, exports.getLoopPoints)(metaData);
+    const { loopStart, loopLength } = getLoopPoints(metaData);
     // console.log("convertLoopPoints - Original values:", {
     //   sampleRate,
     //   loopStart,
@@ -390,23 +385,13 @@ const convertLoopPoints = (metaData, outputFormat, oggCodec) => {
         loopLength: convertedLoopLength,
     };
 };
-exports.convertLoopPoints = convertLoopPoints;
 // Format loop data for ffmpeg command
-const formatLoopData = (loopStart, loopLength) => {
+export const formatLoopData = (loopStart, loopLength) => {
     if (isNaN(loopStart) || isNaN(loopLength))
         return '';
     // Only include the standard variants that are most widely supported
     return (` -metadata LOOPSTART=${loopStart} -metadata LOOPLENGTH=${loopLength} ` +
         `-metadata loopstart=${loopStart} -metadata looplength=${loopLength}`);
 };
-exports.formatLoopData = formatLoopData;
-module.exports = {
-    getMetaData,
-    formatMetaDataField,
-    formatMetaData,
-    formatMetaDataArgs: exports.formatMetaDataArgs,
-    getLoopPoints: exports.getLoopPoints,
-    convertLoopPoints: exports.convertLoopPoints,
-    formatLoopData: exports.formatLoopData,
-};
+export { getMetaData, formatMetaDataField, formatMetaData, };
 //# sourceMappingURL=metadataService.js.map

@@ -1,8 +1,6 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const { readdirSync, statSync } = require('fs');
-const { join, extname } = require('path');
-const chalk = require('chalk');
+import { readdirSync, statSync } from 'fs';
+import { join, extname } from 'path';
+import chalk from 'chalk';
 //Searches for files that meet criteria
 const searchFiles = (settings) => {
     const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
@@ -46,5 +44,5 @@ const searchFiles = (settings) => {
     });
     return Promise.resolve(allFiles);
 };
-module.exports = searchFiles;
+export default searchFiles;
 //# sourceMappingURL=searchFiles.js.map

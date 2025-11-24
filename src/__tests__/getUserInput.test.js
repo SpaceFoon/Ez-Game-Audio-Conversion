@@ -12,7 +12,7 @@ jest.mock('../utils', () => ({ checkDiskSpace: jest.fn() }));
 const mockRl = { question: jest.fn() };
 jest.mock('readline/promises', () => ({ createInterface: () => mockRl }));
 
-const getUserInput = require('../getUserInput');
+const getUserInput = require('../getUserInput').default;
 
 describe('getUserInput', () => {
   let settings;

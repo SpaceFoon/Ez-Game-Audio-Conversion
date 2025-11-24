@@ -9,33 +9,23 @@
   },
   "scripts": {
     "readme": "echo '\n📚 Available CLI Commands:\n\n🔧 Development:\n  npm run dev         - Run with ts-node\n  npm run dev:watch   - Run with nodemon and auto-restart\n  npm run dev:js      - Build then run JS version\n\n🏗️  Building:\n  npm run build:ts    - Compile TypeScript\n  npm run build:watch - Compile with watch mode\n  npm run package     - Build and create executable\n  npm run build       - Full build (TS + package)\n\n🧪 Testing:\n  npm run test        - Run Jest tests\n  npm run test:ci     - Run tests for CI\n  npm run test:coverage - Run with coverage report\n  npm run smoke       - Run smoke tests\n\n✨ Code Quality:\n  npm run lint        - Run ESLint\n  npm run format      - Format with Prettier\n  npm run clean       - Remove dist/release folders\n\n📖 Help:\n  npm run readme      - Show this help\n'",
-    "dev": "npx ts-node ./src/app.ts",
-    "dev:watch": "nodemon --exec \"npx ts-node ./src/app.ts\" --ext ts --ignore dist/ --ignore node_modules/",
+    "dev": "node --loader ts-node/esm ./src/app.ts",
+    "dev:watch": "nodemon --exec \"node --loader ts-node/esm ./src/app.ts\" --ext ts --ignore dist/ --ignore node_modules/",
     "dev:js": "npm run build:ts && node ./dist/app.js",
     "build:ts": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",
-    "package": "npm run build:ts && pkg .",
-    "build": "npm run build:ts && npm run package",
+    "build": "npm run build:ts",
+    "package": "npm run build:sea",
+    "build:sea": "npm run build:ts && node scripts/build-sea.js",
     "clean": "rimraf dist/ release/",
     "test": "jest \"src/__tests__/\" --runInBand",
     "test:ci": "jest \"src/__tests__/\" --runInBand --detectOpenHandles",
     "test:coverage": "jest --coverage --runInBand",
     "smoke": "npm run package && npm run smoke:postpackage",
-    "smoke:postpackage": "node scripts/smokeTest.js",
+    "smoke:postpackage": "node src/__tests__/smokeTest.js",
     "lint": "eslint . --ext .ts,.js",
     "format": "prettier --write .",
     "prepare": "husky"
-  },
-  "pkg": {
-    "main": "dist/app.js",
-    "assets": [
-      "dist/converterWorker.js"
-    ],
-    "targets": [
-      "node24-win-x64",
-      "node24-linux-x64"
-    ],
-    "outputPath": "release"
   },
   "dependencies": {
     "cfonts": "^3.2.0",
@@ -74,9 +64,8 @@
     "markdown-to-html-cli": "^5.0.3",
     "md-to-pdf": "^5.2.4",
     "nodemon": "^3.1.10",
-    "pkg": "^5.8.1",
+    "postject": "^1.0.0-alpha.6",
     "prettier": "^3.6.2",
-    "resedit": "^2.0.0",
     "rimraf": "^6.0.1",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
@@ -85,6 +74,11 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
+    "globals": {
+      "ts-jest": {
+        "tsconfig": "tsconfig.json"
+      }
+    },
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/__tests__/test-utils/",
@@ -99,6 +93,9 @@
       "<rootDir>/build/",
       "<rootDir>/release/"
     ],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
     "transform": {
       "^.+\\.(ts|tsx)$": "ts-jest",
       "^.+\\.(js|jsx)$": "babel-jest"

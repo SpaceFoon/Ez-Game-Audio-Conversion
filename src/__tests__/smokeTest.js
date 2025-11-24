@@ -7,9 +7,12 @@ const { spawnSync } = require('child_process');
 const { existsSync, writeFileSync, mkdirSync } = require('fs');
 const { join } = require('path');
 
+const isWindows = process.platform === 'win32';
+
 function findBinary() {
   const dir = join(process.cwd(), 'release');
   const candidates = [
+    isWindows ? 'ez-game-audio.exe' : 'ez-game-audio',
     'ez-game-audio-conversion-win32-x64.exe',
     'ez-game-audio-conversion-linux-x64',
   ];

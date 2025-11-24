@@ -1,12 +1,13 @@
-"use strict";
 //Creates workers to convert files
-Object.defineProperty(exports, "__esModule", { value: true });
-const { Worker } = require('worker_threads');
-const { performance } = require('perf_hooks');
-const { cpus } = require('os');
-const { join } = require('path');
-const chalk = require('chalk');
-const { initializeFileNames, addToLog, settings, checkDiskSpace, rl, } = require('./utils');
+import { Worker } from 'worker_threads';
+import { performance } from 'perf_hooks';
+import { cpus } from 'os';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import chalk from 'chalk';
+import { initializeFileNames, addToLog, settings, checkDiskSpace, rl, } from './utils.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const convertFiles = async (files) => {
     initializeFileNames();
     const jobStartTime = performance.now();
@@ -144,5 +145,5 @@ const convertFiles = async (files) => {
     await Promise.all(workerPromises);
     return { failedFiles, successfulFiles, jobStartTime: new Date(jobStartTime) };
 };
-module.exports = { convertFiles };
+export { convertFiles };
 //# sourceMappingURL=converterManager.js.map

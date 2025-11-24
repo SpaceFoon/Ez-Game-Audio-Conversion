@@ -27,7 +27,7 @@ const {
   getLoopPoints,
   convertLoopPoints,
   formatLoopData,
-} = require('../../src/metaDataService');
+} = require('../../src/metadataService');
 
 describe('metadataService', () => {
   // Save original console methods

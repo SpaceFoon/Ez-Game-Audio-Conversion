@@ -2,7 +2,7 @@ const { performance } = require('perf_hooks');
 // const { settings } = require('./utils'); // Unused, mock handles this
 // const chalk = require('chalk'); // Unused, mock handles this
 // const { spawn } = require('child_process'); // Unused, mock handles this
-const finalize = require('../finalize');
+const finalize = require('../finalize').default;
 
 jest.mock('perf_hooks', () => ({ performance: { now: jest.fn() } }));
 jest.mock('../utils', () => ({

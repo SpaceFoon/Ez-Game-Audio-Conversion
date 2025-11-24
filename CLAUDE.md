@@ -6,25 +6,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Ez Game Audio Conversion is a batch audio converter designed for game developers. It converts audio files between multiple formats (WAV, MP3, OGG, FLAC, AIFF, M4A) with automatic handling of audio metadata, loop point tags, multi-threaded processing, and intelligent codec selection. The tool uses ffmpeg/ffprobe and Node.js worker threads to maximize performance.
 
+**Module System:** Native ES Modules (ESM) targeting Node.js 24+
+**Distribution:** Single Executable Application (SEA) using Node.js built-in feature
+
 ## Development Commands
 
 ### Running the Application
 
 ```bash
-npm run dev              # Run once with ts-node
+npm run dev              # Run with ts-node ESM loader
 npm run dev:watch        # Auto-reload on file changes (nodemon)
 npm run dev:js           # Build TypeScript then run compiled JS
 ```
 
+**Note:** The project uses ES modules. When running TypeScript directly, ts-node loads via the ESM loader: `node --loader ts-node/esm`
+
 ### Building
 
 ```bash
-npm run build:ts         # Compile TypeScript to dist/
+npm run build:ts         # Compile TypeScript to ES modules in dist/
 npm run build:watch      # Watch mode compilation
-npm run package          # Create standalone executables (requires build:ts first)
-npm run build            # Full build: TypeScript + package
+npm run build:sea        # Build Single Executable Application (SEA)
+npm run build            # Alias for build:ts
 npm run clean            # Remove dist/ and release/ folders
 ```
+
+**SEA Build Process:**
+1. Compiles TypeScript to ESM
+2. Generates SEA blob from `dist/app.js`
+3. Copies Node.js binary
+4. Injects application blob into executable using `postject`
+5. Outputs to `release/ez-game-audio.exe` (Windows) or `release/ez-game-audio` (Linux/macOS)
 
 ### Testing
 
@@ -71,12 +83,15 @@ The conversion process (`src/converterManager.ts`) uses Node.js worker threads:
 - Each worker spawns ffmpeg processes for individual conversions
 - Parent thread collects results and aggregates success/failure counts
 
-**Critical Detail**: Worker path resolution differs between development and packaged builds:
+**Critical Detail**: Worker uses ESM import.meta.url for path resolution:
 
 ```typescript
-const workerPath = runningPkg
-  ? join(__dirname, 'converterWorker.js')                    // Packaged
-  : join(__dirname, '..', 'dist', 'converterWorker.js')     // Development
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const workerPath = join(__dirname, 'converterWorker.js');
 ```
 
 ### Key Architectural Components
@@ -154,21 +169,21 @@ Success logs go to `logs.csv`, errors go to `error.csv`. If files are busy, the 
 
 Logs include: timestamp, exit code, input path, output path, error messages.
 
-## Package Configuration
+## Single Executable Application (SEA) Configuration
 
-The `pkg` section in `package.json` creates standalone executables:
+The project uses Node.js 24's built-in SEA feature to create standalone executables. Configuration is in `scripts/build-sea.js`:
 
-```json
-{
-  "targets": ["node24-win-x64", "node24-linux-x64"],
-  "assets": ["dist/converterWorker.js"],
-  "outputPath": "release"
-}
-```
+**Build Process:**
+1. Generates blob from `dist/app.js` using `--experimental-sea-config`
+2. Copies Node.js binary to `release/`
+3. Injects blob using `postject` tool
+4. Creates platform-specific executables
 
-**Critical**: `converterWorker.js` must be included as an asset since worker threads load it at runtime.
-
-**External Requirements**: Executables require `ffmpeg.exe` and `ffprobe.exe` in the same directory.
+**Important Notes:**
+- Worker threads work seamlessly in SEA (no special configuration needed)
+- The SEA blob includes all ESM imports
+- External Requirements: `ffmpeg.exe` and `ffprobe.exe` must still be in the same directory as the executable
+- Platform-specific signing may be required (macOS: codesign, Linux: chmod +x)
 
 ## Testing Architecture
 
@@ -185,12 +200,16 @@ Coverage thresholds: 40% branches, 50% functions, 55% lines/statements.
 ## TypeScript Configuration
 
 - Target: ES2022
-- Module: CommonJS (required for pkg compatibility)
+- Module: NodeNext (native ESM)
+- Module Resolution: NodeNext
 - Strict mode enabled
 - Source maps generated for debugging
 - Output directory: `dist/`
 
-Uses a hybrid approach: TypeScript for source, CommonJS `module.exports` for Node.js compatibility.
+**Important ESM Requirements:**
+- All relative imports must include `.js` extension (even in `.ts` files)
+- Use `import.meta.url` for entry point detection (not `require.main === module`)
+- For `__dirname` replacement: `dirname(fileURLToPath(import.meta.url))`
 
 ## Format-Specific Codec Selection
 
@@ -210,3 +229,11 @@ To modify bitrates or codecs, edit `getCodec()` and `getBitrate()` functions in 
 - Git hooks: Husky pre-commit hook uses `npx` (not hardcoded Windows paths)
 - Executable extensions: `.exe` suffix automatically added on Windows
 - File paths: Use `path.join()` and `path.resolve()` for cross-platform compatibility
+- SEA builds: Use platform-specific postject flags (different for Windows/macOS/Linux)
+
+## Known Issues
+
+**Test File Errors:** `src/__tests__/utils.test.js` has ESLint errors due to ESM migration:
+- `fileNameL` and `fileNameE` are now internal to `utils.ts`
+- Tests need refactoring to not directly manipulate these variables
+- Alternatively, export them as mutable references if tests require direct access

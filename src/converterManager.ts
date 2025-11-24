@@ -4,20 +4,24 @@ import type {
   ConversionItem,
   ConversionJob,
   ConversionResult,
-} from './types/audio';
+} from './types/audio.js';
 
-const { Worker } = require('worker_threads');
-const { performance } = require('perf_hooks');
-const { cpus } = require('os');
-const { join } = require('path');
-const chalk = require('chalk');
-const {
+import { Worker } from 'worker_threads';
+import { performance } from 'perf_hooks';
+import { cpus } from 'os';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import chalk from 'chalk';
+import {
   initializeFileNames,
   addToLog,
   settings,
   checkDiskSpace,
   rl,
-} = require('./utils');
+} from './utils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const convertFiles = async (
   files: ConversionItem[]
@@ -208,4 +212,4 @@ const convertFiles = async (
   return { failedFiles, successfulFiles, jobStartTime: new Date(jobStartTime) };
 };
 
-module.exports = { convertFiles };
+export { convertFiles };

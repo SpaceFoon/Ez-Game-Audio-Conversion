@@ -1,4 +1,4 @@
-const searchFiles = require('../../src/searchFiles');
+const searchFiles = require('../../src/searchFiles').default;
 const fs = require('fs');
 // const chalk = require('chalk'); // Unused, mock handles this
 const path = require('path');

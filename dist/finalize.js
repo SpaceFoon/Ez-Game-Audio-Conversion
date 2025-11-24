@@ -1,9 +1,7 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const { performance } = require('perf_hooks');
-const { settings, rl } = require('./utils');
-const { spawn } = require('child_process');
-const chalk = require('chalk');
+import { performance } from 'perf_hooks';
+import { settings, rl } from './utils.js';
+import { spawn } from 'child_process';
+import chalk from 'chalk';
 const finalize = async (failedFiles = [], successfulFiles = [], jobStartTime = Date.now()) => {
     const jobEndTime = performance.now();
     const startMs = typeof jobStartTime === 'number' ? jobStartTime : jobStartTime.getTime();
@@ -43,5 +41,5 @@ const finalize = async (failedFiles = [], successfulFiles = [], jobStartTime = D
     };
     quit();
 };
-module.exports = finalize;
+export default finalize;
 //# sourceMappingURL=finalize.js.map

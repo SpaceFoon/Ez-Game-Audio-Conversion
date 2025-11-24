@@ -13,8 +13,7 @@
       "Bash(npm run lint)",
       "Bash(npm run lint:*)",
       "Bash(npm run format:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

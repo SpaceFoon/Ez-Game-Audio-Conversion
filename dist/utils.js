@@ -1,11 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const readline = require('readline');
-const { openSync, closeSync, existsSync, appendFileSync, writeFileSync, statSync, mkdirSync, } = require('fs');
-const moment = require('moment');
-const chalk = require('chalk');
-const { join } = require('path');
-let settings = {
+import readline from 'readline';
+import { openSync, closeSync, existsSync, appendFileSync, writeFileSync, statSync, mkdirSync, } from 'fs';
+import moment from 'moment';
+import chalk from 'chalk';
+import { join } from 'path';
+import { spawn } from 'child_process';
+export let settings = {
     inputFilePath: '',
     outputFilePath: '',
     inputFormats: [],
@@ -65,7 +64,7 @@ else {
         terminal: false,
     });
 }
-const getAnswer = (question) => new Promise((resolve) => {
+export const getAnswer = (question) => new Promise((resolve) => {
     // Handle array of strings (from chalk)
     const formattedQuestion = Array.isArray(question)
         ? question.join(' ')
@@ -99,7 +98,7 @@ console.warn = function (...args) {
     originalConsoleWarn.apply(console, coloredArgs);
 };
 // If a file is not writing, check the disk space.
-const checkDiskSpace = (directory) => {
+export const checkDiskSpace = (directory) => {
     // If directory is empty or undefined, use the current directory
     if (!directory) {
         directory = process.cwd();
@@ -118,7 +117,7 @@ const checkDiskSpace = (directory) => {
     }
 };
 // If a file fails to read or write, check if it is busy.
-const isFileBusy = async (file) => {
+export const isFileBusy = async (file) => {
     if (!existsSync(file))
         return false;
     try {
@@ -144,7 +143,7 @@ const isFileBusy = async (file) => {
 // Error logging to CSV.
 let fileNameL = null;
 let fileNameE = null;
-const initializeFileNames = () => {
+export const initializeFileNames = () => {
     const basePath = settings.outputFilePath || '';
     // Ensure output directory exists once (cross-platform)
     if (basePath) {
@@ -171,7 +170,7 @@ const initFileName = (basePath, fileName) => {
     }
     return fullFileName;
 };
-const addToLog = async (log, file) => {
+export const addToLog = async (log, file) => {
     // Ensure log file names are set
     if (!fileNameL || !fileNameE) {
         initializeFileNames();
@@ -245,22 +244,12 @@ const addToLog = async (log, file) => {
         return false;
     }
 };
-function handleExit(code = 0, { restart = false } = {}) {
-    if (restart && code === 0) {
-        const { spawn } = require('child_process');
+export function handleExit(code = 0, { restart = false } = {}) {
+    if (restart && code === 0 && process.argv[0]) {
         console.log('Restarting the app...');
         spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' });
     }
     process.exit(code);
 }
-module.exports = {
-    initializeFileNames,
-    getAnswer,
-    isFileBusy,
-    addToLog,
-    rl,
-    settings,
-    checkDiskSpace,
-    handleExit,
-};
+export { rl };
 //# sourceMappingURL=utils.js.map

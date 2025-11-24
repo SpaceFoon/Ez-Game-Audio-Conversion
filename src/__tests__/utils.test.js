@@ -1,7 +1,23 @@
 // src/__tests__/utils.test.js
 // Import the module directly
-const utils = require('../../src/utils');
-const fs = require('fs');
+import {
+  rl,
+  settings,
+  initializeFileNames,
+  getAnswer,
+  isFileBusy,
+  addToLog,
+  checkDiskSpace,
+  __setLogFileStateForTests,
+} from '../utils.js';
+import {
+  statSync as _statSync,
+  existsSync as _existsSync,
+  openSync as _openSync,
+  closeSync as _closeSync,
+  writeFileSync as _writeFileSync,
+  appendFileSync as _appendFileSync,
+} from 'fs';
 // const chalk = require('chalk'); // Unused, mock handles this
 // const moment = require('moment'); // Unused, mock handles this
 
@@ -36,7 +52,7 @@ describe('utils module', () => {
   };
 
   // Original functions that we'll restore in afterEach
-  const origReadline = utils.rl.question;
+  const origReadline = rl.question;
   // const origConsoleError = utils.originalConsoleError; // Unused
   // const origConsoleWarn = utils.originalConsolWarn; // Unused
 
@@ -49,11 +65,13 @@ describe('utils module', () => {
     console.warn = jest.fn();
 
     // Mock readline question
-    utils.rl.question = jest.fn((_, callback) => callback('test-answer'));
+    rl.question = jest.fn((_, callback) => callback('test-answer'));
 
     // Setup internal log files
-    utils.fileNameL = '/test/output/logs.csv';
-    utils.fileNameE = '/test/output/error.csv';
+    __setLogFileStateForTests(
+      '/test/output/logs.csv',
+      '/test/output/error.csv'
+    );
   });
 
   afterEach(() => {
@@ -61,40 +79,40 @@ describe('utils module', () => {
     console.log = originalConsole.log;
     console.error = originalConsole.error;
     console.warn = originalConsole.warn;
-    utils.rl.question = origReadline;
+    rl.question = origReadline;
   });
 
   it('should export expected functions and objects', () => {
-    expect(utils.settings).toBeDefined();
-    expect(typeof utils.initializeFileNames).toBe('function');
-    expect(typeof utils.getAnswer).toBe('function');
-    expect(typeof utils.isFileBusy).toBe('function');
-    expect(typeof utils.addToLog).toBe('function');
-    expect(typeof utils.checkDiskSpace).toBe('function');
+    expect(settings).toBeDefined();
+    expect(typeof initializeFileNames).toBe('function');
+    expect(typeof getAnswer).toBe('function');
+    expect(typeof isFileBusy).toBe('function');
+    expect(typeof addToLog).toBe('function');
+    expect(typeof checkDiskSpace).toBe('function');
   });
 
   it('should have correct structure in settings object', () => {
-    expect(utils.settings).toHaveProperty('inputFilePath');
-    expect(utils.settings).toHaveProperty('outputFilePath');
-    expect(utils.settings).toHaveProperty('inputFormats');
-    expect(utils.settings).toHaveProperty('outputFormats');
-    expect(utils.settings).toHaveProperty('oggCodec');
+    expect(settings).toHaveProperty('inputFilePath');
+    expect(settings).toHaveProperty('outputFilePath');
+    expect(settings).toHaveProperty('inputFormats');
+    expect(settings).toHaveProperty('outputFormats');
+    expect(settings).toHaveProperty('oggCodec');
   });
 
   describe('getAnswer function', () => {
     it('should return a promise that resolves with user input', async () => {
-      const answer = await utils.getAnswer('Test question');
+      const answer = await getAnswer('Test question');
       expect(answer).toBe('test-answer');
-      expect(utils.rl.question).toHaveBeenCalledWith(
+      expect(rl.question).toHaveBeenCalledWith(
         'Test question',
         expect.any(Function)
       );
     });
 
     it('should handle array inputs (from chalk)', async () => {
-      const answer = await utils.getAnswer(['Test', 'question']);
+      const answer = await getAnswer(['Test', 'question']);
       expect(answer).toBe('test-answer');
-      expect(utils.rl.question).toHaveBeenCalledWith(
+      expect(rl.question).toHaveBeenCalledWith(
         'Test question',
         expect.any(Function)
       );
@@ -103,76 +121,76 @@ describe('utils module', () => {
 
   describe('checkDiskSpace function', () => {
     it('should return true when disk space check succeeds', () => {
-      fs.statSync.mockReturnValueOnce({ isFile: () => false });
-      expect(utils.checkDiskSpace('/test/dir')).toBe(true);
-      expect(fs.statSync).toHaveBeenCalledWith('/test/dir');
+      _statSync.mockReturnValueOnce({ isFile: () => false });
+      expect(checkDiskSpace('/test/dir')).toBe(true);
+      expect(_statSync).toHaveBeenCalledWith('/test/dir');
     });
 
     it('should return true when directory is not provided', () => {
-      fs.statSync.mockReturnValueOnce({ isFile: () => false });
-      expect(utils.checkDiskSpace()).toBe(true);
-      expect(fs.statSync).toHaveBeenCalled();
+      _statSync.mockReturnValueOnce({ isFile: () => false });
+      expect(checkDiskSpace()).toBe(true);
+      expect(_statSync).toHaveBeenCalled();
     });
 
     it('should return true even when errors occur (fail-safe)', () => {
-      fs.statSync.mockImplementationOnce(() => {
+      _statSync.mockImplementationOnce(() => {
         throw new Error('Test error');
       });
-      expect(utils.checkDiskSpace('/test/dir')).toBe(true);
+      expect(checkDiskSpace('/test/dir')).toBe(true);
       expect(console.error).toHaveBeenCalled();
     });
   });
 
   describe('isFileBusy function', () => {
     it('should return false if file does not exist', async () => {
-      fs.existsSync.mockReturnValueOnce(false);
-      const result = await utils.isFileBusy('/test/file.txt');
+      _existsSync.mockReturnValueOnce(false);
+      const result = await isFileBusy('/test/file.txt');
       expect(result).toBe(false);
     });
 
     it('should return false if file is not busy', async () => {
-      fs.existsSync.mockReturnValueOnce(true);
-      fs.openSync.mockReturnValueOnce(123);
-      const result = await utils.isFileBusy('/test/file.txt');
+      _existsSync.mockReturnValueOnce(true);
+      _openSync.mockReturnValueOnce(123);
+      const result = await isFileBusy('/test/file.txt');
       expect(result).toBe(false);
-      expect(fs.openSync).toHaveBeenCalledWith('/test/file.txt', 'r+');
-      expect(fs.closeSync).toHaveBeenCalledWith(123);
+      expect(_openSync).toHaveBeenCalledWith('/test/file.txt', 'r+');
+      expect(_closeSync).toHaveBeenCalledWith(123);
     });
 
     it('should handle EBUSY error', async () => {
-      fs.existsSync.mockReturnValueOnce(true);
+      _existsSync.mockReturnValueOnce(true);
       const error = new Error('File is busy');
       error.code = 'EBUSY';
-      fs.openSync.mockImplementationOnce(() => {
+      _openSync.mockImplementationOnce(() => {
         throw error;
       });
 
       // Create a promise that resolves after a short delay to handle the async question
-      const promise = utils.isFileBusy('/test/file.txt');
+      const promise = isFileBusy('/test/file.txt');
 
       // We need to wait a tick to allow the async callback to run
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(utils.rl.question).toHaveBeenCalled();
+      expect(rl.question).toHaveBeenCalled();
       await promise;
     });
   });
 
   describe('initializeFileNames function', () => {
     it('should initialize file names for logs and errors', () => {
-      utils.settings.outputFilePath = '/test/output';
-      utils.initializeFileNames();
+      settings.outputFilePath = '/test/output';
+      initializeFileNames();
       // Verify calls to existsSync
-      expect(fs.existsSync).toHaveBeenCalledWith('/test/output/logs.csv');
-      expect(fs.existsSync).toHaveBeenCalledWith('/test/output/error.csv');
+      expect(_existsSync).toHaveBeenCalledWith('/test/output/logs.csv');
+      expect(_existsSync).toHaveBeenCalledWith('/test/output/error.csv');
     });
   });
 
   describe('addToLog function', () => {
     beforeEach(() => {
       // Set up test environment
-      utils.settings.outputFilePath = '/test/output';
-      utils.initializeFileNames();
+      settings.outputFilePath = '/test/output';
+      initializeFileNames();
 
       // Reset mocks after initializeFileNames has been called
       jest.clearAllMocks();
@@ -180,61 +198,61 @@ describe('utils module', () => {
 
     it("should create a new log file when it doesn't exist", async () => {
       // First check if file exists (no)
-      fs.existsSync.mockReturnValueOnce(false);
+      _existsSync.mockReturnValueOnce(false);
 
-      await utils.addToLog(
+      await addToLog(
         { type: 'code', data: '0' },
         { inputFile: 'input.wav', outputFile: 'output.mp3' },
         0
       );
 
-      expect(fs.writeFileSync).toHaveBeenCalled();
+      expect(_writeFileSync).toHaveBeenCalled();
     });
 
     it('should append to existing log file', async () => {
       // First check if file exists (yes)
-      fs.existsSync.mockReturnValueOnce(true);
+      _existsSync.mockReturnValueOnce(true);
 
-      await utils.addToLog(
+      await addToLog(
         { type: 'code', data: '0' },
         { inputFile: 'input.wav', outputFile: 'output.mp3' },
         0
       );
 
-      expect(fs.appendFileSync).toHaveBeenCalled();
+      expect(_appendFileSync).toHaveBeenCalled();
     });
 
     it("should create a new error log file when it doesn't exist", async () => {
       // First check if file exists (no)
-      fs.existsSync.mockReturnValueOnce(false);
+      _existsSync.mockReturnValueOnce(false);
 
-      await utils.addToLog(
+      await addToLog(
         { type: 'stderr', data: 'Test error' },
         { inputFile: 'input.wav', outputFile: 'output.mp3' },
         0
       );
 
-      expect(fs.writeFileSync).toHaveBeenCalled();
+      expect(_writeFileSync).toHaveBeenCalled();
     });
 
     it('should append to existing error log file', async () => {
       // Setup fileNameE
-      utils.fileNameE = '/test/output/error.csv';
+      __setLogFileStateForTests(undefined, '/test/output/error.csv');
 
       // First check if file exists (yes)
-      fs.existsSync.mockReturnValue(true);
+      _existsSync.mockReturnValue(true);
 
       // Ensure appendFileSync is called properly
-      fs.appendFileSync.mockImplementation(() => true);
+      _appendFileSync.mockImplementation(() => true);
 
-      await utils.addToLog(
+      await addToLog(
         { type: 'stderr', data: 'Test error' },
         { inputFile: 'input.wav', outputFile: 'output.mp3' },
         0
       );
 
       // Now appendFileSync should have been called
-      expect(fs.appendFileSync).toHaveBeenCalled();
+      expect(_appendFileSync).toHaveBeenCalled();
     });
   });
 });

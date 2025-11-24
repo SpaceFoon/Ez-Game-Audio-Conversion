@@ -1,7 +1,7 @@
 const fs = require('fs');
 // const chalk = require('chalk'); // Unused, mock handles this
 const { getAnswer, settings } = require('../utils');
-const ExitProgramError = require('../exitProgramError');
+const ExitProgramError = require('../exitProgramError').default;
 
 jest.mock('fs');
 jest.mock('chalk', () => {
@@ -33,7 +33,7 @@ jest.mock('../utils', () => ({
   handleExit: jest.fn(),
 }));
 
-const createConversionList = require('../createConversionList');
+const createConversionList = require('../createConversionList').default;
 
 describe('createConversionList', () => {
   beforeEach(() => {

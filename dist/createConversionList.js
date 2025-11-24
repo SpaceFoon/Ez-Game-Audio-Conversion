@@ -1,14 +1,12 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const { existsSync, mkdirSync } = require('fs');
-const { join, basename, extname, dirname } = require('path');
-const chalk = require('chalk');
-const { getAnswer, settings, handleExit } = require('./utils');
+import { existsSync, mkdirSync } from 'fs';
+import { join, basename, extname, dirname } from 'path';
+import chalk from 'chalk';
+import { getAnswer, settings, handleExit } from './utils.js';
 // Get a unique output file name
 const getOutputFileCopy = async (inputFile, outputFormat, outputFolder, copyNumber = 1) => {
     let baseNameCopy = basename(inputFile, extname(inputFile));
     let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
-    if (match) {
+    if (match && match[1] && match[2]) {
         baseNameCopy = match[1];
         copyNumber = parseInt(match[2], 10);
         copyNumber++;
@@ -233,5 +231,5 @@ const createConversionList = async (files) => {
         return filesToConvert;
     }
 };
-module.exports = createConversionList;
+export default createConversionList;
 //# sourceMappingURL=createConversionList.js.map

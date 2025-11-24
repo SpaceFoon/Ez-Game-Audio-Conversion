@@ -1,8 +1,8 @@
-const { existsSync, mkdirSync } = require('fs');
-const { join, basename, extname, dirname } = require('path');
-const chalk = require('chalk');
-const { getAnswer, settings, handleExit } = require('./utils');
-import type { AudioFormat, ConversionItem } from './types/audio';
+import { existsSync, mkdirSync } from 'fs';
+import { join, basename, extname, dirname } from 'path';
+import chalk from 'chalk';
+import { getAnswer, settings, handleExit } from './utils.js';
+import type { AudioFormat, ConversionItem, OggCodec } from './types/audio.js';
 
 // Get a unique output file name
 const getOutputFileCopy = async (
@@ -14,7 +14,7 @@ const getOutputFileCopy = async (
   let baseNameCopy = basename(inputFile, extname(inputFile));
   let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
 
-  if (match) {
+  if (match && match[1] && match[2]) {
     baseNameCopy = match[1];
     copyNumber = parseInt(match[2], 10);
     copyNumber++;
@@ -35,7 +35,7 @@ const getOutputFileCopy = async (
   return outputFileCopy;
 };
 
-const askOggCodec = async (): Promise<string> => {
+const askOggCodec = async (): Promise<OggCodec> => {
   //Choose codec for OGG
   const userResponse = await getAnswer(
     chalk.blue.bold(
@@ -362,4 +362,4 @@ const createConversionList = async (
   }
 };
 
-module.exports = createConversionList;
+export default createConversionList;

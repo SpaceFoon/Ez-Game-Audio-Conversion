@@ -5,4 +5,4 @@ class ExitProgramError extends Error {
   }
 }
 
-module.exports = ExitProgramError;
+export default ExitProgramError;

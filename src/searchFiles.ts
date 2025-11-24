@@ -1,7 +1,7 @@
-const { readdirSync, statSync } = require('fs');
-const { join, extname } = require('path');
-const chalk = require('chalk');
-import type { Settings } from './types/settings';
+import { readdirSync, statSync } from 'fs';
+import { join, extname } from 'path';
+import chalk from 'chalk';
+import type { Settings } from './types/settings.js';
 
 //Searches for files that meet criteria
 const searchFiles = (settings: Settings): Promise<string[]> => {
@@ -56,4 +56,4 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   return Promise.resolve(allFiles);
 };
 
-module.exports = searchFiles;
+export default searchFiles;

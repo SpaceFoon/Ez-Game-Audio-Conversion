@@ -1,19 +1,21 @@
-const cfonts = require('cfonts');
-const { platform } = require('os');
-const os = require('os');
-const getUserInput = require('./getUserInput');
-const searchFiles = require('./searchFiles');
-const createConversionList = require('./createConversionList');
-const { convertFiles } = require('./convertFiles');
-const { settings } = require('./utils');
-const finalize = require('./finalize');
-const ExitProgramError = require('./exitProgramError');
-require('dotenv').config();
+import cfonts from 'cfonts';
+import { platform } from 'os';
+import os from 'os';
+import { config } from 'dotenv';
+import getUserInput from './getUserInput.js';
+import searchFiles from './searchFiles.js';
+import createConversionList from './createConversionList.js';
+import { convertFiles } from './convertFiles.js';
+import { settings } from './utils.js';
+import finalize from './finalize.js';
+import ExitProgramError from './exitProgramError.js';
 // Ensure global type augmentation is loaded for ts-node/tsc
-import './types/global';
+import './types/global.js';
 
-import type { Settings } from './types/settings';
-import type { ConversionJob } from './types/audio';
+import type { Settings } from './types/settings.js';
+import type { ConversionJob } from './types/audio.js';
+
+config();
 
 function runApp(): Promise<void> {
   if (typeof globalThis.env === 'undefined') {
@@ -32,15 +34,7 @@ function runApp(): Promise<void> {
     };
   }
 
-  // No need to require the worker at runtime; pkg bundles it via pkg.assets
-  // However, during packaging (and for tests expecting this), require it once.
-  if (process.env['PKG_ENV'] === 'packaging') {
-    try {
-      require('./converterWorker');
-    } catch {
-      // Ignore require errors during packaging
-    }
-  }
+  // Worker is loaded dynamically by converterManager when needed
   if (globalThis.env.isDebug) {
     console.log('debug mode');
   }
@@ -101,8 +95,9 @@ function runApp(): Promise<void> {
   );
 }
 
-if (require.main === module) {
+// ESM entry point check
+if (import.meta.url === `file://${process.argv[1]}`) {
   runApp();
 }
 
-module.exports = runApp;
+export default runApp;

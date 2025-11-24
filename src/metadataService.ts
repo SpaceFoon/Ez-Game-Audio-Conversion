@@ -1,9 +1,9 @@
 //metaDataService.ts
-import type { AudioMetadata } from './types/metadata';
+import type { AudioMetadata } from './types/metadata.js';
 
-const { spawnSync } = require('child_process');
-const { join } = require('path');
-const { existsSync } = require('fs');
+import { spawnSync } from 'child_process';
+import { join } from 'path';
+import { existsSync } from 'fs';
 
 // Get metaData from a file using ffprobe
 const getMetaData = async (
@@ -457,12 +457,4 @@ export const formatLoopData = (loopStart: any, loopLength: any) => {
   );
 };
 
-module.exports = {
-  getMetaData,
-  formatMetaDataField,
-  formatMetaData,
-  formatMetaDataArgs,
-  getLoopPoints,
-  convertLoopPoints,
-  formatLoopData,
-};
+export { getMetaData, formatMetaDataField, formatMetaData };

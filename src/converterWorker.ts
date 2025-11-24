@@ -1,16 +1,16 @@
 // converterWorker.ts
 // Worker runs ffprobe to get meta data then ffmpeg to convert on one file.
-const { spawn } = require('child_process');
-const { workerData, parentPort } = require('worker_threads');
-const { join, dirname } = require('path');
-const { existsSync, mkdirSync } = require('fs');
-const {
+import { spawn } from 'child_process';
+import { workerData, parentPort } from 'worker_threads';
+import { join, dirname } from 'path';
+import { existsSync, mkdirSync } from 'fs';
+import {
   getMetaData,
   formatMetaDataArgs,
   convertLoopPoints,
   formatLoopData,
   formatMetaData,
-} = require('./metadataService');
+} from './metadataService.js';
 
 // Helper function for failures
 const failWorker = (reason: any) => {
@@ -26,7 +26,7 @@ const postError = (reason: any, fileCtx: any = {}) => {
       ? reason.message
       : String(reason || 'Unknown error');
   try {
-    parentPort.postMessage({
+    parentPort?.postMessage({
       type: 'error',
       data: msg,
       file: { inputFile: fileCtx?.inputFile, outputFile: fileCtx?.outputFile },
@@ -340,7 +340,7 @@ const converterWorker = async ({
     } catch {
       // Preserve legacy behavior: don't fail conversion on mkdir issues; report and continue
       try {
-        parentPort.postMessage({ type: 'code', data: 0 });
+        parentPort?.postMessage({ type: 'code', data: 0 });
       } catch {
         // Ignore postMessage errors
       }
@@ -460,14 +460,14 @@ const runFFMPEG = (
         const errorText = data.toString().trim();
         errorOutput += errorText + '\n';
         if (errorText) {
-          parentPort.postMessage({ type: 'stderr', data: errorText });
+          parentPort?.postMessage({ type: 'stderr', data: errorText });
         }
       });
 
       // Handle successful completion
       ffmpegCommand.on('exit', (code: any) => {
         if (code === 0) {
-          parentPort.postMessage({ type: 'code', data: code });
+          parentPort?.postMessage({ type: 'code', data: code });
           resolve(undefined);
         } else {
           const fileExt = outputFile.split('.').pop()?.toLowerCase();
@@ -495,11 +495,10 @@ const runFFMPEG = (
     }
   });
 };
-if (require.main === module) {
+
+// ESM equivalent of require.main === module
+if (import.meta.url === `file://${process.argv[1]}`) {
   runConversion();
 }
 
-module.exports = {
-  runConversion,
-  converterWorker,
-};
+export { runConversion, converterWorker };

@@ -1,5 +1,5 @@
-const readline = require('readline');
-const {
+import readline from 'readline';
+import {
   openSync,
   closeSync,
   existsSync,
@@ -7,13 +7,14 @@ const {
   writeFileSync,
   statSync,
   mkdirSync,
-} = require('fs');
-const moment = require('moment');
-const chalk = require('chalk');
-const { join } = require('path');
-import type { Settings, LogEntry, FileInfo } from './types/settings';
+} from 'fs';
+import moment from 'moment';
+import chalk from 'chalk';
+import { join } from 'path';
+import { spawn } from 'child_process';
+import type { Settings, LogEntry, FileInfo } from './types/settings.js';
 
-let settings: Settings = {
+export let settings: Settings = {
   inputFilePath: '',
   outputFilePath: '',
   inputFormats: [],
@@ -76,7 +77,7 @@ if (process.env.JEST_WORKER_ID) {
   }) as unknown as ReadLineLike;
 }
 
-const getAnswer = (question: string | string[]): Promise<string> =>
+export const getAnswer = (question: string | string[]): Promise<string> =>
   new Promise((resolve) => {
     // Handle array of strings (from chalk)
     const formattedQuestion = Array.isArray(question)
@@ -113,7 +114,7 @@ console.warn = function (...args) {
 };
 
 // If a file is not writing, check the disk space.
-const checkDiskSpace = (directory?: string): boolean => {
+export const checkDiskSpace = (directory?: string): boolean => {
   // If directory is empty or undefined, use the current directory
   if (!directory) {
     directory = process.cwd();
@@ -134,7 +135,7 @@ const checkDiskSpace = (directory?: string): boolean => {
 };
 
 // If a file fails to read or write, check if it is busy.
-const isFileBusy = async (file: string): Promise<boolean> => {
+export const isFileBusy = async (file: string): Promise<boolean> => {
   if (!existsSync(file)) return false;
   try {
     const fd = openSync(file, 'r+');
@@ -164,7 +165,24 @@ const isFileBusy = async (file: string): Promise<boolean> => {
 let fileNameL: string | null = null;
 let fileNameE: string | null = null;
 
-const initializeFileNames = () => {
+// Test helpers to control log file state in a platform-agnostic way
+export const __setLogFileStateForTests = (
+  logPath: string | null = fileNameL,
+  errorPath: string | null = fileNameE
+): void => {
+  fileNameL = logPath;
+  fileNameE = errorPath;
+};
+
+export const __getLogFileStateForTests = (): {
+  logFile: string | null;
+  errorFile: string | null;
+} => ({
+  logFile: fileNameL,
+  errorFile: fileNameE,
+});
+
+export const initializeFileNames = () => {
   const basePath = settings.outputFilePath || '';
   // Ensure output directory exists once (cross-platform)
   if (basePath) {
@@ -194,7 +212,7 @@ const initFileName = (basePath: string, fileName: string): string => {
   return fullFileName;
 };
 
-const addToLog = async (
+export const addToLog = async (
   log: LogEntry,
   file?: FileInfo
 ): Promise<boolean | void> => {
@@ -278,25 +296,15 @@ const addToLog = async (
   }
 };
 
-function handleExit(
+export function handleExit(
   code: number = 0,
   { restart = false }: { restart?: boolean } = {}
 ): void {
-  if (restart && code === 0) {
-    const { spawn } = require('child_process');
+  if (restart && code === 0 && process.argv[0]) {
     console.log('Restarting the app...');
     spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' });
   }
   process.exit(code);
 }
 
-module.exports = {
-  initializeFileNames,
-  getAnswer,
-  isFileBusy,
-  addToLog,
-  rl,
-  settings,
-  checkDiskSpace,
-  handleExit,
-};
+export { rl };

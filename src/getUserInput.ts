@@ -1,10 +1,10 @@
-const { existsSync, mkdirSync, statSync } = require('fs');
-const chalk = require('chalk');
-const { checkDiskSpace } = require('./utils');
-const readline = require('readline/promises');
-const path = require('path');
-import type { Settings } from './types/settings';
-import type { AudioFormat } from './types/audio';
+import { existsSync, mkdirSync, statSync } from 'fs';
+import chalk from 'chalk';
+import { checkDiskSpace } from './utils.js';
+import readline from 'readline/promises';
+import path from 'path';
+import type { Settings } from './types/settings.js';
+import type { AudioFormat } from './types/audio.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -17,12 +17,13 @@ const outputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 //Entire input loop to get settings before converting.
 const getUserInput = async (settings: Settings): Promise<Settings> => {
   // Check if we have a command-line argument (either file or folder)
-  if (process.argv.length > 2 && existsSync(process.argv[2])) {
-    const pathStats = statSync(process.argv[2]);
+  const argPath = process.argv[2];
+  if (argPath && process.argv.length > 2 && existsSync(argPath)) {
+    const pathStats = statSync(argPath);
 
     // Handle single file mode
     if (pathStats.isFile()) {
-      const filePath = process.argv[2];
+      const filePath = argPath;
       const fileExt = path.extname(filePath).toLowerCase().substring(1); // Remove the dot
 
       if (!inputTypes.includes(fileExt as AudioFormat)) {
@@ -44,7 +45,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     }
     // Handle folder from context menu
     else if (pathStats.isDirectory()) {
-      settings.inputFilePath = process.argv[2] || '';
+      settings.inputFilePath = argPath;
       settings.singleFileMode = false;
       console.log(
         chalk.green.italic(`\n📝 Input Folder: ${settings.inputFilePath} ✅`)
@@ -90,10 +91,10 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
         );
 
         settings.inputFormats = inputFormatString
-          ? inputFormatString
+          ? (inputFormatString
               .toLowerCase()
               .split(/\s*,\s*|\s+/)
-              .map((format: string) => format.trim())
+              .map((format: string) => format.trim()) as AudioFormat[])
           : [...inputTypes];
 
         if (
@@ -126,10 +127,10 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       );
 
       settings.outputFormats = outputFormatString
-        ? outputFormatString
+        ? (outputFormatString
             .toLowerCase()
             .split(/\s*,\s*|\s+/)
-            .map((format: string) => format.trim())
+            .map((format: string) => format.trim()) as AudioFormat[])
         : [...outputTypes];
 
       if (
@@ -214,10 +215,10 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     );
 
     settings.inputFormats = inputFormatString
-      ? inputFormatString
+      ? (inputFormatString
           .toLowerCase()
           .split(/\s*,\s*|\s+/)
-          .map((format: string) => format.trim())
+          .map((format: string) => format.trim()) as AudioFormat[])
       : [...inputTypes];
 
     if (
@@ -283,4 +284,4 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
   return settings;
 };
 
-module.exports = getUserInput;
+export default getUserInput;

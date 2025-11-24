@@ -5,11 +5,11 @@ const fs = require('fs');
 //   formatMetaData,
 //   convertLoopPoints,
 //   formatLoopData,
-// } = require('../metaDataService'); // Unused, mock handles this
+// } = require('../metadataService'); // Unused, mock handles this
 
 // Mock dependencies
 jest.mock('fs');
-jest.mock('../metaDataService', () => ({
+jest.mock('../metadataService', () => ({
   getMetaData: jest.fn(),
   formatMetaData: jest.fn(),
   convertLoopPoints: jest.fn(),
@@ -61,20 +61,20 @@ describe('converterWorker.js', () => {
     originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'test';
 
-    // Setup default mocks for metaDataService
-    require('../metaDataService').getMetaData.mockResolvedValue({
+    // Setup default mocks for metadataService
+    require('../metadataService').getMetaData.mockResolvedValue({
       streams: [{ sample_rate: 44100 }],
     });
-    require('../metaDataService').formatMetaData.mockReturnValue({
+    require('../metadataService').formatMetaData.mockReturnValue({
       metaData: '-metadata title=Test',
       channels: '-ac 2',
     });
-    require('../metaDataService').convertLoopPoints.mockReturnValue({
+    require('../metadataService').convertLoopPoints.mockReturnValue({
       newSampleRate: null,
       loopStart: null,
       loopLength: null,
     });
-    require('../metaDataService').formatLoopData.mockReturnValue('');
+    require('../metadataService').formatLoopData.mockReturnValue('');
   });
 
   afterEach(() => {
@@ -169,7 +169,7 @@ describe('converterWorker.js', () => {
       mkdirSync: mockMkdirSync,
     }));
 
-    jest.mock('../metaDataService', () => ({
+    jest.mock('../metadataService', () => ({
       getMetaData: jest
         .fn()
         .mockResolvedValue({ streams: [{ sample_rate: 44100 }] }),
@@ -245,7 +245,7 @@ describe('converterWorker.js', () => {
       dirname: jest.fn(() => ''),
     }));
 
-    jest.mock('../metaDataService', () => ({
+    jest.mock('../metadataService', () => ({
       getMetaData: jest
         .fn()
         .mockResolvedValue({ streams: [{ sample_rate: 44100 }] }),
@@ -303,7 +303,7 @@ describe('converterWorker.js', () => {
     });
 
     // Reconfigure metadata service for loop points present
-    const mds = require('../metaDataService');
+    const mds = require('../metadataService');
     mds.getMetaData.mockResolvedValue({
       streams: [{ sample_rate: 44100 }],
       format: { tags: { LOOPSTART: '1000', LOOPLENGTH: '10000' } },

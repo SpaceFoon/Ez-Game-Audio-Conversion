@@ -30,7 +30,7 @@ describe('app.js', () => {
     jest.doMock('os', () => mockOs);
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(mockGetUserInput).toHaveBeenCalled();
@@ -64,7 +64,7 @@ describe('app.js', () => {
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(errorSpy).toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('app.js', () => {
     jest.doMock('os', () => mockOs);
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(globalThis.env).toEqual({ already: true });
@@ -148,7 +148,7 @@ describe('app.js', () => {
     jest.doMock('os', () => mockOs);
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(converterWorkerLoaded).toBe(true);
@@ -204,7 +204,7 @@ describe('app.js', () => {
       destroy: () => {},
     };
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(logSpy).toHaveBeenCalledWith('debug mode');
@@ -254,7 +254,7 @@ describe('app.js', () => {
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(logSpy).toHaveBeenCalledWith('in dev mode');
@@ -291,7 +291,7 @@ describe('app.js', () => {
       .spyOn(process.stdout, 'write')
       .mockImplementation(() => {});
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       await runApp();
     });
     expect(writeSpy).toHaveBeenCalledWith('\x1b]0;EZ Game Audio\x1b\x5c');
@@ -332,7 +332,7 @@ describe('app.js', () => {
     jest.doMock('os', () => mockOsWin);
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       const { settings } = require('../utils');
       await runApp();
       expect(settings.userOS).toBe('ffprobe.exe');
@@ -347,7 +347,7 @@ describe('app.js', () => {
     jest.doMock('os', () => mockOsNonWin);
     jest.doMock('dotenv', () => ({ config: jest.fn() }));
     await jest.isolateModulesAsync(async () => {
-      const runApp = require('../app');
+      const runApp = require('../app').default;
       const { settings } = require('../utils');
       await runApp();
       expect(settings.userOS).toBe('ffprobe');

@@ -1,1 +1,15 @@
-npx lint-staged
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Try to find npx in common locations for GitHub Desktop compatibility
+if command -v npx >/dev/null 2>&1; then
+  npx lint-staged
+elif [ -f "$HOME/AppData/Roaming/nvm/npx.cmd" ]; then
+  "$HOME/AppData/Roaming/nvm/npx.cmd" lint-staged
+elif [ -f "/c/Program Files/nodejs/npx.cmd" ]; then
+  "/c/Program Files/nodejs/npx.cmd" lint-staged
+else
+  echo "Warning: npx not found, skipping lint-staged"
+  echo "To run linting, commit from a terminal with Node.js in PATH"
+  exit 0
+fi

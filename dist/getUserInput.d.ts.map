@@ -1,1 +1,1 @@
-{"version":3,"file":"getUserInput.d.ts","sourceRoot":"","sources":["../src/getUserInput.ts"],"names":[],"mappings":""}
+{"version":3,"file":"getUserInput.d.ts","sourceRoot":"","sources":["../src/getUserInput.ts"],"names":[],"mappings":"AAKA,OAAO,KAAK,EAAE,QAAQ,EAAE,MAAM,qBAAqB,CAAC;AAYpD,QAAA,MAAM,YAAY,GAAU,UAAU,QAAQ,KAAG,OAAO,CAAC,QAAQ,CA2QhE,CAAC;AAEF,eAAe,YAAY,CAAC"}

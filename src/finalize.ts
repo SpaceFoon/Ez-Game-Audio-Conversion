@@ -1,8 +1,8 @@
-const { performance } = require('perf_hooks');
-const { settings, rl } = require('./utils');
-const { spawn } = require('child_process');
-const chalk = require('chalk');
-import type { ConversionResult } from './types/audio';
+import { performance } from 'perf_hooks';
+import { settings, rl } from './utils.js';
+import { spawn } from 'child_process';
+import chalk from 'chalk';
+import type { ConversionResult } from './types/audio.js';
 
 const finalize = async (
   failedFiles: ConversionResult[] = [],
@@ -67,4 +67,5 @@ const finalize = async (
   };
   quit();
 };
-module.exports = finalize;
+
+export default finalize;
