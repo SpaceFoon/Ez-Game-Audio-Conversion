@@ -1,2 +1,9 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Force LF line endings for all text files
+* text=auto eol=lf
+
+# Ensure shell scripts always use LF
+*.sh text eol=lf
+
+# Windows scripts can keep CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
