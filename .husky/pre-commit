@@ -1,6 +1,3 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
 # Try to find npx in common locations for GitHub Desktop compatibility
 if command -v npx >/dev/null 2>&1; then
   npx lint-staged
