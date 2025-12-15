@@ -2,8 +2,24 @@ import readline from 'readline';
 import { openSync, closeSync, existsSync, appendFileSync, writeFileSync, statSync, mkdirSync, } from 'fs';
 import moment from 'moment';
 import chalk from 'chalk';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const seaFuseKey = Object.keys(process.env).find((key) => key.startsWith('NODE_SEA_FUSE_'));
+export const isSeaRuntime = Boolean(seaFuseKey);
+export const isPackagedRuntime = isSeaRuntime ||
+    Boolean(process.pkg) ||
+    process.env.PKG_ENV === 'packaging';
+export const runtimeBaseDir = isPackagedRuntime
+    ? dirname(process.execPath)
+    : join(__dirname, '..');
+export const platformSlug = process.platform === 'win32'
+    ? 'windows'
+    : process.platform === 'darwin'
+        ? 'macos'
+        : 'linux';
 export let settings = {
     inputFilePath: '',
     outputFilePath: '',
@@ -61,7 +77,7 @@ else {
     rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
-        terminal: false,
+        terminal: true,
     });
 }
 export const getAnswer = (question) => new Promise((resolve) => {
@@ -69,7 +85,9 @@ export const getAnswer = (question) => new Promise((resolve) => {
     const formattedQuestion = Array.isArray(question)
         ? question.join(' ')
         : question;
-    rl.question(formattedQuestion, (answer) => {
+    // Always echo the question so Windows PowerShell/cmd users see it even if ANSI is suppressed
+    console.log(formattedQuestion);
+    rl.question('', (answer) => {
         resolve(answer);
     });
 });
@@ -100,8 +118,10 @@ console.warn = function (...args) {
 // If a file is not writing, check the disk space.
 export const checkDiskSpace = (directory) => {
     // If directory is empty or undefined, use the current directory
+    // TODO this is dumb. use windows music path
     if (!directory) {
-        directory = process.cwd();
+        console.warn(chalk.yellow.bold('\n⚠️ No directory provided for disk space check. No idea where to check! Assuming enough space...'));
+        return true;
     }
     try {
         // On Windows, this approach is more reliable
@@ -143,6 +163,15 @@ export const isFileBusy = async (file) => {
 // Error logging to CSV.
 let fileNameL = null;
 let fileNameE = null;
+// Test helpers to control log file state in a platform-agnostic way
+export const __setLogFileStateForTests = (logPath = fileNameL, errorPath = fileNameE) => {
+    fileNameL = logPath;
+    fileNameE = errorPath;
+};
+export const __getLogFileStateForTests = () => ({
+    logFile: fileNameL,
+    errorFile: fileNameE,
+});
 export const initializeFileNames = () => {
     const basePath = settings.outputFilePath || '';
     // Ensure output directory exists once (cross-platform)

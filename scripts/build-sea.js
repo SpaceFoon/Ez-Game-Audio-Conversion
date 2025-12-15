@@ -8,12 +8,12 @@
  */
 
 import { execSync } from 'child_process';
-import { copyFileSync, writeFileSync, mkdirSync } from 'fs';
+import { copyFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { platform } from 'os';
 
 const isWindows = platform() === 'win32';
-const APP_NAME = 'ez-game-audio';
+const APP_NAME = 'EZ-Game-Audio';
 const RELEASE_DIR = 'release';
 const SEA_CONFIG_PATH = 'sea-config.json';
 const SEA_BLOB_PATH = join(RELEASE_DIR, 'sea-prep.blob');
@@ -32,7 +32,7 @@ const seaConfig = {
   output: SEA_BLOB_PATH,
   disableExperimentalSEAWarning: true,
   useSnapshot: false,
-  useCodeCache: true,
+  useCodeCache: false, // Code cache doesn't work with ESM
 };
 writeFileSync(SEA_CONFIG_PATH, JSON.stringify(seaConfig, null, 2));
 
@@ -42,7 +42,7 @@ try {
   execSync(`node --experimental-sea-config ${SEA_CONFIG_PATH}`, {
     stdio: 'inherit',
   });
-} catch (error) {
+} catch {
   console.error('[SEA] Failed to generate SEA blob');
   process.exit(1);
 }
@@ -75,10 +75,27 @@ try {
   execSync(postjectCommand.join(' '), { stdio: 'inherit' });
 } catch (error) {
   console.error('[SEA] Failed to inject blob:', error.message);
-  console.error('Make sure postject is installed: npm install --save-dev postject');
+  console.error(
+    'Make sure postject is installed: npm install --save-dev postject'
+  );
   process.exit(1);
+}
+
+// Step 6: Cleanup temporary files
+console.log('[SEA] Cleaning up temporary files...');
+try {
+  if (existsSync(SEA_BLOB_PATH)) {
+    rmSync(SEA_BLOB_PATH);
+  }
+  if (existsSync(SEA_CONFIG_PATH)) {
+    rmSync(SEA_CONFIG_PATH);
+  }
+} catch {
+  console.warn('[SEA] Warning: Could not clean up some temporary files');
 }
 
 console.log('\n[SEA] Build complete!');
 console.log(`[SEA] Executable location: ${OUTPUT_EXE}`);
-console.log('[SEA] Remember to place ffmpeg/ffprobe binaries next to the executable before distribution.');
+console.log(
+  '[SEA] Remember to place ffmpeg/ffprobe binaries next to the executable before distribution.'
+);

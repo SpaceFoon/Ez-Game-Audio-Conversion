@@ -1,12 +1,7 @@
 import { existsSync, mkdirSync, statSync } from 'fs';
 import chalk from 'chalk';
-import { checkDiskSpace } from './utils.js';
-import readline from 'readline/promises';
+import { checkDiskSpace, getAnswer } from './utils.js';
 import path from 'path';
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-});
 const inputTypes = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 const outputTypes = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 //Entire input loop to get settings before converting.
@@ -39,7 +34,7 @@ const getUserInput = async (settings) => {
         }
         // Ask for the output folder
         while (true) {
-            let outputFilePath = await rl.question(chalk.blue.bold('\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input 📂:'));
+            let outputFilePath = await getAnswer(chalk.blue.bold('\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input 📂:'));
             if (outputFilePath === '')
                 outputFilePath = settings.inputFilePath;
             if (!existsSync(outputFilePath)) {
@@ -61,7 +56,7 @@ const getUserInput = async (settings) => {
         if (!settings.singleFileMode) {
             // Ask for input formats
             while (true) {
-                const inputFormatString = await rl.question(chalk.blue.bold('\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
+                const inputFormatString = await getAnswer(chalk.blue.bold('\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
                 settings.inputFormats = inputFormatString
                     ? inputFormatString
                         .toLowerCase()
@@ -81,7 +76,7 @@ const getUserInput = async (settings) => {
         }
         // Ask for output formats
         while (true) {
-            const outputFormatString = await rl.question(chalk.blue.bold('\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
+            const outputFormatString = await getAnswer(chalk.blue.bold('\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
             settings.outputFormats = outputFormatString
                 ? outputFormatString
                     .toLowerCase()
@@ -102,7 +97,7 @@ const getUserInput = async (settings) => {
     }
     // No command-line arguments - Normal interactive mode
     while (true) {
-        let inputFilePath = await rl.question(chalk.blue.bold('\n 📁 Choose the folder to search for files to convert. ', '\n 🔍 This will recursively search, ie: all subfolders ', '\n 🐭 Right-click to paste. ', '\n ✏️  Input Folder Path: '));
+        let inputFilePath = await getAnswer(chalk.blue.bold('\n 📁 Choose the folder to search for files to convert. ', '\n 🔍 This will recursively search, ie: all subfolders ', '\n 🐭 Right-click to paste. ', '\n ✏️  Input Folder Path: '));
         if (!existsSync(inputFilePath)) {
             console.warn('\n⚠️  File Path does not exist! 🤣😊😂');
             continue;
@@ -114,7 +109,7 @@ const getUserInput = async (settings) => {
     }
     // Ask for the output folder
     while (true) {
-        let outputFilePath = await rl.question(chalk.blue.bold('\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input files 📂:'));
+        let outputFilePath = await getAnswer(chalk.blue.bold('\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input files 📂:'));
         if (outputFilePath === '')
             outputFilePath = settings.inputFilePath;
         if (!existsSync(outputFilePath)) {
@@ -134,7 +129,7 @@ const getUserInput = async (settings) => {
     }
     // Ask for input formats
     while (true) {
-        const inputFormatString = await rl.question(chalk.blue.bold('\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
+        const inputFormatString = await getAnswer(chalk.blue.bold('\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
         settings.inputFormats = inputFormatString
             ? inputFormatString
                 .toLowerCase()
@@ -153,7 +148,7 @@ const getUserInput = async (settings) => {
     }
     // Ask for output formats
     while (true) {
-        const outputFormatString = await rl.question(chalk.blue.bold('\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
+        const outputFormatString = await getAnswer(chalk.blue.bold('\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '));
         settings.outputFormats = outputFormatString
             ? outputFormatString
                 .toLowerCase()

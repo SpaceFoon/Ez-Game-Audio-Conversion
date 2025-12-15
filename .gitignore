@@ -130,10 +130,15 @@ out
 ffmpeg-6.1.1-essentials_build.zip
 .history/
 *.exe
-dist/ffmpeg-tools-2022-01-01-git-d6b2357edd.zip
-dist/ffmpeg-6.1.1-essentials_build.7z
+dist/*
 notes/*
 release/*
+ffmpeg-bin/*
+!ffmpeg-bin/README.md
+!ffmpeg-bin/windows/.gitkeep
+!ffmpeg-bin/linux/.gitkeep
+!ffmpeg-bin/macos/.gitkeep
+sea-config.json
 
 **/**/*.mp3
 **/**/*.m4a

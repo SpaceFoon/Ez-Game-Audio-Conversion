@@ -1,4 +1,6 @@
-const path = require('path');
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+
+import { join, dirname, basename, extname } from 'path';
 
 // Simplified version of deleteDuplicateFiles for test purposes only
 const handleDuplicateFiles = (files) => {
@@ -13,8 +15,8 @@ const handleDuplicateFiles = (files) => {
     '.aiff',
   ];
   const fileobjs = files.map((file) => [
-    path.join(path.dirname(file), path.basename(file, path.extname(file))),
-    path.extname(file),
+    join(dirname(file), basename(file, extname(file))),
+    extname(file),
   ]);
 
   const uniq = new Map();
@@ -57,10 +59,10 @@ describe('Simple Integration Tests', () => {
 
   it('should handle duplicate files correctly', () => {
     // Create test data with duplicates (same name, different extensions)
-    const song1 = path.join('/test/input', 'song.mp3');
-    const song2 = path.join('/test/input', 'song.wav');
-    const song3 = path.join('/test/input', 'song.flac');
-    const unique = path.join('/test/input', 'unique.mp3');
+    const song1 = join('/test/input', 'song.mp3');
+    const song2 = join('/test/input', 'song.wav');
+    const song3 = join('/test/input', 'song.flac');
+    const unique = join('/test/input', 'unique.mp3');
 
     const filesWithDuplicates = [song1, song2, song3, unique];
 
@@ -75,14 +77,14 @@ describe('Simple Integration Tests', () => {
     expect(droppedFiles.length).toBe(2);
 
     // Use path.basename for more reliable assertions across platforms
-    const basenames = uniqueFiles.map((f) => path.basename(f));
+    const basenames = uniqueFiles.map((f) => basename(f));
     expect(basenames).toContain('song.flac');
     expect(basenames).toContain('unique.mp3');
     expect(basenames).not.toContain('song.mp3');
     expect(basenames).not.toContain('song.wav');
 
     // Check that the dropped files are the correct ones
-    const droppedBasenames = droppedFiles.map((f) => path.basename(f));
+    const droppedBasenames = droppedFiles.map((f) => basename(f));
     expect(droppedBasenames).toContain('song.mp3');
     expect(droppedBasenames).toContain('song.wav');
   });

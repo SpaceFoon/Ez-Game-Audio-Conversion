@@ -5,19 +5,30 @@
  * after tests have been run. It can be run manually or on a schedule.
  */
 
-const fs = require('fs');
-const path = require('path');
+import {
+  existsSync,
+  unlinkSync,
+  readdirSync,
+  statSync,
+  rmSync,
+  mkdirSync,
+} from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Add directories to clean up here
 const TEST_DIRECTORIES = [
-  path.join(__dirname, '..', 'test-assets'),
-  path.join(process.cwd(), 'format-test'),
-  path.join(process.cwd(), 'loop-test'),
-  path.join(process.cwd(), 'test-audio'),
-  path.join(process.cwd(), 'tag-test'),
-  path.join(process.cwd(), 'direct-test'),
-  path.join(process.cwd(), 'test-samplerates'),
-  path.join(process.cwd(), 'final-test'),
+  join(__dirname, '..', 'test-assets'),
+  join(process.cwd(), 'format-test'),
+  join(process.cwd(), 'loop-test'),
+  join(process.cwd(), 'test-audio'),
+  join(process.cwd(), 'tag-test'),
+  join(process.cwd(), 'direct-test'),
+  join(process.cwd(), 'test-samplerates'),
+  join(process.cwd(), 'final-test'),
 ];
 
 /**
@@ -25,8 +36,8 @@ const TEST_DIRECTORIES = [
  */
 function safeDeleteFile(filePath) {
   try {
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
     }
     return true;
   } catch (error) {
@@ -42,11 +53,11 @@ function safeDeleteFile(filePath) {
  */
 function cleanupTestDirectories(directories) {
   for (const dir of directories) {
-    if (fs.existsSync(dir)) {
+    if (existsSync(dir)) {
       try {
-        const files = fs.readdirSync(dir);
+        const files = readdirSync(dir);
         for (const file of files) {
-          safeDeleteFile(path.join(dir, file));
+          safeDeleteFile(join(dir, file));
         }
       } catch (error) {
         console.warn(
@@ -63,23 +74,23 @@ function cleanupTestDirectories(directories) {
  * @returns {boolean} - Success status
  */
 function cleanupDirectory(dirPath) {
-  if (!fs.existsSync(dirPath)) {
+  if (!existsSync(dirPath)) {
     console.log(`Directory does not exist: ${dirPath}`);
     return true;
   }
 
   try {
-    const stats = fs.statSync(dirPath);
+    const stats = statSync(dirPath);
     if (!stats.isDirectory()) {
       console.log(`Not a directory: ${dirPath}`);
       return false;
     }
 
     console.log(`Cleaning up directory: ${dirPath}`);
-    fs.rmSync(dirPath, { recursive: true, force: true });
+    rmSync(dirPath, { recursive: true, force: true });
 
     // If directory should remain, recreate it empty
-    fs.mkdirSync(dirPath, { recursive: true });
+    mkdirSync(dirPath, { recursive: true });
 
     return true;
   } catch (error) {
@@ -114,11 +125,11 @@ function cleanupAllDirectories() {
 }
 
 // If script is run directly, execute the cleanup
-if (require.main === module) {
+if (process.argv[1] === __filename) {
   cleanupAllDirectories();
 }
 
-module.exports = {
+export default {
   cleanupDirectory,
   cleanupAllDirectories,
   cleanupTestDirectories,

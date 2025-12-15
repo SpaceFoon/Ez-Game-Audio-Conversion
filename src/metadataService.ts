@@ -4,45 +4,62 @@ import type { AudioMetadata } from './types/metadata.js';
 import { spawnSync } from 'child_process';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { runtimeBaseDir, platformSlug } from './utils.js';
 
 // Get metaData from a file using ffprobe
 const getMetaData = async (
   inputFile: string
 ): Promise<AudioMetadata | null> => {
-  try {
-    // Determine executable name based on platform
-    const executableName =
-      process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
+  // Determine executable name based on platform
+  const executableName =
+    process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
 
-    const devPath = join(process.cwd(), executableName);
-    const binPath = join(process.cwd(), 'bin', executableName);
-    // Prefer dev path if present, otherwise try bin path (do not gate on exists for test predictability)
-    let ffprobePath = existsSync(devPath) ? devPath : binPath;
+  const searchPaths = [
+    join(runtimeBaseDir, executableName),
+    join(runtimeBaseDir, 'bin', executableName),
+    join(runtimeBaseDir, 'ffmpeg-bin', platformSlug, executableName),
+    join(process.cwd(), executableName),
+    join(process.cwd(), 'bin', executableName),
+    executableName, // Allow system PATH resolution as last resort
+  ];
 
-    const output = spawnSync(
-      ffprobePath,
-      [
-        '-v',
-        'quiet',
-        '-print_format',
-        'json',
-        '-show_format',
-        '-show_streams',
-        inputFile,
-      ],
-      { encoding: 'utf8' }
-    );
-    if (output.error) throw output.error;
-    if (!output.stdout) throw new Error('ffprobe returned no output');
-
-    const metaData: AudioMetadata = JSON.parse(output.stdout);
-    return metaData;
-  } catch (error: any) {
-    // Keep this lightweight for tests: don't import utils/addToLog here
-    // Standardize error message to match tests
-    console.error('Error running ffprobe.exe:', error.message || String(error));
-    return null;
+  let lastError: any;
+  for (const ffprobePath of searchPaths) {
+    if (ffprobePath !== executableName && !existsSync(ffprobePath)) continue;
+    try {
+      const output = spawnSync(
+        ffprobePath,
+        [
+          '-v',
+          'quiet',
+          '-print_format',
+          'json',
+          '-show_format',
+          '-show_streams',
+          inputFile,
+        ],
+        { encoding: 'utf8' }
+      );
+      if (output.error) {
+        throw output.error;
+      }
+      if (!output.stdout) {
+        throw new Error('ffprobe returned no output');
+      }
+      const metaData: AudioMetadata = JSON.parse(output.stdout);
+      return metaData;
+    } catch (error: any) {
+      // Try next candidate
+      lastError = error;
+      continue;
+    }
   }
+
+  console.error(
+    'Error running ffprobe:',
+    lastError?.message || 'ffprobe not found or failed'
+  );
+  return null;
 };
 
 // Extract metaData fields from tags
@@ -427,17 +444,6 @@ export const convertLoopPoints = (
   const ratio = (newSampleRate || sampleRateNumber) / sampleRateNumber;
   const convertedLoopStart = Math.round(loopStart * ratio);
   const convertedLoopLength = Math.round(loopLength * ratio);
-  if (process.env.DEBUG) {
-    console.log('convertLoopPoints - Conversion:', {
-      oldSampleRate: sampleRateNumber,
-      newSampleRate,
-      ratio,
-      oldLoopStart: loopStart,
-      newLoopStart: convertedLoopStart,
-      oldLoopLength: loopLength,
-      newLoopLength: convertedLoopLength,
-    });
-  }
 
   return {
     newSampleRate,

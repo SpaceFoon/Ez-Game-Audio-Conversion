@@ -8,29 +8,29 @@
     "ez-game-audio-conversion": "dist/app.js"
   },
   "scripts": {
-    "readme": "echo '\n📚 Available CLI Commands:\n\n🔧 Development:\n  npm run dev         - Run with ts-node\n  npm run dev:watch   - Run with nodemon and auto-restart\n  npm run dev:js      - Build then run JS version\n\n🏗️  Building:\n  npm run build:ts    - Compile TypeScript\n  npm run build:watch - Compile with watch mode\n  npm run package     - Build and create executable\n  npm run build       - Full build (TS + package)\n\n🧪 Testing:\n  npm run test        - Run Jest tests\n  npm run test:ci     - Run tests for CI\n  npm run test:coverage - Run with coverage report\n  npm run smoke       - Run smoke tests\n\n✨ Code Quality:\n  npm run lint        - Run ESLint\n  npm run format      - Format with Prettier\n  npm run clean       - Remove dist/release folders\n\n📖 Help:\n  npm run readme      - Show this help\n'",
-    "dev": "node --loader ts-node/esm ./src/app.ts",
-    "dev:watch": "nodemon --exec \"node --loader ts-node/esm ./src/app.ts\" --ext ts --ignore dist/ --ignore node_modules/",
+    "readme": "echo '\n📚 Available CLI Commands:\n\n🔧 Development:\n  npm run dev         - Run with ts-node ESM loader\n  npm run dev:watch   - Run with nodemon and auto-restart\n  npm run dev:js      - Build then run JS version\n\n🏗️  Building:\n  npm run build:ts    - Compile TypeScript to ESM\n  npm run build:watch - Compile with watch mode\n  npm run build:sea   - Build Single Executable Application\n  npm run package     - Full package: SEA + docs + ZIP/7z archives\n  npm run build       - Alias for build:ts\n\n🧪 Testing:\n  npm run test        - Run Jest tests\n  npm run test:ci     - Run tests for CI\n  npm run test:coverage - Run with coverage report\n  npm run smoke       - Run smoke tests\n\n✨ Code Quality:\n  npm run lint        - Run ESLint\n  npm run format      - Format with Prettier\n  npm run clean       - Remove dist/release folders\n\n📖 Help:\n  npm run readme      - Show this help\n'",
+    "dev": "npm run dev:js",
+    "dev:watch": "npm run dev:js",
     "dev:js": "npm run build:ts && node ./dist/app.js",
     "build:ts": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",
     "build": "npm run build:ts",
-    "package": "npm run build:sea",
+    "package": "npm run build:sea && node scripts/post-sea.js",
     "build:sea": "npm run build:ts && node scripts/build-sea.js",
     "clean": "rimraf dist/ release/",
-    "test": "jest \"src/__tests__/\" --runInBand",
-    "test:ci": "jest \"src/__tests__/\" --runInBand --detectOpenHandles",
-    "test:coverage": "jest --coverage --runInBand",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand",
+    "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --detectOpenHandles",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand",
     "smoke": "npm run package && npm run smoke:postpackage",
-    "smoke:postpackage": "node src/__tests__/smokeTest.js",
+    "smoke:postpackage": "node src/__tests__/smokeTest.mjs",
     "lint": "eslint . --ext .ts,.js",
     "format": "prettier --write .",
     "prepare": "husky"
   },
   "dependencies": {
     "cfonts": "^3.2.0",
-    "chalk": "^4.1.2",
-    "dotenv": "^16.5.0",
+    "chalk": "^5.6.2",
+    "dotenv": "^17.2.3",
     "moment": "^2.30.1",
     "winston": "^3.14.2"
   },
@@ -51,7 +51,7 @@
   "homepage": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion#readme",
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.3.0",
+    "@types/node": "^25.0.2",
     "@typescript-eslint/eslint-plugin": "^8.41.0",
     "@typescript-eslint/parser": "^8.41.0",
     "eslint": "^9.34.0",
@@ -59,7 +59,7 @@
     "eslint-plugin-prettier": "^5.5.4",
     "globals": "^16.3.0",
     "husky": "^9.1.7",
-    "jest": "^29.7.0",
+    "jest": "^30.2.0",
     "lint-staged": "^16.1.5",
     "markdown-to-html-cli": "^5.0.3",
     "md-to-pdf": "^5.2.4",
@@ -72,13 +72,7 @@
     "typescript": "^5.9.2"
   },
   "jest": {
-    "preset": "ts-jest",
     "testEnvironment": "node",
-    "globals": {
-      "ts-jest": {
-        "tsconfig": "tsconfig.json"
-      }
-    },
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/__tests__/test-utils/",
@@ -93,12 +87,18 @@
       "<rootDir>/build/",
       "<rootDir>/release/"
     ],
-    "moduleNameMapper": {
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    },
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "resolver": "./jest-resolver.cjs",
+    "moduleNameMapper": {},
     "transform": {
-      "^.+\\.(ts|tsx)$": "ts-jest",
-      "^.+\\.(js|jsx)$": "babel-jest"
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
     },
     "moduleFileExtensions": [
       "ts",

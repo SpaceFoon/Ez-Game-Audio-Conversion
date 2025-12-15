@@ -19,5 +19,5 @@ export declare const convertLoopPoints: (metaData: any, outputFormat: string, og
     loopLength: number;
 };
 export declare const formatLoopData: (loopStart: any, loopLength: any) => string;
-export { getMetaData, formatMetaDataField, formatMetaData, };
+export { getMetaData, formatMetaDataField, formatMetaData };
 //# sourceMappingURL=metadataService.d.ts.map

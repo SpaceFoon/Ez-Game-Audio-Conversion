@@ -10,9 +10,31 @@ import {
 } from 'fs';
 import moment from 'moment';
 import chalk from 'chalk';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import type { Settings, LogEntry, FileInfo } from './types/settings.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const seaFuseKey = Object.keys(process.env).find((key) =>
+  key.startsWith('NODE_SEA_FUSE_')
+);
+export const isSeaRuntime = Boolean(seaFuseKey);
+export const isPackagedRuntime =
+  isSeaRuntime ||
+  Boolean((process as any).pkg) ||
+  process.env.PKG_ENV === 'packaging';
+export const runtimeBaseDir = isPackagedRuntime
+  ? dirname(process.execPath)
+  : join(__dirname, '..');
+export const platformSlug =
+  process.platform === 'win32'
+    ? 'windows'
+    : process.platform === 'darwin'
+      ? 'macos'
+      : 'linux';
 
 export let settings: Settings = {
   inputFilePath: '',
@@ -73,7 +95,7 @@ if (process.env.JEST_WORKER_ID) {
   rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    terminal: false,
+    terminal: true,
   }) as unknown as ReadLineLike;
 }
 
@@ -83,7 +105,9 @@ export const getAnswer = (question: string | string[]): Promise<string> =>
     const formattedQuestion = Array.isArray(question)
       ? question.join(' ')
       : question;
-    rl.question(formattedQuestion, (answer: string) => {
+    // Always echo the question so Windows PowerShell/cmd users see it even if ANSI is suppressed
+    console.log(formattedQuestion);
+    rl.question('', (answer: string) => {
       resolve(answer);
     });
   });
@@ -116,8 +140,14 @@ console.warn = function (...args) {
 // If a file is not writing, check the disk space.
 export const checkDiskSpace = (directory?: string): boolean => {
   // If directory is empty or undefined, use the current directory
+  // TODO this is dumb. use windows music path
   if (!directory) {
-    directory = process.cwd();
+    console.warn(
+      chalk.yellow.bold(
+        '\n⚠️ No directory provided for disk space check. No idea where to check! Assuming enough space...'
+      )
+    );
+    return true;
   }
 
   try {

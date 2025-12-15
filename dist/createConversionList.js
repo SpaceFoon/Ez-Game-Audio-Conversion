@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'fs';
-import { join, basename, extname, dirname } from 'path';
+import { join, basename, extname, dirname, relative } from 'path';
 import chalk from 'chalk';
 import { getAnswer, settings, handleExit } from './utils.js';
 // Get a unique output file name
@@ -57,8 +57,38 @@ const createConversionList = async (files) => {
         console.error(chalk.redBright('\n❌ Error: No input files found to process.'));
         handleExit(1);
     }
+    // Pre-calculate and create all unique output directories ONCE
+    // This avoids 180k+ existsSync calls (30k files × 6 formats)
+    if (inputFilePath !== outputFilePath) {
+        console.log(chalk.cyan('\n📁 Preparing output directories...'));
+        const outputDirs = new Set();
+        for (const inputFile of files) {
+            try {
+                const relPath = dirname(relative(inputFilePath, inputFile));
+                outputDirs.add(join(outputFilePath, relPath));
+            }
+            catch {
+                // Will handle errors in main loop
+            }
+        }
+        console.log(chalk.cyan(`   Creating ${outputDirs.size} directories...`));
+        for (const dir of outputDirs) {
+            if (!existsSync(dir)) {
+                try {
+                    mkdirSync(dir, { recursive: true });
+                }
+                catch (error) {
+                    console.error(chalk.redBright.bold("Couldn't create directory:", dir), error);
+                }
+            }
+        }
+        console.log(chalk.green('   ✅ Directories ready'));
+    }
+    // Track progress for large batches
+    const totalItems = files.length * outputFormats.length;
+    let processedCount = 0;
+    const showProgress = files.length > 100;
     for (const inputFile of files) {
-        // Debug the input file
         console.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
         for (const outputFormat of outputFormats) {
             console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
@@ -69,7 +99,7 @@ const createConversionList = async (files) => {
             outputFile = `${join(dirname(inputFile), basename(inputFile, extname(inputFile)))}.${outputFormat}`;
             // Calculate relative path if needed
             try {
-                relativePath = dirname(inputFile.substring(inputFilePath.length));
+                relativePath = dirname(relative(inputFilePath, inputFile));
             }
             catch (error) {
                 console.error(chalk.redBright(`❌ Error calculating relative path: ${error instanceof Error ? error.message : String(error)}`));
@@ -78,19 +108,15 @@ const createConversionList = async (files) => {
             if (inputFilePath !== outputFilePath) {
                 outputFolder = join(outputFilePath, relativePath);
                 outputFile = join(outputFolder, `${basename(inputFile, extname(inputFile))}.${outputFormat}`);
-                // Create output directory if needed
-                if (!existsSync(outputFolder)) {
-                    try {
-                        mkdirSync(outputFolder, { recursive: true });
-                    }
-                    catch (error) {
-                        console.error(chalk.redBright.bold("Couldn't create directory, check folder"), error);
-                        handleExit(1);
-                    }
-                }
+                // Directories already created in batch above
             }
             else {
                 outputFolder = join(inputFilePath, relativePath);
+            }
+            // Show progress for large batches (update every 1000 items)
+            processedCount++;
+            if (showProgress && processedCount % 1000 === 0) {
+                process.stdout.write(`\r   Building list: ${processedCount}/${totalItems} items...`);
             }
             console.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
             console.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
@@ -196,6 +222,10 @@ const createConversionList = async (files) => {
             console.log(chalk.green(`  ✅ Added to conversion list: ${inputFile} -> ${outputFile}`));
         }
     }
+    // Clear progress line and show completion
+    if (showProgress) {
+        process.stdout.write(`\r   Building list: ${totalItems}/${totalItems} items... Done!\n`);
+    }
     // Process the conversion list
     while (true) {
         // Function to remove duplicates based on outputFile
@@ -210,18 +240,29 @@ const createConversionList = async (files) => {
         const uniqueConversionList = await removeDuplicates(conversionList);
         // Filter out skipped files
         const filesToConvert = uniqueConversionList.filter((x) => !/Skipped!.*⏭️/g.test(x.outputFile));
-        // Display conversion list
-        const numbered = await filesToConvert.map((x, index) => `🔊 ${index + 1} ${x.outputFile}`);
-        console.log(chalk.cyanBright('\n🔄 Pending Conversion 🔄', numbered.length, 'Output Files \n\n', numbered.join('\n')));
+        // Display conversion list - only build numbered array for what we show
+        const MAX_DISPLAY = 20;
+        const fileCount = filesToConvert.length;
+        if (fileCount > 200) {
+            // For large lists, only number the first few
+            const preview = filesToConvert
+                .slice(0, MAX_DISPLAY)
+                .map((x, i) => `🔊 ${i + 1} ${x.outputFile}`);
+            console.log(chalk.cyanBright('\n🔄 Pending Conversion 🔄', fileCount, 'Output Files \n\n', preview.join('\n'), chalk.gray(`\n    ... and ${fileCount - MAX_DISPLAY} more files`)));
+        }
+        else {
+            const numbered = filesToConvert.map((x, index) => `🔊 ${index + 1} ${x.outputFile}`);
+            console.log(chalk.cyanBright('\n🔄 Pending Conversion 🔄', fileCount, 'Output Files \n\n', numbered.join('\n')));
+        }
         // No files to convert
-        if (numbered.length === 0) {
+        if (fileCount === 0) {
             console.log(chalk.yellow('\n⚠️ No files to convert after filtering! Exiting.'));
             handleExit(0);
         }
         // Final confirmation
         const accept_answer = await getAnswer(chalk.blueBright('\n✏️ This is the list of files to be converted. Start now? Type "yes" ✅ or "no" ❌:  '));
         if (/^no$/i.test(accept_answer)) {
-            console.log('\n🚫 Conversion cancelled. Exiting program 🚫');
+            console.log('\n🚫 Conversion cancelled. Restarting program 🚫');
             handleExit(0);
         }
         else if (!/^yes$/i.test(accept_answer)) {

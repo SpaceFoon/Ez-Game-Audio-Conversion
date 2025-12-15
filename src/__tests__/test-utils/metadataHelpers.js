@@ -4,8 +4,8 @@
  * Functions for extracting and verifying metadata from audio files.
  */
 
-const { spawnSync } = require('child_process');
-const { findFfmpegExecutables } = require('./generateTestFiles');
+import { spawnSync } from 'child_process';
+import { findFfmpegExecutables } from './generateTestFiles';
 
 /**
  * Extract metadata from an audio file
@@ -241,7 +241,7 @@ function verifyLoopPoints(filePath, expectedPoints) {
   return true;
 }
 
-module.exports = {
+export default {
   extractMetadata,
   extractLoopPoints,
   adjustLoopPoints,

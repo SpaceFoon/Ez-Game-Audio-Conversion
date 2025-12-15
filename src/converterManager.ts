@@ -17,7 +17,9 @@ import {
   addToLog,
   settings,
   checkDiskSpace,
-  rl,
+  getAnswer,
+  runtimeBaseDir,
+  isPackagedRuntime,
 } from './utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -82,42 +84,67 @@ const convertFiles = async (
         // When running from source (ts-node or node dist), worker is in dist/
         // When running the packaged binary (pkg), __dirname points to a virtual fs, and the worker
         // is placed next to the main file via pkg.assets.
-        const runningPkg = (process as any).pkg;
-        const workerPath = runningPkg
-          ? join(__dirname, 'converterWorker.js')
-          : join(__dirname, '..', 'dist', 'converterWorker.js');
+        const workerBaseDir = isPackagedRuntime
+          ? join(runtimeBaseDir, 'dist')
+          : join(__dirname, '..', 'dist');
+        const workerPath = join(workerBaseDir, 'converterWorker.js');
 
         const worker = new Worker(workerPath, {
           workerData,
         });
 
+        // Accumulate stderr for final error log
+        let stderrOutput = '';
+        let errorLogged = false;
+
         worker.on('message', (message: any) => {
-          // Errors messages
-          if (message.type === 'error' || message.type === 'stderr') {
-            console.error(
-              'ERROR MESSAGE FROM FFMPEG:',
-              message.data,
-              'Output file:',
-              file.outputFile
-            );
+          // Accumulate stderr messages (don't log each one individually)
+          if (message.type === 'stderr') {
+            stderrOutput += message.data + ' ';
             // Catch disk space errors and stop a runaway process
             if (/no space left/i.test(message.data)) {
               console.error(
                 '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
               );
-              rl.question('Press ENTER to exit...', () => process.exit(1));
+              getAnswer('Press ENTER to exit...').then(() => process.exit(1));
             }
-            addToLog(message, file);
-            reject(new Error(message.data));
             return;
           }
 
-          // File Success code
+          // Handle error type messages - log immediately and mark as logged
+          if (message.type === 'error') {
+            if (!errorLogged) {
+              errorLogged = true;
+              const errorMessage = {
+                type: 'error' as const,
+                data: message.data,
+              };
+              addToLog(errorMessage, file);
+              // Show error with details
+              console.error(
+                chalk.red(`\n❌ Error: ${file.outputFile}\n   ${message.data}`)
+              );
+
+              if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
+                failedFiles.push({
+                  success: false,
+                  inputFile: file.inputFile,
+                  outputFile: file.outputFile,
+                });
+              }
+              resolve();
+            }
+            return;
+          }
+
+          // File completion code (success or failure)
           if (message.type === 'code') {
             const workerEndTime = performance.now();
             const workerCompTime = workerEndTime - workerStartTime;
-            addToLog(message, file);
+
             if (message.data === 0) {
+              // Success
+              addToLog(message, file);
               successfulFiles.push({
                 success: true,
                 inputFile: file.inputFile,
@@ -135,8 +162,22 @@ const convertFiles = async (
                 )
               );
               resolve();
-              // File Failure code
-            } else if (message.data !== 0) {
+              // File Failure code - only log if not already logged via error message
+            } else if (message.data !== 0 && !errorLogged) {
+              errorLogged = true;
+              // Log the error once with accumulated stderr
+              const errorMessage = {
+                type: 'error' as const,
+                data: `ffmpeg exited with code ${message.data}. ${stderrOutput.trim()}`,
+              };
+              addToLog(errorMessage, file);
+              // Show error with details
+              console.error(
+                chalk.red(
+                  `\n❌ Error: ${file.outputFile}\n   ffmpeg exit code ${message.data}: ${stderrOutput.trim() || 'No error output'}`
+                )
+              );
+
               if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
                 failedFiles.push({
                   success: false,
@@ -144,25 +185,12 @@ const convertFiles = async (
                   outputFile: file.outputFile,
                 });
               }
-              console.error(
-                chalk.bgRed(
-                  '\n🚨🚨⛔ Worker',
-                  workerCounter,
-                  'did not finish file successfully ⛔🚨🚨: ',
-                  file.outputFile
-                )
-              );
               resolve();
             }
           }
         });
 
         worker.on('error', (error: any) => {
-          console.error(
-            `🚨🚨⛔ Worker had an error:`,
-            error.toString(),
-            '⛔🚨🚨'
-          );
           if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
             failedFiles.push({
               success: false,
@@ -173,10 +201,8 @@ const convertFiles = async (
           reject(error);
         });
 
-        worker.on('exit', (code: any) => {
-          if (code !== 0) {
-            console.error(`Worker stopped with exit code ${code}`);
-          }
+        worker.on('exit', () => {
+          // Exit handled by message handlers
         });
       } catch (error) {
         console.error('Error creating worker:', error);
@@ -198,7 +224,7 @@ const convertFiles = async (
             const tasksLeft = files.length;
             task++;
             workerCounter++;
-            if (workerCounter > 8) workerCounter = workerCounter - 8;
+            if (workerCounter > maxConcurrentWorkers) workerCounter = 1;
             if (file) await processFile(file, workerCounter, task, tasksLeft);
           } catch (error) {
             console.error(error);

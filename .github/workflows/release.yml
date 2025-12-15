@@ -1,0 +1,141 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on version tags like v1.6.0
+  workflow_dispatch: # Allows manual trigger from GitHub UI (for testing)
+    inputs:
+      create_release:
+        description: 'Create GitHub Release (yes/no)'
+        required: false
+        default: 'no'
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            artifact-name: EZ-Game-Audio-Windows
+            ffmpeg-url: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+
+          - os: ubuntu-latest
+            platform: linux
+            artifact-name: EZ-Game-Audio-Linux
+            ffmpeg-url: https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+
+          - os: macos-latest
+            platform: macos
+            artifact-name: EZ-Game-Audio-macOS
+            ffmpeg-url-1: https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
+            ffmpeg-url-2: https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Windows ffmpeg download
+      - name: Download ffmpeg (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ffmpeg-bin/windows
+          Invoke-WebRequest -Uri "${{ matrix.ffmpeg-url }}" -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath temp
+          Copy-Item "temp/ffmpeg-*/bin/ffmpeg.exe" -Destination "ffmpeg-bin/windows/"
+          Copy-Item "temp/ffmpeg-*/bin/ffprobe.exe" -Destination "ffmpeg-bin/windows/"
+          Remove-Item -Recurse -Force temp, ffmpeg.zip
+
+      # Linux ffmpeg download
+      - name: Download ffmpeg (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p ffmpeg-bin/linux
+          cd ffmpeg-bin/linux
+          curl -L "${{ matrix.ffmpeg-url }}" -o ffmpeg.tar.xz
+          tar -xf ffmpeg.tar.xz --strip-components=1
+          rm ffmpeg.tar.xz
+          rm -rf manpages model GPLv3.txt readme.txt qt-faststart
+          chmod +x ffmpeg ffprobe
+
+      # macOS ffmpeg download
+      - name: Download ffmpeg (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p ffmpeg-bin/macos
+          cd ffmpeg-bin/macos
+          curl -L "${{ matrix.ffmpeg-url-1 }}" -o ffmpeg.zip
+          curl -L "${{ matrix.ffmpeg-url-2 }}" -o ffprobe.zip
+          unzip -o ffmpeg.zip
+          unzip -o ffprobe.zip
+          rm ffmpeg.zip ffprobe.zip
+          chmod +x ffmpeg ffprobe
+
+      # Build the application
+      - name: Build release package
+        run: npm run package
+
+      # Rename archives with platform name
+      - name: Rename archives (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          if (Test-Path "release/EZ-Game-Audio-Conversion.zip") {
+            Rename-Item "release/EZ-Game-Audio-Conversion.zip" "${{ matrix.artifact-name }}.zip"
+          }
+          if (Test-Path "release/EZ-Game-Audio-Conversion.7z") {
+            Rename-Item "release/EZ-Game-Audio-Conversion.7z" "${{ matrix.artifact-name }}.7z"
+          }
+
+      - name: Rename archives (Unix)
+        if: matrix.platform != 'windows'
+        run: |
+          if [ -f "release/EZ-Game-Audio-Conversion.zip" ]; then
+            mv "release/EZ-Game-Audio-Conversion.zip" "release/${{ matrix.artifact-name }}.zip"
+          fi
+
+      # Upload artifacts
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            release/*.zip
+            release/*.7z
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'yes'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.7z
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

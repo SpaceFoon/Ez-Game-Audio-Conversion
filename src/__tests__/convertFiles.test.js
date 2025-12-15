@@ -1,47 +1,58 @@
 // src/__tests__/convertFiles.test.js
-const { Worker } = require('worker_threads');
-const { convertFiles } = require('../../src/convertFiles');
-// const { performance } = require('perf_hooks'); // Unused, commented out
-const events = require('events');
-events.defaultMaxListeners = 20;
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 
-// Remove fake timers - they're causing the tests to hang
-// jest.useFakeTimers();
-
-// Mock dependencies
-jest.mock('perf_hooks', () => ({
+// ESM mocks must be declared BEFORE dynamic imports
+jest.unstable_mockModule('perf_hooks', () => ({
   performance: {
     now: jest.fn().mockReturnValue(1000),
   },
 }));
 
-jest.mock('worker_threads', () => ({
+jest.unstable_mockModule('worker_threads', () => ({
   Worker: jest.fn(),
 }));
 
-jest.mock('chalk', () => ({
+jest.unstable_mockModule('chalk', () => ({
+  default: {
+    cyanBright: jest.fn((text) => text),
+    greenBright: jest.fn((text) => text),
+    bgRed: jest.fn((text) => text),
+  },
   cyanBright: jest.fn((text) => text),
   greenBright: jest.fn((text) => text),
   bgRed: jest.fn((text) => text),
 }));
 
-// Create a factory for mocking utils to make it easier to update
-const createUtilsMock = (overrides = {}) => ({
+jest.unstable_mockModule('../utils.js', () => ({
   isFileBusy: jest.fn(),
   addToLog: jest.fn(),
   settings: { oggCodec: 'vorbis' },
   checkDiskSpace: jest.fn(),
   initializeFileNames: jest.fn(),
   rl: { question: jest.fn((question, callback) => callback()) },
-  ...overrides,
-});
+  getAnswer: jest.fn(),
+  runtimeBaseDir: '/mock/base',
+  isPackagedRuntime: false,
+}));
 
-jest.mock('../../src/utils', () => createUtilsMock());
-
-// Mock os module
-jest.mock('os', () => ({
+jest.unstable_mockModule('os', () => ({
   cpus: jest.fn().mockReturnValue([{}, {}, {}, {}]), // Mock 4 CPUs
 }));
+
+// Dynamic imports after mock declarations
+const { Worker } = await import('worker_threads');
+const os = await import('os');
+const { convertFiles } = await import('../convertFiles.js');
+import events from 'events';
+
+events.defaultMaxListeners = 20;
 
 // Add a timeout helper function
 const withTimeout = (promise, timeoutMs, errorMessage) => {
@@ -310,7 +321,7 @@ describe('convertFiles', () => {
     // Mock os.cpus to throw an error
     console.log("Starting 'should handle CPU detection failure' test");
 
-    require('os').cpus.mockImplementationOnce(() => {
+    os.cpus.mockImplementationOnce(() => {
       throw new Error('CPU detection failed');
     });
 
@@ -334,7 +345,7 @@ describe('convertFiles', () => {
     // Set up 10 CPUs but only 2 files
     console.log("Starting 'should limit concurrent workers' test");
 
-    require('os').cpus.mockReturnValueOnce(Array(10).fill({}));
+    os.cpus.mockReturnValueOnce(Array(10).fill({}));
     Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
 
     await withTimeout(

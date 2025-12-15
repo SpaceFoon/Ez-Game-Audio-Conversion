@@ -1,15 +1,9 @@
 import { existsSync, mkdirSync, statSync } from 'fs';
 import chalk from 'chalk';
-import { checkDiskSpace } from './utils.js';
-import readline from 'readline/promises';
+import { checkDiskSpace, getAnswer } from './utils.js';
 import path from 'path';
 import type { Settings } from './types/settings.js';
 import type { AudioFormat } from './types/audio.js';
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
 
 const inputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 const outputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
@@ -54,7 +48,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
     // Ask for the output folder
     while (true) {
-      let outputFilePath = await rl.question(
+      let outputFilePath = await getAnswer(
         chalk.blue.bold(
           '\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input 📂:'
         )
@@ -84,7 +78,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     if (!settings.singleFileMode) {
       // Ask for input formats
       while (true) {
-        const inputFormatString = await rl.question(
+        const inputFormatString = await getAnswer(
           chalk.blue.bold(
             '\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
           )
@@ -120,7 +114,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
     // Ask for output formats
     while (true) {
-      const outputFormatString = await rl.question(
+      const outputFormatString = await getAnswer(
         chalk.blue.bold(
           '\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
         )
@@ -158,7 +152,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
   // No command-line arguments - Normal interactive mode
   while (true) {
-    let inputFilePath = await rl.question(
+    let inputFilePath = await getAnswer(
       chalk.blue.bold(
         '\n 📁 Choose the folder to search for files to convert. ',
         '\n 🔍 This will recursively search, ie: all subfolders ',
@@ -182,7 +176,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
   // Ask for the output folder
   while (true) {
-    let outputFilePath = await rl.question(
+    let outputFilePath = await getAnswer(
       chalk.blue.bold(
         '\n✏️  Enter the output folder for converted file(s). 🚨 Leave blank for same folder as input files 📂:'
       )
@@ -208,7 +202,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
   // Ask for input formats
   while (true) {
-    const inputFormatString = await rl.question(
+    const inputFormatString = await getAnswer(
       chalk.blue.bold(
         '\n✏️  Enter the file extensions to look for. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
       )
@@ -243,7 +237,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
   // Ask for output formats
   while (true) {
-    const outputFormatString = await rl.question(
+    const outputFormatString = await getAnswer(
       chalk.blue.bold(
         '\n✏️  Enter the output formats. Leave blank for all 🚨 (e.g., ogg, mp3, m4a, wav, aiff, flac): '
       )

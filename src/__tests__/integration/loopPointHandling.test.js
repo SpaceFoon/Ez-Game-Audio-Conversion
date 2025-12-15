@@ -1,16 +1,18 @@
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import { describe, it, expect } from '@jest/globals';
+
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
+import { join, basename } from 'path';
+import { execSync } from 'child_process';
 
 // Constants
-const TEST_DIR = path.join(
+const TEST_DIR = join(
   process.cwd(),
   'src/__tests__',
   'test-assets',
   'format-loop-test'
 );
-const INPUT_DIR = path.join(TEST_DIR, 'input');
-const OUTPUT_DIR = path.join(TEST_DIR, 'output');
+const INPUT_DIR = join(TEST_DIR, 'input');
+const OUTPUT_DIR = join(TEST_DIR, 'output');
 
 // Test parameters
 const SAMPLE_RATE = 44100;
@@ -87,23 +89,23 @@ function createDirectories() {
   console.log('Creating test directories...');
 
   // Create directories if they don't exist
-  if (!fs.existsSync(TEST_DIR)) {
-    fs.mkdirSync(TEST_DIR, { recursive: true });
+  if (!existsSync(TEST_DIR)) {
+    mkdirSync(TEST_DIR, { recursive: true });
   }
 
-  if (!fs.existsSync(INPUT_DIR)) {
-    fs.mkdirSync(INPUT_DIR);
+  if (!existsSync(INPUT_DIR)) {
+    mkdirSync(INPUT_DIR);
   }
 
-  if (!fs.existsSync(OUTPUT_DIR)) {
-    fs.mkdirSync(OUTPUT_DIR);
+  if (!existsSync(OUTPUT_DIR)) {
+    mkdirSync(OUTPUT_DIR);
   } else {
     // Clean output directory if it exists, but don't fail if we can't clean some files
     try {
-      const files = fs.readdirSync(OUTPUT_DIR);
+      const files = readdirSync(OUTPUT_DIR);
       for (const file of files) {
         try {
-          fs.unlinkSync(path.join(OUTPUT_DIR, file));
+          unlinkSync(join(OUTPUT_DIR, file));
         } catch (error) {
           console.log(`Warning: Couldn't remove ${file}: ${error.message}`);
         }
@@ -130,7 +132,7 @@ function checkForFfmpeg() {
 // Generate test files
 function generateTestFiles() {
   console.log('Generating base test audio file...');
-  const baseWavPath = path.join(INPUT_DIR, 'base-sine.wav');
+  const baseWavPath = join(INPUT_DIR, 'base-sine.wav');
 
   // Generate a sine wave base file with no metadata
   const baseCmd = [
@@ -243,7 +245,7 @@ function runTests(baseFilePath) {
     // For each metadata approach
     for (const approach of METADATA_APPROACHES) {
       const outputFileName = `${format.name}_${approach.name}.${format.extension}`;
-      const outputFilePath = path.join(OUTPUT_DIR, outputFileName);
+      const outputFilePath = join(OUTPUT_DIR, outputFileName);
 
       console.log(`\nTesting ${format.name} with ${approach.description}...`);
 
@@ -268,11 +270,9 @@ function runTests(baseFilePath) {
         execSync(cmd.join(' '), { stdio: 'pipe' });
 
         // Check if file was created
-        if (fs.existsSync(outputFilePath)) {
+        if (existsSync(outputFilePath)) {
           // Extract metadata
-          console.log(
-            `Reading metadata from ${path.basename(outputFilePath)}...`
-          );
+          console.log(`Reading metadata from ${basename(outputFilePath)}...`);
           const metadata = getMetadata(outputFilePath);
 
           if (metadata) {

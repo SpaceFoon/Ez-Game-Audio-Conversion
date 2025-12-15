@@ -1,11 +1,11 @@
-const fs = require("fs");
-const path = require("path");
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { join } from "path";
 
-const { load } = require("resedit/cjs");
+import { load } from "resedit/cjs";
 load().then((ResEdit) => {
   try {
-    const exePath = path.join(".", "dist", "EZ-Game-Audio.exe");
-    fs.existsSync(exePath);
+    const exePath = join(".", "dist", "EZ-Game-Audio.exe");
+    existsSync(exePath);
   } catch {
     console.log("can't find ./dist/EZ-Game-Audio.exe");
   }
@@ -14,10 +14,10 @@ load().then((ResEdit) => {
   // ResEdit will be the namespace object of resedit library
   // (for example ResEdit.Data.IconFile is available)
   function windowsPostBuild(output) {
-    const exe = ResEdit.NtExecutable.from(fs.readFileSync(output));
+    const exe = ResEdit.NtExecutable.from(readFileSync(output));
     const res = ResEdit.NtExecutableResource.from(exe);
     const iconFile = ResEdit.Data.IconFile.from(
-      fs.readFileSync(path.join(".", "src", "ico", "icon.ico"))
+      readFileSync(join(".", "src", "ico", "icon.ico"))
     );
 
     ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
@@ -44,9 +44,9 @@ load().then((ResEdit) => {
     vi.setProductVersion(1, 4, 4, 2);
     vi.outputToResourceEntries(res.entries);
     res.outputResource(exe);
-    fs.writeFileSync(output, Buffer.from(exe.generate()));
+    writeFileSync(output, Buffer.from(exe.generate()));
     console.log("resedit finished.");
   }
 
-  windowsPostBuild(path.join(".", "build", "EZ-Game-Audio.exe"));
+  windowsPostBuild(join(".", "build", "EZ-Game-Audio.exe"));
 });

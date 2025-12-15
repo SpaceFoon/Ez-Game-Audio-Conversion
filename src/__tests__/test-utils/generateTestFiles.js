@@ -5,10 +5,9 @@
  * and loop points for use in tests.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-// const { execSync, spawnSync } = require('child_process'); // spawnSync unused
+import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { execSync } from 'child_process';
 
 /**
  * Find ffmpeg executable (cross-platform)
@@ -23,14 +22,14 @@ function findFfmpegExecutables() {
   let ffprobePath = ffprobeExe;
 
   // Look in project root
-  if (fs.existsSync(path.join(process.cwd(), ffmpegExe))) {
-    ffmpegPath = path.join(process.cwd(), ffmpegExe);
-    ffprobePath = path.join(process.cwd(), ffprobeExe);
+  if (existsSync(join(process.cwd(), ffmpegExe))) {
+    ffmpegPath = join(process.cwd(), ffmpegExe);
+    ffprobePath = join(process.cwd(), ffprobeExe);
   }
   // Look in bin directory
-  else if (fs.existsSync(path.join(process.cwd(), 'bin', ffmpegExe))) {
-    ffmpegPath = path.join(process.cwd(), 'bin', ffmpegExe);
-    ffprobePath = path.join(process.cwd(), 'bin', ffprobeExe);
+  else if (existsSync(join(process.cwd(), 'bin', ffmpegExe))) {
+    ffmpegPath = join(process.cwd(), 'bin', ffmpegExe);
+    ffprobePath = join(process.cwd(), 'bin', ffprobeExe);
   }
 
   return { ffmpegPath, ffprobePath };
@@ -42,23 +41,23 @@ function findFfmpegExecutables() {
  * @returns {Object} - Directory paths
  */
 function createTestDirectories(testDir) {
-  const inputDir = path.join(testDir, 'input');
-  const outputDir = path.join(testDir, 'output');
+  const inputDir = join(testDir, 'input');
+  const outputDir = join(testDir, 'output');
 
-  if (!fs.existsSync(testDir)) {
-    fs.mkdirSync(testDir, { recursive: true });
+  if (!existsSync(testDir)) {
+    mkdirSync(testDir, { recursive: true });
   }
 
-  if (!fs.existsSync(inputDir)) {
-    fs.mkdirSync(inputDir, { recursive: true });
+  if (!existsSync(inputDir)) {
+    mkdirSync(inputDir, { recursive: true });
   }
 
   // Clean and recreate output directory
-  if (fs.existsSync(outputDir)) {
+  if (existsSync(outputDir)) {
     try {
-      fs.readdirSync(outputDir).forEach((file) => {
+      readdirSync(outputDir).forEach((file) => {
         try {
-          fs.unlinkSync(path.join(outputDir, file));
+          unlinkSync(join(outputDir, file));
         } catch (error) {
           console.warn(
             `Warning: Could not delete file ${file}: ${error.message}`
@@ -71,7 +70,7 @@ function createTestDirectories(testDir) {
       );
     }
   } else {
-    fs.mkdirSync(outputDir, { recursive: true });
+    mkdirSync(outputDir, { recursive: true });
   }
 
   return { testDir, inputDir, outputDir };
@@ -99,7 +98,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
   const generatedFiles = {};
 
   // Generate base WAV file with loop points
-  const baseWavFile = path.join(inputDir, `loop_${sampleRate}.wav`);
+  const baseWavFile = join(inputDir, `loop_${sampleRate}.wav`);
   const baseCmd =
     `"${ffmpegPath}" -y -f lavfi -i "sine=frequency=${frequency}:sample_rate=${sampleRate}:duration=${duration}" ` +
     `-metadata TITLE="${title}" ` +
@@ -118,7 +117,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
 
     // Generate other formats if requested
     if (formats.includes('ogg')) {
-      const oggFile = path.join(inputDir, `loop_${sampleRate}.ogg`);
+      const oggFile = join(inputDir, `loop_${sampleRate}.ogg`);
       const oggCmd =
         `"${ffmpegPath}" -y -i "${baseWavFile}" ` +
         `-c:a libvorbis -q:a 6 ` +
@@ -138,7 +137,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
     // Generate other formats
     const remainingFormats = formats.filter((f) => f !== 'wav' && f !== 'ogg');
     remainingFormats.forEach((format) => {
-      const outputFile = path.join(inputDir, `loop_${sampleRate}.${format}`);
+      const outputFile = join(inputDir, `loop_${sampleRate}.${format}`);
       const cmd =
         `"${ffmpegPath}" -y -i "${baseWavFile}" ` +
         `-metadata LOOPSTART="${loopStart}" ` +
@@ -163,7 +162,7 @@ function generateTestAudioFiles(inputDir, options = {}) {
   return generatedFiles;
 }
 
-module.exports = {
+export default {
   findFfmpegExecutables,
   createTestDirectories,
   generateTestAudioFiles,

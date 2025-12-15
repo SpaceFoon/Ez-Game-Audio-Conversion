@@ -1,12 +1,25 @@
-const fs = require('fs');
-const path = require('path');
-const { convertFiles } = require('../../src/convertFiles');
-const { settings } = require('../../src/utils');
+import { describe, it, expect, beforeAll } from '@jest/globals';
+import { fileURLToPath } from 'url';
+
+import {
+  existsSync,
+  readdirSync,
+  mkdirSync,
+  unlinkSync,
+  copyFileSync,
+} from 'fs';
+import { join, dirname, basename, extname } from 'path';
+import { convertFiles } from '../../src/convertFiles.js';
+import { settings } from '../../src/utils.js';
+
+// ESM equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Constants for test directories
-const TEST_FILES_DIR = path.join(__dirname, 'test_files');
-const TEST_INPUT_DIR = path.join(TEST_FILES_DIR, 'input');
-const TEST_OUTPUT_DIR = path.join(TEST_FILES_DIR, 'output');
+const TEST_FILES_DIR = join(__dirname, 'test_files');
+const TEST_INPUT_DIR = join(TEST_FILES_DIR, 'input');
+const TEST_OUTPUT_DIR = join(TEST_FILES_DIR, 'output');
 
 // Simplified version of deleteDuplicateFiles for test purposes only
 const handleDuplicateFiles = (files) => {
@@ -21,8 +34,8 @@ const handleDuplicateFiles = (files) => {
     '.aiff',
   ];
   const fileobjs = files.map((file) => [
-    path.join(path.dirname(file), path.basename(file, path.extname(file))),
-    path.extname(file),
+    join(dirname(file), basename(file, extname(file))),
+    extname(file),
   ]);
 
   const uniq = new Map();
@@ -57,15 +70,15 @@ const handleDuplicateFiles = (files) => {
 // Skip these tests if no audio files are found or if running in CI
 const shouldRunTests = () => {
   // Check if test input directory exists and has files
-  if (!fs.existsSync(TEST_INPUT_DIR)) {
+  if (!existsSync(TEST_INPUT_DIR)) {
     console.log('Test input directory not found, skipping real file tests');
     return false;
   }
 
   // Check if there are any audio files
-  const files = fs.readdirSync(TEST_INPUT_DIR);
+  const files = readdirSync(TEST_INPUT_DIR);
   const audioFiles = files.filter((file) => {
-    const ext = path.extname(file).toLowerCase();
+    const ext = extname(file).toLowerCase();
     return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
   });
 
@@ -82,14 +95,14 @@ const shouldRunTests = () => {
 // Create a function to setup the test environment
 const setupTestEnvironment = () => {
   // Create output directory if it doesn't exist
-  if (!fs.existsSync(TEST_OUTPUT_DIR)) {
-    fs.mkdirSync(TEST_OUTPUT_DIR, { recursive: true });
+  if (!existsSync(TEST_OUTPUT_DIR)) {
+    mkdirSync(TEST_OUTPUT_DIR, { recursive: true });
   }
 
   // Clean output directory
-  const files = fs.readdirSync(TEST_OUTPUT_DIR);
+  const files = readdirSync(TEST_OUTPUT_DIR);
   for (const file of files) {
-    fs.unlinkSync(path.join(TEST_OUTPUT_DIR, file));
+    unlinkSync(join(TEST_OUTPUT_DIR, file));
   }
 
   // Configure settings for testing
@@ -140,13 +153,12 @@ describe('Real file tests', () => {
     }
 
     // Get all audio files in the test input directory
-    const files = fs
-      .readdirSync(TEST_INPUT_DIR)
+    const files = readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
-        const ext = path.extname(file).toLowerCase();
+        const ext = extname(file).toLowerCase();
         return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
       })
-      .map((file) => path.join(TEST_INPUT_DIR, file));
+      .map((file) => join(TEST_INPUT_DIR, file));
 
     // Log the files we found
     console.log('Found audio files:', files);
@@ -159,9 +171,9 @@ describe('Real file tests', () => {
     // Create conversion file list
     const conversionList = result.uniqueFiles.map((inputFile) => ({
       inputFile,
-      outputFile: path.join(
+      outputFile: join(
         TEST_OUTPUT_DIR,
-        `${path.basename(inputFile, path.extname(inputFile))}.mp3`
+        `${basename(inputFile, extname(inputFile))}.mp3`
       ),
       outputFormat: 'mp3',
     }));
@@ -182,7 +194,7 @@ describe('Real file tests', () => {
       });
 
       // Check output files were created
-      const outputFiles = fs.readdirSync(TEST_OUTPUT_DIR);
+      const outputFiles = readdirSync(TEST_OUTPUT_DIR);
       expect(outputFiles.length).toBeGreaterThan(0);
     }
   }, 30000); // Increase timeout to 30 seconds for file processing
@@ -198,13 +210,12 @@ describe('Real file tests', () => {
     settings.outputFormats = ['mp3', 'ogg'];
 
     // Get all audio files in the test input directory
-    const files = fs
-      .readdirSync(TEST_INPUT_DIR)
+    const files = readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
-        const ext = path.extname(file).toLowerCase();
+        const ext = extname(file).toLowerCase();
         return ['.mp3', '.wav', '.flac', '.ogg'].includes(ext);
       })
-      .map((file) => path.join(TEST_INPUT_DIR, file));
+      .map((file) => join(TEST_INPUT_DIR, file));
 
     if (files.length === 0) {
       console.log('No suitable audio files for metadata test');
@@ -216,12 +227,12 @@ describe('Real file tests', () => {
     const conversionList = [
       {
         inputFile: testFile,
-        outputFile: path.join(TEST_OUTPUT_DIR, `metadata_test_mp3.mp3`),
+        outputFile: join(TEST_OUTPUT_DIR, `metadata_test_mp3.mp3`),
         outputFormat: 'mp3',
       },
       {
         inputFile: testFile,
-        outputFile: path.join(TEST_OUTPUT_DIR, `metadata_test_ogg.ogg`),
+        outputFile: join(TEST_OUTPUT_DIR, `metadata_test_ogg.ogg`),
         outputFormat: 'ogg',
       },
     ];
@@ -244,13 +255,12 @@ describe('Real file tests', () => {
     }
 
     // Get all audio files in the test input directory
-    const files = fs
-      .readdirSync(TEST_INPUT_DIR)
+    const files = readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
-        const ext = path.extname(file).toLowerCase();
+        const ext = extname(file).toLowerCase();
         return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
       })
-      .map((file) => path.join(TEST_INPUT_DIR, file));
+      .map((file) => join(TEST_INPUT_DIR, file));
 
     // Create files array with duplicates (if we have enough files)
     let duplicateFiles = [];
@@ -260,17 +270,17 @@ describe('Real file tests', () => {
       const file2 = files[1];
 
       // Rename the files to have the same base name but different extensions
-      const testFile1 = path.join(TEST_INPUT_DIR, `duplicate_test.mp3`);
-      const testFile2 = path.join(TEST_INPUT_DIR, `duplicate_test.wav`);
+      const testFile1 = join(TEST_INPUT_DIR, `duplicate_test.mp3`);
+      const testFile2 = join(TEST_INPUT_DIR, `duplicate_test.wav`);
 
       // Skip this test if we can't create the test files
       try {
         // Only copy if the files don't already exist
-        if (!fs.existsSync(testFile1)) {
-          fs.copyFileSync(file1, testFile1);
+        if (!existsSync(testFile1)) {
+          copyFileSync(file1, testFile1);
         }
-        if (!fs.existsSync(testFile2)) {
-          fs.copyFileSync(file2, testFile2);
+        if (!existsSync(testFile2)) {
+          copyFileSync(file2, testFile2);
         }
 
         duplicateFiles = [testFile1, testFile2];
@@ -293,8 +303,8 @@ describe('Real file tests', () => {
     // Cleanup test files
     try {
       for (const file of duplicateFiles) {
-        if (fs.existsSync(file)) {
-          fs.unlinkSync(file);
+        if (existsSync(file)) {
+          unlinkSync(file);
         }
       }
     } catch (error) {

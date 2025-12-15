@@ -9,5 +9,5 @@ declare const converterWorker: ({ file: { inputFile, outputFile, outputFormat },
     };
 }) => Promise<void>;
 declare const runConversion: () => Promise<void>;
-export { runConversion, converterWorker, };
+export { runConversion, converterWorker };
 //# sourceMappingURL=converterWorker.d.ts.map

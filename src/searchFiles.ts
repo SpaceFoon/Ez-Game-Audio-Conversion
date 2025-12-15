@@ -49,9 +49,21 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   console.log(
     chalk.whiteBright.bold('\n🔍 Matched', allFiles.length, 'Input Files:\n')
   );
-  allFiles.forEach((inputFile) => {
-    console.log(chalk.white(' 🎶 ', inputFile));
-  });
+
+  // Truncate display if more than 200 files
+  const MAX_DISPLAY = 20;
+  if (allFiles.length > 200) {
+    allFiles.slice(0, MAX_DISPLAY).forEach((inputFile) => {
+      console.log(chalk.white(' 🎶 ', inputFile));
+    });
+    console.log(
+      chalk.gray(`    ... and ${allFiles.length - MAX_DISPLAY} more files`)
+    );
+  } else {
+    allFiles.forEach((inputFile) => {
+      console.log(chalk.white(' 🎶 ', inputFile));
+    });
+  }
 
   return Promise.resolve(allFiles);
 };

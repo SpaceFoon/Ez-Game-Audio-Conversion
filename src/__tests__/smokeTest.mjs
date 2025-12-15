@@ -3,9 +3,9 @@
  Simple smoke test: run packaged binary on a dummy conversion to verify it starts and exits.
  Assumes `npm run package` has produced binaries in `release/`.
 */
-const { spawnSync } = require('child_process');
-const { existsSync, writeFileSync, mkdirSync } = require('fs');
-const { join } = require('path');
+import { spawnSync } from 'child_process';
+import { existsSync, writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 
 const isWindows = process.platform === 'win32';
 

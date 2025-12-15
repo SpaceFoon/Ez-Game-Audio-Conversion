@@ -1,20 +1,28 @@
-const searchFiles = require('../../src/searchFiles').default;
-const fs = require('fs');
-// const chalk = require('chalk'); // Unused, mock handles this
-const path = require('path');
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
-// Mock dependencies
-jest.mock('fs', () => ({
+// ESM mocks must be declared BEFORE dynamic imports
+jest.unstable_mockModule('fs', () => ({
   readdirSync: jest.fn(),
   statSync: jest.fn(),
 }));
 
-jest.mock('chalk', () => ({
+jest.unstable_mockModule('chalk', () => ({
+  default: {
+    whiteBright: {
+      bold: jest.fn((text) => text),
+    },
+    white: jest.fn((text) => text),
+  },
   whiteBright: {
     bold: jest.fn((text) => text),
   },
   white: jest.fn((text) => text),
 }));
+
+// Dynamic imports after mock declarations
+const { readdirSync: _readdirSync, statSync: _statSync } = await import('fs');
+const { join } = await import('path');
+const { default: searchFiles } = await import('../searchFiles.js');
 
 describe('searchFiles', () => {
   beforeEach(() => {
@@ -25,11 +33,11 @@ describe('searchFiles', () => {
 
   it('should find files with matching extensions', async () => {
     // Mock file structure
-    fs.readdirSync.mockReturnValueOnce(['file1.mp3', 'file2.txt', 'subdir']);
-    fs.readdirSync.mockReturnValueOnce(['file3.wav', 'file4.jpg']);
+    _readdirSync.mockReturnValueOnce(['file1.mp3', 'file2.txt', 'subdir']);
+    _readdirSync.mockReturnValueOnce(['file3.wav', 'file4.jpg']);
 
     // Mock file stats
-    fs.statSync
+    _statSync
       .mockImplementationOnce((_path) => ({
         isDirectory: () => false, // file1.mp3
       }))
@@ -52,8 +60,8 @@ describe('searchFiles', () => {
     };
 
     const result = await searchFiles(settings);
-    const expectedFile1 = path.join('/test/dir', 'file1.mp3');
-    const expectedFile2 = path.join('/test/dir', 'subdir', 'file3.wav');
+    const expectedFile1 = join('/test/dir', 'file1.mp3');
+    const expectedFile2 = join('/test/dir', 'subdir', 'file3.wav');
 
     // Should find file1.mp3 and file3.wav
     expect(result).toHaveLength(2);
@@ -61,20 +69,16 @@ describe('searchFiles', () => {
     expect(result.some((file) => file.endsWith(expectedFile2))).toBe(true);
     expect(result.every((file) => !file.endsWith('file2.txt'))).toBe(true);
     expect(
-      result.every((file) => !file.endsWith(path.join('subdir', 'file4.jpg')))
+      result.every((file) => !file.endsWith(join('subdir', 'file4.jpg')))
     ).toBe(true);
   });
 
   it('should handle midi files with both .mid and .midi extensions', async () => {
     // Mock file structure with midi files
-    fs.readdirSync.mockReturnValueOnce([
-      'song1.mid',
-      'song2.midi',
-      'song3.mp3',
-    ]);
+    _readdirSync.mockReturnValueOnce(['song1.mid', 'song2.midi', 'song3.mp3']);
 
     // Mock stats to make all files non-directories
-    fs.statSync.mockImplementation((_path) => ({
+    _statSync.mockImplementation((_path) => ({
       isDirectory: () => false,
     }));
 
@@ -94,10 +98,10 @@ describe('searchFiles', () => {
 
   it('should return an empty array when no matching files are found', async () => {
     // Mock empty directory
-    fs.readdirSync.mockReturnValueOnce(['file1.txt', 'file2.jpg']);
+    _readdirSync.mockReturnValueOnce(['file1.txt', 'file2.jpg']);
 
     // Mock stats
-    fs.statSync.mockImplementation((_path) => ({
+    _statSync.mockImplementation((_path) => ({
       isDirectory: () => false,
     }));
 

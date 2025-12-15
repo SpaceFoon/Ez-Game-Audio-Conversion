@@ -30,13 +30,11 @@ function runApp() {
     // Worker is loaded dynamically by converterManager when needed
     if (globalThis.env.isDebug) {
         console.log('debug mode');
+        console.log('stdin is TTY:', process.stdin.isTTY);
+        console.log('stdout is TTY:', process.stdout.isTTY);
     }
     if (globalThis.env.isDev) {
         console.log('in dev mode');
-    }
-    if (globalThis.env.isDebug) {
-        console.log('stdin is TTY:', process.stdin.isTTY);
-        console.log('stdout is TTY:', process.stdout.isTTY);
     }
     process.stdout.write('\x1b]0;EZ Game Audio\x1b\x5c');
     process.stdout.write('\x1b]2;EZ Game Audio\x1b\x5c');
@@ -80,8 +78,20 @@ function runApp() {
         console.error('Fatal Error', error);
     }));
 }
-// ESM entry point check
-if (import.meta.url === `file://${process.argv[1]}`) {
+// ESM entry point check - normalize paths for cross-platform compatibility
+import { fileURLToPath } from 'url';
+import { resolve } from 'path';
+const isMainModule = (() => {
+    try {
+        const modulePath = fileURLToPath(import.meta.url);
+        const argPath = resolve(process.argv[1] || '');
+        return modulePath === argPath;
+    }
+    catch {
+        return false;
+    }
+})();
+if (isMainModule) {
     runApp();
 }
 export default runApp;
