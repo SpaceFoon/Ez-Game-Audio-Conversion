@@ -23,10 +23,12 @@ jest.unstable_mockModule('chalk', () => ({
   default: {
     cyanBright: jest.fn((text) => text),
     greenBright: jest.fn((text) => text),
+    red: jest.fn((text) => text),
     bgRed: jest.fn((text) => text),
   },
   cyanBright: jest.fn((text) => text),
   greenBright: jest.fn((text) => text),
+  red: jest.fn((text) => text),
   bgRed: jest.fn((text) => text),
 }));
 

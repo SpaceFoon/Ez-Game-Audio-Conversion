@@ -15,6 +15,7 @@ import { platform } from 'os';
 const isWindows = platform() === 'win32';
 const APP_NAME = 'EZ-Game-Audio';
 const RELEASE_DIR = 'release';
+const BUNDLED_APP = join(RELEASE_DIR, 'app.bundle.cjs');
 const SEA_CONFIG_PATH = 'sea-config.json';
 const SEA_BLOB_PATH = join(RELEASE_DIR, 'sea-prep.blob');
 const OUTPUT_EXE = join(RELEASE_DIR, isWindows ? `${APP_NAME}.exe` : APP_NAME);
@@ -25,16 +26,42 @@ console.log('[SEA] Building Single Executable Application...\n');
 console.log('[SEA] Ensuring release directory exists...');
 mkdirSync(RELEASE_DIR, { recursive: true });
 
+// Step 1.5: Bundle ESM to CJS for SEA compatibility
+// The code handles import.meta being empty by falling back to CJS __filename
+// Exclude cfonts entirely - it uses dynamic require for fonts that can't work in SEA
+console.log('[SEA] Bundling application with esbuild...');
+try {
+  execSync(`npx esbuild dist/app.js --bundle --platform=node --format=cjs --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --log-override:empty-import-meta=silent`, {
+    stdio: 'inherit',
+  });
+} catch (error) {
+  console.error('[SEA] Failed to bundle application:', error.message);
+  process.exit(1);
+}
+
 // Step 2: Create SEA configuration
 console.log('[SEA] Writing sea-config.json...');
 const seaConfig = {
-  main: 'dist/app.js',
+  main: BUNDLED_APP,
   output: SEA_BLOB_PATH,
   disableExperimentalSEAWarning: true,
   useSnapshot: false,
-  useCodeCache: false, // Code cache doesn't work with ESM
+  useCodeCache: true,
 };
 writeFileSync(SEA_CONFIG_PATH, JSON.stringify(seaConfig, null, 2));
+
+// Step 2.5: Bundle and copy worker file (workers can't be inlined in SEA)
+console.log('[SEA] Bundling worker file...');
+const WORKER_BUNDLE = join(RELEASE_DIR, 'dist', 'converterWorker.js');
+mkdirSync(join(RELEASE_DIR, 'dist'), { recursive: true });
+try {
+  execSync(`npx esbuild dist/converterWorker.js --bundle --platform=node --format=cjs --outfile=${WORKER_BUNDLE} --log-override:empty-import-meta=silent`, {
+    stdio: 'inherit',
+  });
+} catch (error) {
+  console.error('[SEA] Failed to bundle worker:', error.message);
+  process.exit(1);
+}
 
 // Step 3: Generate SEA blob
 console.log('[SEA] Generating SEA blob...');

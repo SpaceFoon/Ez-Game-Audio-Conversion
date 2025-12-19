@@ -88,10 +88,15 @@ const createConversionList = async (files) => {
     const totalItems = files.length * outputFormats.length;
     let processedCount = 0;
     const showProgress = files.length > 100;
+    const showDetailedLogs = files.length <= 20; // Only show per-file logs for small batches
     for (const inputFile of files) {
-        console.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
+        if (showDetailedLogs) {
+            console.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
+        }
         for (const outputFormat of outputFormats) {
-            console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
+            if (showDetailedLogs) {
+                console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
+            }
             let outputFile;
             if (outputFormats.includes('ogg') && !oggCodec) {
                 oggCodec = await askOggCodec();
@@ -118,8 +123,10 @@ const createConversionList = async (files) => {
             if (showProgress && processedCount % 1000 === 0) {
                 process.stdout.write(`\r   Building list: ${processedCount}/${totalItems} items...`);
             }
-            console.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
-            console.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
+            if (showDetailedLogs) {
+                console.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
+                console.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
+            }
             // Stops from overwriting input file.
             // Yes, both checks are required, no idea why..
             if (inputFile.toLowerCase() === outputFile.toLowerCase() ||
@@ -219,7 +226,9 @@ const createConversionList = async (files) => {
                 outputFile,
                 outputFormat,
             });
-            console.log(chalk.green(`  ✅ Added to conversion list: ${inputFile} -> ${outputFile}`));
+            if (showDetailedLogs) {
+                console.log(chalk.green(`  ✅ Added to conversion list: ${inputFile} -> ${outputFile}`));
+            }
         }
     }
     // Clear progress line and show completion

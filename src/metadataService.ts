@@ -11,8 +11,7 @@ const getMetaData = async (
   inputFile: string
 ): Promise<AudioMetadata | null> => {
   // Determine executable name based on platform
-  const executableName =
-    process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe';
+  const executableName = platformSlug === 'windows' ? 'ffprobe.exe' : 'ffprobe';
 
   const searchPaths = [
     join(runtimeBaseDir, executableName),
@@ -56,7 +55,7 @@ const getMetaData = async (
   }
 
   console.error(
-    'Error running ffprobe:',
+    `Error running ${executableName}:`,
     lastError?.message || 'ffprobe not found or failed'
   );
   return null;

@@ -4,10 +4,16 @@ import { performance } from 'perf_hooks';
 import { cpus } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import chalk from 'chalk';
 import { initializeFileNames, addToLog, settings, checkDiskSpace, getAnswer, runtimeBaseDir, isPackagedRuntime, } from './utils.js';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Handle both ESM and bundled CJS contexts
+const __filename_esm = typeof import.meta?.url === 'string' && import.meta.url
+    ? fileURLToPath(import.meta.url)
+    : '';
+// @ts-ignore - __filename exists in CJS context
+const __filename_resolved = __filename_esm || (typeof __filename !== 'undefined' ? __filename : '');
+const __dirname_resolved = __filename_resolved ? dirname(__filename_resolved) : '';
 const convertFiles = async (files) => {
     initializeFileNames();
     const jobStartTime = performance.now();
@@ -45,13 +51,22 @@ const convertFiles = async (files) => {
                 });
                 const workerData = JSON.parse(workerDataJson);
                 // Determine the correct path for the worker based on runtime environment
-                // When running from source (ts-node or node dist), worker is in dist/
-                // When running the packaged binary (pkg), __dirname points to a virtual fs, and the worker
-                // is placed next to the main file via pkg.assets.
-                const workerBaseDir = isPackagedRuntime
-                    ? join(runtimeBaseDir, 'dist')
-                    : join(__dirname, '..', 'dist');
-                const workerPath = join(workerBaseDir, 'converterWorker.js');
+                // Search multiple candidate locations for the worker file
+                const workerCandidates = isPackagedRuntime
+                    ? [
+                        join(runtimeBaseDir, 'dist', 'converterWorker.js'),
+                        join(runtimeBaseDir, 'converterWorker.js'),
+                        join(dirname(process.execPath), 'dist', 'converterWorker.js'),
+                    ]
+                    : [
+                        join(__dirname_resolved, '..', 'dist', 'converterWorker.js'),
+                        join(__dirname_resolved, 'converterWorker.js'),
+                        join(process.cwd(), 'dist', 'converterWorker.js'),
+                    ];
+                const workerPath = workerCandidates.find((p) => existsSync(p));
+                if (!workerPath) {
+                    throw new Error(`Worker file not found. Searched:\n${workerCandidates.join('\n')}\nruntimeBaseDir: ${runtimeBaseDir}\n__dirname_resolved: ${__dirname_resolved}`);
+                }
                 const worker = new Worker(workerPath, {
                     workerData,
                 });

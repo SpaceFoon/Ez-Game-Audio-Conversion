@@ -83,7 +83,6 @@ echo Build done!
 
 cd ../build/frames
 
-TITLE HACKED!
 powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$wshell = New-Object -ComObject wscript.shell;Sleep 1;$wshell.SendKeys('{F11}');"
 
 echo " _____                                                                                                     _____ ";

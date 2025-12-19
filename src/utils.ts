@@ -139,12 +139,11 @@ console.warn = function (...args) {
 
 // If a file is not writing, check the disk space.
 export const checkDiskSpace = (directory?: string): boolean => {
-  // If directory is empty or undefined, use the current directory
-  // TODO this is dumb. use windows music path
+  // If directory is empty or undefined, warn and continue
   if (!directory) {
     console.warn(
       chalk.yellow.bold(
-        '\n⚠️ No directory provided for disk space check. No idea where to check! Assuming enough space...'
+        '\nWARNING: No directory provided for disk space check. Unable to verify available space; assuming enough disk for now.'
       )
     );
     return true;

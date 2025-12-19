@@ -23,7 +23,7 @@ jest.unstable_mockModule('fs', () => ({
 
 jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
-  platformSlug: 'win32-x64',
+  platformSlug: 'windows',
 }));
 
 jest.unstable_mockModule('child_process', () => ({
@@ -108,7 +108,7 @@ describe('metadataService', () => {
 
       expect(result).toBeNull();
       expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error running ffprobe.exe'),
+        expect.stringContaining('Error running ffprobe.exe:'),
         expect.any(String)
       );
     });

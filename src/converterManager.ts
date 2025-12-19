@@ -11,6 +11,7 @@ import { performance } from 'perf_hooks';
 import { cpus } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import chalk from 'chalk';
 import {
   initializeFileNames,
@@ -22,8 +23,14 @@ import {
   isPackagedRuntime,
 } from './utils.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Handle both ESM and bundled CJS contexts
+const __filename_esm =
+  typeof import.meta?.url === 'string' && import.meta.url
+    ? fileURLToPath(import.meta.url)
+    : '';
+// @ts-ignore - __filename exists in CJS context
+const __filename_resolved = __filename_esm || (typeof __filename !== 'undefined' ? __filename : '');
+const __dirname_resolved = __filename_resolved ? dirname(__filename_resolved) : '';
 
 const convertFiles = async (
   files: ConversionItem[]
@@ -63,8 +70,6 @@ const convertFiles = async (
     );
 
     return new Promise((resolve, reject) => {
-      //TODO: if debug
-      // console.log("settings-------", settings);
       try {
         // Clone the data to prevent any circular references
         const workerDataJson = JSON.stringify({
@@ -81,17 +86,37 @@ const convertFiles = async (
         const workerData = JSON.parse(workerDataJson);
 
         // Determine the correct path for the worker based on runtime environment
-        // When running from source (ts-node or node dist), worker is in dist/
-        // When running the packaged binary (pkg), __dirname points to a virtual fs, and the worker
-        // is placed next to the main file via pkg.assets.
-        const workerBaseDir = isPackagedRuntime
-          ? join(runtimeBaseDir, 'dist')
-          : join(__dirname, '..', 'dist');
-        const workerPath = join(workerBaseDir, 'converterWorker.js');
+        // Search multiple candidate locations for the worker file
+        const workerCandidates = isPackagedRuntime
+          ? [
+              join(runtimeBaseDir, 'dist', 'converterWorker.js'),
+              join(runtimeBaseDir, 'converterWorker.js'),
+              join(dirname(process.execPath), 'dist', 'converterWorker.js'),
+            ]
+          : [
+              join(__dirname_resolved, '..', 'dist', 'converterWorker.js'),
+              join(__dirname_resolved, 'converterWorker.js'),
+              join(process.cwd(), 'dist', 'converterWorker.js'),
+            ];
+
+        const workerPath = workerCandidates.find((p) => existsSync(p));
+
+        if (!workerPath) {
+          throw new Error(
+            `Worker file not found. Searched:\n${workerCandidates.join('\n')}\nruntimeBaseDir: ${runtimeBaseDir}\n__dirname_resolved: ${__dirname_resolved}`
+          );
+        }
 
         const worker = new Worker(workerPath, {
           workerData,
         });
+
+        let settled = false;
+        const resolveOnce = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
 
         // Accumulate stderr for final error log
         let stderrOutput = '';
@@ -100,13 +125,25 @@ const convertFiles = async (
         worker.on('message', (message: any) => {
           // Accumulate stderr messages (don't log each one individually)
           if (message.type === 'stderr') {
-            stderrOutput += message.data + ' ';
+            const stderrMessage = String(message.data ?? '');
+            stderrOutput += stderrMessage + ' ';
+            console.error(
+              'ERROR MESSAGE FROM FFMPEG:',
+              stderrMessage,
+              String(file.inputFile ?? ''),
+              String(file.outputFile ?? '')
+            );
             // Catch disk space errors and stop a runaway process
-            if (/no space left/i.test(message.data)) {
+            if (/no space left/i.test(stderrMessage)) {
               console.error(
                 '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
               );
-              getAnswer('Press ENTER to exit...').then(() => process.exit(1));
+              const answer = getAnswer('Press ENTER to exit...');
+              if (answer && typeof (answer as any).then === 'function') {
+                (answer as Promise<unknown>).then(() => process.exit(1));
+              } else {
+                process.exit(1);
+              }
             }
             return;
           }
@@ -132,7 +169,7 @@ const convertFiles = async (
                   outputFile: file.outputFile,
                 });
               }
-              resolve();
+              resolveOnce();
             }
             return;
           }
@@ -161,7 +198,7 @@ const convertFiles = async (
                   }✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
                 )
               );
-              resolve();
+              resolveOnce();
               // File Failure code - only log if not already logged via error message
             } else if (message.data !== 0 && !errorLogged) {
               errorLogged = true;
@@ -185,12 +222,25 @@ const convertFiles = async (
                   outputFile: file.outputFile,
                 });
               }
-              resolve();
+              resolveOnce();
             }
           }
         });
 
         worker.on('error', (error: any) => {
+          const message = `Worker had an error: ${String(error?.message ?? error)}`;
+          console.error(
+            message,
+            String(file.inputFile ?? ''),
+            String(file.outputFile ?? '')
+          );
+          addToLog(
+            {
+              type: 'error' as const,
+              data: message,
+            },
+            file
+          );
           if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
             failedFiles.push({
               success: false,
@@ -198,15 +248,58 @@ const convertFiles = async (
               outputFile: file.outputFile,
             });
           }
-          reject(error);
+          resolveOnce();
         });
 
-        worker.on('exit', () => {
-          // Exit handled by message handlers
+        worker.on('exit', (exitCode: number) => {
+          if (settled) return;
+          if (exitCode === 0) {
+            if (
+              !successfulFiles.some((s) => s.outputFile === file.outputFile) &&
+              !failedFiles.some((f) => f.outputFile === file.outputFile)
+            ) {
+              successfulFiles.push({
+                success: true,
+                inputFile: file.inputFile,
+                outputFile: file.outputFile,
+              });
+            }
+            resolveOnce();
+            return;
+          }
+
+          const exitMessage = `Worker exited with code ${exitCode}. ${stderrOutput.trim()}`;
+          addToLog(
+            {
+              type: 'error' as const,
+              data: exitMessage,
+            },
+            file
+          );
+          console.error(
+            chalk.red(
+              `\nƒ?O Error: ${file.outputFile}\n   Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
+            )
+          );
+          if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
+            failedFiles.push({
+              success: false,
+              inputFile: file.inputFile,
+              outputFile: file.outputFile,
+            });
+          }
+          resolveOnce();
         });
       } catch (error) {
         console.error('Error creating worker:', error);
-        reject(error);
+        if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
+          failedFiles.push({
+            success: false,
+            inputFile: file.inputFile,
+            outputFile: file.outputFile,
+          });
+        }
+        resolve();
       }
     });
   };

@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run unit tests
+        run: npm test
+
       # Windows ffmpeg download
       - name: Download ffmpeg (Windows)
         if: matrix.platform == 'windows'
@@ -88,6 +91,9 @@ jobs:
       - name: Build release package
         run: npm run package
 
+      - name: Run smoke test on packaged binary
+        run: npm run smoke:postpackage
+
       # Rename archives with platform name
       - name: Rename archives (Windows)
         if: matrix.platform == 'windows'
@@ -96,8 +102,14 @@ jobs:
           if (Test-Path "release/EZ-Game-Audio-Conversion.zip") {
             Rename-Item "release/EZ-Game-Audio-Conversion.zip" "${{ matrix.artifact-name }}.zip"
           }
+          if (Test-Path "release/EZ-Game-Audio-Conversion.zip.sha256") {
+            Rename-Item "release/EZ-Game-Audio-Conversion.zip.sha256" "${{ matrix.artifact-name }}.zip.sha256"
+          }
           if (Test-Path "release/EZ-Game-Audio-Conversion.7z") {
             Rename-Item "release/EZ-Game-Audio-Conversion.7z" "${{ matrix.artifact-name }}.7z"
+          }
+          if (Test-Path "release/EZ-Game-Audio-Conversion.7z.sha256") {
+            Rename-Item "release/EZ-Game-Audio-Conversion.7z.sha256" "${{ matrix.artifact-name }}.7z.sha256"
           }
 
       - name: Rename archives (Unix)
@@ -105,6 +117,9 @@ jobs:
         run: |
           if [ -f "release/EZ-Game-Audio-Conversion.zip" ]; then
             mv "release/EZ-Game-Audio-Conversion.zip" "release/${{ matrix.artifact-name }}.zip"
+          fi
+          if [ -f "release/EZ-Game-Audio-Conversion.zip.sha256" ]; then
+            mv "release/EZ-Game-Audio-Conversion.zip.sha256" "release/${{ matrix.artifact-name }}.zip.sha256"
           fi
 
       # Upload artifacts
@@ -115,6 +130,7 @@ jobs:
           path: |
             release/*.zip
             release/*.7z
+            release/*.sha256
           if-no-files-found: error
 
   release:

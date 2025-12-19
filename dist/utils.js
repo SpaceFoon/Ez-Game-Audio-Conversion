@@ -5,16 +5,35 @@ import chalk from 'chalk';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const seaFuseKey = Object.keys(process.env).find((key) => key.startsWith('NODE_SEA_FUSE_'));
-export const isSeaRuntime = Boolean(seaFuseKey);
+// Handle both ESM and bundled CJS contexts
+// In ESM: import.meta.url is available
+// In CJS bundle: __filename is already defined by Node
+const __filename_esm = typeof import.meta?.url === 'string' && import.meta.url
+    ? fileURLToPath(import.meta.url)
+    : '';
+// @ts-ignore - __filename exists in CJS context
+const __filename_resolved = __filename_esm || (typeof __filename !== 'undefined' ? __filename : '');
+const __dirname_resolved = __filename_resolved ? dirname(__filename_resolved) : '';
+// Properly detect SEA runtime using the node:sea module
+// Use createRequire to load node:sea synchronously since top-level await doesn't work in CJS
+import { createRequire } from 'module';
+let isSeaRuntimeValue = false;
+try {
+    const require = createRequire(import.meta.url || 'file:///');
+    const sea = require('node:sea');
+    isSeaRuntimeValue = sea.isSea();
+}
+catch {
+    // node:sea not available or isSea() returned false
+    isSeaRuntimeValue = false;
+}
+export const isSeaRuntime = isSeaRuntimeValue;
 export const isPackagedRuntime = isSeaRuntime ||
     Boolean(process.pkg) ||
     process.env.PKG_ENV === 'packaging';
 export const runtimeBaseDir = isPackagedRuntime
     ? dirname(process.execPath)
-    : join(__dirname, '..');
+    : join(__dirname_resolved, '..');
 export const platformSlug = process.platform === 'win32'
     ? 'windows'
     : process.platform === 'darwin'

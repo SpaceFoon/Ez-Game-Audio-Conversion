@@ -6,6 +6,7 @@ import {
   beforeEach,
   afterEach,
 } from '@jest/globals';
+import type { Mock } from 'jest-mock';
 
 // ESM mocks must be declared BEFORE dynamic imports
 jest.unstable_mockModule('../getUserInput.js', () => ({
@@ -54,38 +55,37 @@ jest.unstable_mockModule('dotenv', () => ({
 // Dynamic imports after mock declarations
 const { default: getUserInput } = await import('../getUserInput.js');
 const { default: searchFiles } = await import('../searchFiles.js');
-const { default: createConversionList } =
-  await import('../createConversionList.js');
+const { default: createConversionList } = await import('../createConversionList.js');
 const { convertFiles } = await import('../convertFiles.js');
 const { default: finalize } = await import('../finalize.js');
 const { default: runApp } = await import('../app.js');
 
 describe('app.js', () => {
-  let originalEnv;
-  let logSpy;
-  let errorSpy;
+  let originalEnv: typeof globalThis.env | undefined;
+  let logSpy: ReturnType<typeof jest.spyOn>;
+  let errorSpy: ReturnType<typeof jest.spyOn>;
 
   beforeEach(() => {
     jest.clearAllMocks();
     originalEnv = globalThis.env;
 
     // Default mock implementations
-    getUserInput.mockResolvedValue({});
-    searchFiles.mockResolvedValue(['file1']);
-    createConversionList.mockResolvedValue(['file2']);
-    convertFiles.mockResolvedValue({
+    (getUserInput as Mock).mockResolvedValue({});
+    (searchFiles as Mock).mockResolvedValue(['file1']);
+    (createConversionList as Mock).mockResolvedValue(['file2']);
+    (convertFiles as Mock).mockResolvedValue({
       failedFiles: [],
       successfulFiles: ['file2'],
       jobStartTime: 0,
     });
-    finalize.mockResolvedValue();
+    (finalize as Mock).mockResolvedValue(undefined);
 
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    globalThis.env = originalEnv;
+    globalThis.env = originalEnv!;
     logSpy.mockRestore();
     errorSpy.mockRestore();
   });
@@ -101,7 +101,7 @@ describe('app.js', () => {
   });
 
   it('handles errors in the promise chain', async () => {
-    getUserInput.mockRejectedValue(new Error('fail'));
+    (getUserInput as Mock).mockRejectedValue(new Error('fail'));
 
     await runApp();
 
@@ -109,7 +109,7 @@ describe('app.js', () => {
   });
 
   it('does not reinitialize globalThis.env if already set', async () => {
-    globalThis.env = { already: true };
+    (globalThis as Record<string, unknown>).env = { already: true };
 
     await runApp();
 
@@ -130,24 +130,11 @@ describe('app.js', () => {
       cpuCount: 4,
     };
 
-    const origStdin = process.stdin;
-    const origStdout = process.stdout;
-    process.stdin = { isTTY: true, unref: () => {}, destroy: () => {} };
-    process.stdout = {
-      isTTY: true,
-      write: jest.fn(),
-      unref: () => {},
-      destroy: () => {},
-    };
-
     await runApp();
 
     expect(logSpy).toHaveBeenCalledWith('debug mode');
     expect(logSpy).toHaveBeenCalledWith('stdin is TTY:', true);
     expect(logSpy).toHaveBeenCalledWith('stdout is TTY:', true);
-
-    process.stdin = origStdin;
-    process.stdout = origStdout;
   });
 
   it('logs dev mode if env.isDev is true', async () => {
@@ -169,9 +156,7 @@ describe('app.js', () => {
   });
 
   it('writes to process.stdout for terminal title', async () => {
-    const writeSpy = jest
-      .spyOn(process.stdout, 'write')
-      .mockImplementation(() => {});
+    const writeSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
     await runApp();
 

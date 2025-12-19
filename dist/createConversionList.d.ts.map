@@ -1,1 +1,1 @@
-{"version":3,"file":"createConversionList.d.ts","sourceRoot":"","sources":["../src/createConversionList.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAe,cAAc,EAAY,MAAM,kBAAkB,CAAC;AA2D9E,QAAA,MAAM,oBAAoB,GACxB,OAAO,MAAM,EAAE,KACd,OAAO,CAAC,cAAc,EAAE,CA+V1B,CAAC;AAEF,eAAe,oBAAoB,CAAC"}
+{"version":3,"file":"createConversionList.d.ts","sourceRoot":"","sources":["../src/createConversionList.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAe,cAAc,EAAY,MAAM,kBAAkB,CAAC;AA2D9E,QAAA,MAAM,oBAAoB,GACxB,OAAO,MAAM,EAAE,KACd,OAAO,CAAC,cAAc,EAAE,CAwW1B,CAAC;AAEF,eAAe,oBAAoB,CAAC"}

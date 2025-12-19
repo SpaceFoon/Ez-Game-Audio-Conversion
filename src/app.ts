@@ -1,4 +1,4 @@
-import cfonts from 'cfonts';
+import chalk from 'chalk';
 import { platform } from 'os';
 import os from 'os';
 import { config } from 'dotenv';
@@ -6,7 +6,7 @@ import getUserInput from './getUserInput.js';
 import searchFiles from './searchFiles.js';
 import createConversionList from './createConversionList.js';
 import { convertFiles } from './convertFiles.js';
-import { settings } from './utils.js';
+import { settings, isSeaRuntime } from './utils.js';
 import finalize from './finalize.js';
 import ExitProgramError from './exitProgramError.js';
 // Ensure global type augmentation is loaded for ts-node/tsc
@@ -17,7 +17,7 @@ import type { ConversionJob } from './types/audio.js';
 
 config();
 
-function runApp(): Promise<void> {
+async function runApp(): Promise<void> {
   if (typeof globalThis.env === 'undefined') {
     globalThis.env = {
       isDev: process.env['NODE_ENV'] === 'dev',
@@ -47,16 +47,25 @@ function runApp(): Promise<void> {
   process.stdout.write('\x1b]0;EZ Game Audio\x1b\x5c');
   process.stdout.write('\x1b]2;EZ Game Audio\x1b\x5c');
 
-  cfonts.say('|||EZ Game|Audio', {
-    font: 'huge',
-    align: 'center',
-    gradient: ['green', '#f80'],
-    background: 'black',
-    // colors: ["red", "blue"],
-    independentGradient: true, // define if you want to recalculate the gradient for each new line
-    transitionGradient: false, // define if this is a transition between colors directly
-    env: 'node',
-  });
+  // cfonts uses dynamic require for fonts which fails in SEA bundles
+  if (isSeaRuntime) {
+    // Fallback banner for SEA runtime where cfonts fonts aren't available
+    console.log(chalk.green.bold('\n  ╔═══════════════════════════════╗'));
+    console.log(chalk.green.bold('  ║') + chalk.yellow.bold('     EZ Game Audio Converter    ') + chalk.green.bold('║'));
+    console.log(chalk.green.bold('  ╚═══════════════════════════════╝\n'));
+  } else {
+    // Dynamic import to avoid loading cfonts in SEA (it errors even at import time)
+    const cfonts = await import('cfonts');
+    cfonts.default.say('|||EZ Game|Audio', {
+      font: 'huge',
+      align: 'center',
+      gradient: ['green', '#f80'],
+      background: 'black',
+      independentGradient: true,
+      transitionGradient: false,
+      env: 'node',
+    });
+  }
 
   const userOS = platform() === 'win32' ? 'ffprobe.exe' : 'ffprobe';
   settings.userOS = userOS;
@@ -98,11 +107,19 @@ import { resolve } from 'path';
 
 const isMainModule = (() => {
   try {
+    // In CJS bundles, import.meta.url may be empty string
+    // In that case, we're likely the main bundled entry point
+    if (!import.meta?.url) {
+      // CJS context - check if require.main === module (not available in ESM)
+      // For bundled code, we're always the main module
+      return true;
+    }
     const modulePath = fileURLToPath(import.meta.url);
     const argPath = resolve(process.argv[1] || '');
     return modulePath === argPath;
   } catch {
-    return false;
+    // If fileURLToPath fails, we're likely in CJS context
+    return true;
   }
 })();
 

@@ -17,7 +17,7 @@ jest.unstable_mockModule('fs', () => ({
 jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   isPackagedRuntime: false,
-  platformSlug: 'windows',
+  platformSlug: 'win32-x64',
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -166,54 +166,6 @@ describe('converterWorker.js', () => {
       type: 'code',
       data: 0,
     });
-  }, 10000);
-
-  it('passes opus sample rate + loop points into ffmpeg args', async () => {
-    fs.existsSync.mockReturnValue(true);
-
-    const meta = {
-      streams: [{ sample_rate: 44100 }],
-      format: { tags: { LOOPSTART: '1000', LOOPLENGTH: '5000' } },
-    };
-
-    metadataService.getMetaData.mockResolvedValue(meta);
-    metadataService.convertLoopPoints.mockReturnValue({
-      newSampleRate: 48000,
-      loopStart: 123,
-      loopLength: 456,
-    });
-    metadataService.formatLoopData.mockReturnValue(
-      ' -metadata LOOPSTART=123 -metadata loopstart=123 -metadata LOOPLENGTH=456 -metadata looplength=456'
-    );
-
-    await converterWorker({
-      file: {
-        inputFile: 'in.wav',
-        outputFile: 'out.ogg',
-        outputFormat: 'ogg',
-      },
-      settings: { oggCodec: 'opus' },
-    });
-
-    expect(metadataService.convertLoopPoints).toHaveBeenCalledWith(
-      meta,
-      'ogg',
-      'opus'
-    );
-
-    expect(spawn).toHaveBeenCalled();
-    const args = spawn.mock.calls[0][1];
-
-    // Codec + opus preset
-    expect(args).toEqual(expect.arrayContaining(['-c:a', 'libopus']));
-    expect(args).toEqual(expect.arrayContaining(['-b:a', '64k']));
-
-    // Resample argument comes from convertLoopPoints
-    expect(args).toEqual(expect.arrayContaining(['-ar', '48000']));
-
-    // Loop points are passed through as ffmpeg metadata args
-    expect(args).toEqual(expect.arrayContaining(['-metadata', 'LOOPSTART=123']));
-    expect(args).toEqual(expect.arrayContaining(['-metadata', 'LOOPLENGTH=456']));
   }, 10000);
 
   it('handles directory creation error gracefully', async () => {

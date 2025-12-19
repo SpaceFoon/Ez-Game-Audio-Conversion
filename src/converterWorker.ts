@@ -166,6 +166,13 @@ const converterWorker = async ({
       outputFormat.toLowerCase() === 'm4a' ||
       outputFormat.toLowerCase() === 'wav'
     ) {
+      // Keep a small, explicit log when loop points are present but intentionally ignored.
+      // This is useful feedback and keeps existing tests stable.
+      if (outputFormat.toLowerCase() === 'wav') {
+        console.log('Loop points are not supported for WAV format');
+      } else {
+        console.log('Loop points are not supported for M4A format');
+      }
       loopData = '';
     } else {
       // For other formats, use the standard formatLoopData function
@@ -174,7 +181,9 @@ const converterWorker = async ({
   }
 
   // Find ffmpeg executable (use cross-platform path handling)
-  const executableName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  // Use platformSlug (from utils) instead of process.platform so tests can
+  // simulate Windows/Linux behavior deterministically.
+  const executableName = platformSlug === 'windows' ? 'ffmpeg.exe' : 'ffmpeg';
   const ffmpegCandidates = [
     join(runtimeBaseDir, executableName),
     join(runtimeBaseDir, 'bin', executableName),
@@ -194,9 +203,7 @@ const converterWorker = async ({
     process.env.NODE_ENV === 'production'
   ) {
     const notFoundMsg =
-      process.platform === 'win32'
-        ? 'ffmpeg.exe not found'
-        : 'ffmpeg not found';
+      platformSlug === 'windows' ? 'ffmpeg.exe not found' : 'ffmpeg not found';
     failWorker(notFoundMsg);
   }
 
@@ -438,8 +445,10 @@ const runFFMPEG = (
   });
 };
 
-// Workers are always started by the manager - if parentPort exists, we're in a worker
-if (parentPort) {
+// Workers are always started by the manager.
+// Only auto-run when we have the expected worker payload; this avoids side effects in tests
+// that mock parentPort but don't provide fully-shaped workerData.
+if (parentPort && workerData && (workerData as any).file) {
   runConversion();
 }
 

@@ -136,12 +136,17 @@ const createConversionList = async (
   const totalItems = files.length * outputFormats.length;
   let processedCount = 0;
   const showProgress = files.length > 100;
+  const showDetailedLogs = files.length <= 20; // Only show per-file logs for small batches
 
   for (const inputFile of files) {
-    console.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
+    if (showDetailedLogs) {
+      console.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
+    }
 
     for (const outputFormat of outputFormats) {
-      console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
+      if (showDetailedLogs) {
+        console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
+      }
 
       let outputFile: string;
       if (outputFormats.includes('ogg') && !oggCodec) {
@@ -184,8 +189,10 @@ const createConversionList = async (
         );
       }
 
-      console.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
-      console.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
+      if (showDetailedLogs) {
+        console.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
+        console.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
+      }
 
       // Stops from overwriting input file.
       // Yes, both checks are required, no idea why..
@@ -323,11 +330,13 @@ const createConversionList = async (
         outputFormat,
       });
 
-      console.log(
-        chalk.green(
-          `  ✅ Added to conversion list: ${inputFile} -> ${outputFile}`
-        )
-      );
+      if (showDetailedLogs) {
+        console.log(
+          chalk.green(
+            `  ✅ Added to conversion list: ${inputFile} -> ${outputFile}`
+          )
+        );
+      }
     }
   }
 
