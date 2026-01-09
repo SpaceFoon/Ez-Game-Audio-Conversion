@@ -55,7 +55,8 @@ jest.unstable_mockModule('dotenv', () => ({
 // Dynamic imports after mock declarations
 const { default: getUserInput } = await import('../getUserInput.js');
 const { default: searchFiles } = await import('../searchFiles.js');
-const { default: createConversionList } = await import('../createConversionList.js');
+const { default: createConversionList } =
+  await import('../createConversionList.js');
 const { convertFiles } = await import('../convertFiles.js');
 const { default: finalize } = await import('../finalize.js');
 const { default: runApp } = await import('../app.js');
@@ -69,16 +70,24 @@ describe('app.js', () => {
     jest.clearAllMocks();
     originalEnv = globalThis.env;
 
-    // Default mock implementations
-    (getUserInput as Mock).mockResolvedValue({});
-    (searchFiles as Mock).mockResolvedValue(['file1']);
-    (createConversionList as Mock).mockResolvedValue(['file2']);
-    (convertFiles as Mock).mockResolvedValue({
+    // Default mock implementations - cast through unknown to avoid strict type checking
+    (getUserInput as unknown as Mock<() => Promise<object>>).mockResolvedValue(
+      {}
+    );
+    (searchFiles as unknown as Mock<() => Promise<string[]>>).mockResolvedValue(
+      ['file1']
+    );
+    (
+      createConversionList as unknown as Mock<() => Promise<string[]>>
+    ).mockResolvedValue(['file2']);
+    (convertFiles as unknown as Mock<() => Promise<object>>).mockResolvedValue({
       failedFiles: [],
       successfulFiles: ['file2'],
       jobStartTime: 0,
     });
-    (finalize as Mock).mockResolvedValue(undefined);
+    (finalize as unknown as Mock<() => Promise<void>>).mockResolvedValue(
+      undefined
+    );
 
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -101,7 +110,9 @@ describe('app.js', () => {
   });
 
   it('handles errors in the promise chain', async () => {
-    (getUserInput as Mock).mockRejectedValue(new Error('fail'));
+    (getUserInput as unknown as Mock<() => Promise<never>>).mockRejectedValue(
+      new Error('fail')
+    );
 
     await runApp();
 
@@ -156,7 +167,9 @@ describe('app.js', () => {
   });
 
   it('writes to process.stdout for terminal title', async () => {
-    const writeSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const writeSpy = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
 
     await runApp();
 

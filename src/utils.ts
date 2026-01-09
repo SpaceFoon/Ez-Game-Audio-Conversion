@@ -24,7 +24,7 @@ const seaFuseKey = Object.keys(process.env).find((key) =>
 export const isSeaRuntime = Boolean(seaFuseKey);
 export const isPackagedRuntime =
   isSeaRuntime ||
-  Boolean((process as any).pkg) ||
+  Boolean((process as NodeJS.Process & { pkg?: unknown }).pkg) ||
   process.env.PKG_ENV === 'packaging';
 export const runtimeBaseDir = isPackagedRuntime
   ? dirname(process.execPath)
@@ -64,7 +64,11 @@ if (process.env.JEST_WORKER_ID) {
   };
   // Attempt to fully release the TTY handle so Jest can exit cleanly.
   try {
-    const stdin: any = process.stdin;
+    const stdin = process.stdin as NodeJS.ReadStream & {
+      unref?: () => void;
+      pause?: () => void;
+      destroy?: () => void;
+    };
     if (stdin) {
       if (typeof stdin.unref === 'function') {
         try {
@@ -170,20 +174,21 @@ export const isFileBusy = async (file: string): Promise<boolean> => {
     const fd = openSync(file, 'r+');
     closeSync(fd);
     return false;
-  } catch (error: any) {
-    if (error.code === 'EBUSY') {
+  } catch (error: unknown) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'EBUSY') {
       await getAnswer(
         chalk.redBright(
-          `\n${error}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
+          `\n${String(error)}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
         )
       );
       return false;
-    } else if (error.code === 'ENOENT') {
-      console.error('code', error);
+    } else if (err?.code === 'ENOENT') {
+      console.error('code', String(error));
       return false;
     } else {
       console.error(
-        `\n🚨🚨⛔ Error checking status of Log file: ${error.message} ⛔🚨🚨`
+        `\n🚨🚨⛔ Error checking status of Log file: ${err?.message ?? String(error)} ⛔🚨🚨`
       );
       throw error;
     }

@@ -393,13 +393,16 @@ describe('metadataService', () => {
     });
 
     it('should handle different sample rates correctly', () => {
-      // Test different sample rate bands - following the exact ranges in metadataService.js
+      // Test different sample rate bands - following the exact ranges in metadataService.ts
       const testCases = [
         // if (sampleRateNumber < 8000)
         { rate: '7000', expected: 8000 },
 
-        // else if (sampleRateNumber >= 8000)
-        { rate: '8000', expected: 12000 },
+        // else if (sampleRateNumber <= 8000) - 8000 is a valid Opus rate
+        { rate: '8000', expected: 8000 },
+
+        // else if (sampleRateNumber > 8000)
+        { rate: '9000', expected: 12000 },
         { rate: '10000', expected: 12000 },
 
         // else if (sampleRateNumber > 12000)

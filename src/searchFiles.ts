@@ -8,7 +8,7 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
   const searchPath = settings.inputFilePath;
   //midi can have .mid or .midi extension
-  if (settings.inputFormats.includes('midi' as any)) {
+  if (settings.inputFormats.includes('midi')) {
     fileExtensions.push('.mid');
   }
 

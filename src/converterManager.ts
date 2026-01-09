@@ -23,14 +23,25 @@ import {
   isPackagedRuntime,
 } from './utils.js';
 
+type WorkerManagerMessage =
+  | { type: 'stderr'; data: string }
+  | { type: 'error'; data: string }
+  | { type: 'code'; data: number }
+  | { type: string; data?: unknown; [key: string]: unknown };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 // Handle both ESM and bundled CJS contexts
 const __filename_esm =
   typeof import.meta?.url === 'string' && import.meta.url
     ? fileURLToPath(import.meta.url)
     : '';
-// @ts-ignore - __filename exists in CJS context
-const __filename_resolved = __filename_esm || (typeof __filename !== 'undefined' ? __filename : '');
-const __dirname_resolved = __filename_resolved ? dirname(__filename_resolved) : '';
+const __filename_resolved =
+  __filename_esm || (typeof __filename !== 'undefined' ? __filename : '');
+const __dirname_resolved = __filename_resolved
+  ? dirname(__filename_resolved)
+  : '';
 
 const convertFiles = async (
   files: ConversionItem[]
@@ -69,7 +80,7 @@ const convertFiles = async (
       )
     );
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         // Clone the data to prevent any circular references
         const workerDataJson = JSON.stringify({
@@ -79,7 +90,8 @@ const convertFiles = async (
             outputFormat: file.outputFormat,
           },
           settings: {
-            oggCodec: settings.oggCodec || 'vorbis', // Default to vorbis
+            oggCodec: settings.oggCodec || 'vorbis',
+            loopDataMode: settings.loopDataMode || 'auto',
           },
         });
 
@@ -122,10 +134,13 @@ const convertFiles = async (
         let stderrOutput = '';
         let errorLogged = false;
 
-        worker.on('message', (message: any) => {
+        worker.on('message', (message: unknown) => {
+          if (!isRecord(message) || typeof message.type !== 'string') return;
+          const typedMessage = message as WorkerManagerMessage;
+
           // Accumulate stderr messages (don't log each one individually)
-          if (message.type === 'stderr') {
-            const stderrMessage = String(message.data ?? '');
+          if (typedMessage.type === 'stderr') {
+            const stderrMessage = String(typedMessage.data ?? '');
             stderrOutput += stderrMessage + ' ';
             console.error(
               'ERROR MESSAGE FROM FFMPEG:',
@@ -138,28 +153,27 @@ const convertFiles = async (
               console.error(
                 '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
               );
-              const answer = getAnswer('Press ENTER to exit...');
-              if (answer && typeof (answer as any).then === 'function') {
-                (answer as Promise<unknown>).then(() => process.exit(1));
-              } else {
-                process.exit(1);
-              }
+              void getAnswer('Press ENTER to exit...').then(() =>
+                process.exit(1)
+              );
             }
             return;
           }
 
           // Handle error type messages - log immediately and mark as logged
-          if (message.type === 'error') {
+          if (typedMessage.type === 'error') {
             if (!errorLogged) {
               errorLogged = true;
               const errorMessage = {
                 type: 'error' as const,
-                data: message.data,
+                data: String(typedMessage.data ?? ''),
               };
               addToLog(errorMessage, file);
               // Show error with details
               console.error(
-                chalk.red(`\n❌ Error: ${file.outputFile}\n   ${message.data}`)
+                chalk.red(
+                  `\n❌ Error: ${file.outputFile}\n   ${String(typedMessage.data ?? '')}`
+                )
               );
 
               if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
@@ -175,13 +189,18 @@ const convertFiles = async (
           }
 
           // File completion code (success or failure)
-          if (message.type === 'code') {
+          if (typedMessage.type === 'code') {
             const workerEndTime = performance.now();
             const workerCompTime = workerEndTime - workerStartTime;
 
-            if (message.data === 0) {
+            const exitCode =
+              typeof typedMessage.data === 'number'
+                ? typedMessage.data
+                : Number(typedMessage.data);
+
+            if (exitCode === 0) {
               // Success
-              addToLog(message, file);
+              addToLog({ type: 'code', data: exitCode }, file);
               successfulFiles.push({
                 success: true,
                 inputFile: file.inputFile,
@@ -200,18 +219,18 @@ const convertFiles = async (
               );
               resolveOnce();
               // File Failure code - only log if not already logged via error message
-            } else if (message.data !== 0 && !errorLogged) {
+            } else if (exitCode !== 0 && !errorLogged) {
               errorLogged = true;
               // Log the error once with accumulated stderr
               const errorMessage = {
                 type: 'error' as const,
-                data: `ffmpeg exited with code ${message.data}. ${stderrOutput.trim()}`,
+                data: `ffmpeg exited with code ${exitCode}. ${stderrOutput.trim()}`,
               };
               addToLog(errorMessage, file);
               // Show error with details
               console.error(
                 chalk.red(
-                  `\n❌ Error: ${file.outputFile}\n   ffmpeg exit code ${message.data}: ${stderrOutput.trim() || 'No error output'}`
+                  `\n❌ Error: ${file.outputFile}\n   ffmpeg exit code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
                 )
               );
 
@@ -227,8 +246,10 @@ const convertFiles = async (
           }
         });
 
-        worker.on('error', (error: any) => {
-          const message = `Worker had an error: ${String(error?.message ?? error)}`;
+        worker.on('error', (error: unknown) => {
+          const message = `Worker had an error: ${String(
+            error instanceof Error ? error.message : error
+          )}`;
           console.error(
             message,
             String(file.inputFile ?? ''),
@@ -278,7 +299,7 @@ const convertFiles = async (
           );
           console.error(
             chalk.red(
-              `\nƒ?O Error: ${file.outputFile}\n   Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
+              `\n ❌ Error: ${file.outputFile}\n   Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
             )
           );
           if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {

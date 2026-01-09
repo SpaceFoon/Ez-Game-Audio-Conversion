@@ -130,15 +130,21 @@ out
 ffmpeg-6.1.1-essentials_build.zip
 .history/
 *.exe
-dist/*
-notes/*
-release/*
-ffmpeg-bin/*
+dist/
+notes/
+release/
+ffmpeg-bin/
 !ffmpeg-bin/README.md
 !ffmpeg-bin/windows/.gitkeep
 !ffmpeg-bin/linux/.gitkeep
 !ffmpeg-bin/macos/.gitkeep
 sea-config.json
+
+# Local diagnostic outputs
+.eslint_out.txt
+.eslint_exit.txt
+.jest_path_test_out.txt
+.jest_path_test_exit.txt
 
 **/**/*.mp3
 **/**/*.m4a
@@ -148,3 +154,5 @@ sea-config.json
 **/**/*.flac
 MIGRATION-GUIDE.md
 MIGRATION-COMPLETE.md
+
+.jest_run*

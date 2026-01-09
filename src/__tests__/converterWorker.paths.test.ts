@@ -66,14 +66,16 @@ jest.unstable_mockModule('../utils.js', () => ({
 
 jest.unstable_mockModule('../metadataService.js', () => ({
   getMetaData: jest.fn(async () => null),
-  formatMetaDataArgs: jest.fn(() => ({ metaDataArgs: [], channelsArgs: [] })),
+  formatMetaDataArgs: jest.fn(() => ({
+    metaDataArgs: [],
+    channelsArgs: ['-ac', '2'],
+  })),
   convertLoopPoints: jest.fn(() => ({
     newSampleRate: null,
     loopStart: NaN,
     loopLength: NaN,
   })),
   formatLoopData: jest.fn(() => ''),
-  formatMetaData: jest.fn(() => ({ metaData: '', channels: ' -ac 2' })),
 }));
 
 afterEach(() => {
@@ -126,7 +128,11 @@ describe('converterWorker ffmpeg path resolution', () => {
       runtimeBaseDir: 'C:\\app',
       platformSlug: 'windows',
       isPackagedRuntime: true,
-      exists: new Set<string>(['C:\\out', 'C:\\app\\ffmpeg.exe']),
+      exists: new Set<string>([
+        'C:\\out',
+        'C:\\app\\ffmpeg.exe',
+        'C:\\in\\in.wav',
+      ]),
     };
 
     jest.resetModules();

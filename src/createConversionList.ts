@@ -350,20 +350,20 @@ const createConversionList = async (
   // Process the conversion list
   while (true) {
     // Function to remove duplicates based on outputFile
-    const removeDuplicates = async (conversionList: any[]) => {
-      const seen = new Set();
-      return conversionList.filter((conversion: any) => {
+    const removeDuplicates = (list: ConversionItem[]): ConversionItem[] => {
+      const seen = new Set<string>();
+      return list.filter((conversion: ConversionItem) => {
         const duplicate = seen.has(conversion.outputFile);
         seen.add(conversion.outputFile);
         return !duplicate;
       });
     };
 
-    const uniqueConversionList = await removeDuplicates(conversionList);
+    const uniqueConversionList = removeDuplicates(conversionList);
 
     // Filter out skipped files
     const filesToConvert = uniqueConversionList.filter(
-      (x: any) => !/Skipped!.*⏭️/g.test(x.outputFile)
+      (x: ConversionItem) => !/Skipped!.*⏭️/g.test(x.outputFile)
     );
 
     // Display conversion list - only build numbered array for what we show
@@ -374,7 +374,7 @@ const createConversionList = async (
       // For large lists, only number the first few
       const preview = filesToConvert
         .slice(0, MAX_DISPLAY)
-        .map((x: any, i: number) => `🔊 ${i + 1} ${x.outputFile}`);
+        .map((x: ConversionItem, i: number) => `🔊 ${i + 1} ${x.outputFile}`);
       console.log(
         chalk.cyanBright(
           '\n🔄 Pending Conversion 🔄',
@@ -386,7 +386,7 @@ const createConversionList = async (
       );
     } else {
       const numbered = filesToConvert.map(
-        (x: any, index: number) => `🔊 ${index + 1} ${x.outputFile}`
+        (x: ConversionItem, index: number) => `🔊 ${index + 1} ${x.outputFile}`
       );
       console.log(
         chalk.cyanBright(

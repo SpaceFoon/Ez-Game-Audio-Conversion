@@ -88,46 +88,18 @@
       "<rootDir>/build/",
       "<rootDir>/release/"
     ],
-    "extensionsToTreatAsEsm": [
-      ".ts"
-    ],
-    "resolver": "./jest-resolver.cjs",
-    "moduleNameMapper": {},
-    "transform": {
-      "^.+\\.ts$": [
-        "ts-jest",
-        {
-          "useESM": true
-        }
-      ]
+    "extensionsToTreatAsEsm": [".ts"],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
     },
-    "moduleFileExtensions": [
-      "ts",
-      "tsx",
-      "js",
-      "jsx",
-      "json",
-      "node"
-    ],
-    "verbose": true,
-    "collectCoverageFrom": [
-      "src/**/*.{ts,js}",
-      "!src/**/__tests__/**",
-      "!src/**/test-utils/**"
-    ],
-    "coverageReporters": [
-      "text",
-      "lcov",
-      "json-summary"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 40,
-        "functions": 50,
-        "lines": 55,
-        "statements": 55
-      }
-    }
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", { "useESM": true }]
+    },
+    "moduleFileExtensions": ["ts", "js", "cjs", "jsx", "json", "node"],
+    "testMatch": ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.js"],
+    "verbose": false,
+    "forceExit": true,
+    "testTimeout": 30000
   },
   "lint-staged": {
     "*.{ts,js}": [

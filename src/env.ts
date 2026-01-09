@@ -28,7 +28,8 @@ if (typeof globalThis.env === 'undefined') {
   globalThis.env = {
     isDev: process.env.NODE_ENV === 'dev',
     isDebug: process.env.DEBUG === 'true',
-    isPkg: Boolean((process as any).pkg) || isPkgEnv,
+    isPkg:
+      Boolean((process as NodeJS.Process & { pkg?: unknown }).pkg) || isPkgEnv,
 
     // OS info
     isWindows: os.platform() === 'win32',

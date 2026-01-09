@@ -77,7 +77,9 @@ describe('createConversionList', () => {
 
       // 1 input file × 2 formats = 2 outputs
       expect(result).toHaveLength(2);
-      expect(result[0].inputFile).toBe(join(settings.inputFilePath, 'song.wav'));
+      expect(result[0].inputFile).toBe(
+        join(settings.inputFilePath, 'song.wav')
+      );
       expect(result[0].outputFile).toContain('.mp3');
       expect(result[1].outputFile).toContain('.ogg');
     });

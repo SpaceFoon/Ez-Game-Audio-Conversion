@@ -12,6 +12,7 @@ import {
   statSync,
   rmSync,
   mkdirSync,
+  PathLike,
 } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -34,16 +35,15 @@ const TEST_DIRECTORIES = [
 /**
  * Safely delete a file, handling permissions errors
  */
-function safeDeleteFile(filePath) {
+function safeDeleteFile(filePath: PathLike) {
   try {
     if (existsSync(filePath)) {
       unlinkSync(filePath);
     }
     return true;
-  } catch (error) {
-    console.warn(
-      `Warning: Could not delete file ${filePath}: ${error.message}`
-    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: Could not delete file ${filePath}: ${msg}`);
     return false;
   }
 }
@@ -51,7 +51,7 @@ function safeDeleteFile(filePath) {
 /**
  * Clean up test directories by removing all files
  */
-function cleanupTestDirectories(directories) {
+function cleanupTestDirectories(directories: any) {
   for (const dir of directories) {
     if (existsSync(dir)) {
       try {
@@ -59,10 +59,9 @@ function cleanupTestDirectories(directories) {
         for (const file of files) {
           safeDeleteFile(join(dir, file));
         }
-      } catch (error) {
-        console.warn(
-          `Warning: Could not clean directory ${dir}: ${error.message}`
-        );
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.warn(`Warning: Could not clean directory ${dir}: ${msg}`);
       }
     }
   }
@@ -73,7 +72,7 @@ function cleanupTestDirectories(directories) {
  * @param {string} dirPath - Directory to delete
  * @returns {boolean} - Success status
  */
-function cleanupDirectory(dirPath) {
+function cleanupDirectory(dirPath: PathLike) {
   if (!existsSync(dirPath)) {
     console.log(`Directory does not exist: ${dirPath}`);
     return true;
@@ -93,8 +92,9 @@ function cleanupDirectory(dirPath) {
     mkdirSync(dirPath, { recursive: true });
 
     return true;
-  } catch (error) {
-    console.error(`Error cleaning up directory ${dirPath}:`, error.message);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`Error cleaning up directory ${dirPath}:`, msg);
     return false;
   }
 }

@@ -31,9 +31,12 @@ mkdirSync(RELEASE_DIR, { recursive: true });
 // Exclude cfonts entirely - it uses dynamic require for fonts that can't work in SEA
 console.log('[SEA] Bundling application with esbuild...');
 try {
-  execSync(`npx esbuild dist/app.js --bundle --platform=node --format=cjs --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --log-override:empty-import-meta=silent`, {
-    stdio: 'inherit',
-  });
+  execSync(
+    `npx esbuild dist/app.js --bundle --platform=node --format=cjs --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --log-override:empty-import-meta=silent`,
+    {
+      stdio: 'inherit',
+    }
+  );
 } catch (error) {
   console.error('[SEA] Failed to bundle application:', error.message);
   process.exit(1);
@@ -55,9 +58,12 @@ console.log('[SEA] Bundling worker file...');
 const WORKER_BUNDLE = join(RELEASE_DIR, 'dist', 'converterWorker.js');
 mkdirSync(join(RELEASE_DIR, 'dist'), { recursive: true });
 try {
-  execSync(`npx esbuild dist/converterWorker.js --bundle --platform=node --format=cjs --outfile=${WORKER_BUNDLE} --log-override:empty-import-meta=silent`, {
-    stdio: 'inherit',
-  });
+  execSync(
+    `npx esbuild dist/converterWorker.js --bundle --platform=node --format=cjs --outfile=${WORKER_BUNDLE} --log-override:empty-import-meta=silent`,
+    {
+      stdio: 'inherit',
+    }
+  );
 } catch (error) {
   console.error('[SEA] Failed to bundle worker:', error.message);
   process.exit(1);

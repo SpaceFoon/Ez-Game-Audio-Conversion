@@ -10,12 +10,12 @@ module.exports = (request, options) => {
     // Try to resolve as .ts first
     const tsRequest = request.replace(/\.js$/, '.ts');
     const resolved = path.resolve(options.basedir, tsRequest);
-    
+
     if (fs.existsSync(resolved)) {
       return resolved;
     }
   }
-  
+
   // Fall back to default resolution
   return options.defaultResolver(request, options);
 };

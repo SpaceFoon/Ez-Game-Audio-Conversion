@@ -85,16 +85,16 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
         );
 
         settings.inputFormats = inputFormatString
-          ? (inputFormatString
+          ? inputFormatString
               .toLowerCase()
               .split(/\s*,\s*|\s+/)
-              .map((format: string) => format.trim()) as AudioFormat[])
+              .map((format: string) => format.trim())
+              .filter((format: string): format is AudioFormat =>
+                inputTypes.includes(format as AudioFormat)
+              )
           : [...inputTypes];
 
-        if (
-          settings.inputFormats.length === 0 ||
-          !settings.inputFormats.every((format) => inputTypes.includes(format))
-        ) {
+        if (settings.inputFormats.length === 0) {
           console.warn(
             '\n🛑🙊Invalid input format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed'
           );
@@ -209,16 +209,16 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
     );
 
     settings.inputFormats = inputFormatString
-      ? (inputFormatString
+      ? inputFormatString
           .toLowerCase()
           .split(/\s*,\s*|\s+/)
-          .map((format: string) => format.trim()) as AudioFormat[])
+          .map((format: string) => format.trim())
+          .filter((format: string): format is AudioFormat =>
+            inputTypes.includes(format as AudioFormat)
+          )
       : [...inputTypes];
 
-    if (
-      settings.inputFormats.length === 0 ||
-      !settings.inputFormats.every((format) => inputTypes.includes(format))
-    ) {
+    if (settings.inputFormats.length === 0) {
       console.warn(
         '\n🛑🙊Invalid input format🙈🛑\n⚠️Only ogg, mp3, m4a, wav, aiff and flac are allowed'
       );

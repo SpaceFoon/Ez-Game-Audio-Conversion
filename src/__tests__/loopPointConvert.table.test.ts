@@ -69,7 +69,7 @@ describe('convertLoopPoints table cases', () => {
       Math.round(baseLoopStart * (16000 / 13000)),
       Math.round(baseLoopLength * (16000 / 13000)),
     ],
-    // >=8000 to <=12000 -> 12000
+    // >8000 to <=12000 -> 12000
     [
       12000,
       12000,
@@ -77,10 +77,17 @@ describe('convertLoopPoints table cases', () => {
       Math.round(baseLoopLength * (12000 / 12000)),
     ],
     [
-      8000,
+      9000,
       12000,
-      Math.round(baseLoopStart * (12000 / 8000)),
-      Math.round(baseLoopLength * (12000 / 8000)),
+      Math.round(baseLoopStart * (12000 / 9000)),
+      Math.round(baseLoopLength * (12000 / 9000)),
+    ],
+    // <=8000 -> 8000
+    [
+      8000,
+      8000,
+      Math.round(baseLoopStart * (8000 / 8000)),
+      Math.round(baseLoopLength * (8000 / 8000)),
     ],
     // <8000 -> 8000
     [

@@ -22,7 +22,7 @@ const getMetaData = async (
     executableName, // Allow system PATH resolution as last resort
   ];
 
-  let lastError: any;
+  let lastError: unknown;
   for (const ffprobePath of searchPaths) {
     if (ffprobePath !== executableName && !existsSync(ffprobePath)) continue;
     try {
@@ -47,7 +47,7 @@ const getMetaData = async (
       }
       const metaData: AudioMetadata = JSON.parse(output.stdout);
       return metaData;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Try next candidate
       lastError = error;
       continue;
@@ -56,7 +56,9 @@ const getMetaData = async (
 
   console.error(
     `Error running ${executableName}:`,
-    lastError?.message || 'ffprobe not found or failed'
+    lastError instanceof Error
+      ? lastError.message
+      : String(lastError || 'ffprobe not found or failed')
   );
   return null;
 };
@@ -89,9 +91,6 @@ const formatMetaData = (
     // Maintain legacy spacing contract: channels string includes leading space
     return { metaData: '', channels: ' -ac 2' };
   }
-  let streamTags = metaData.streams[0]?.tags || {};
-  let formatTags = metaData.format?.tags || {};
-
   const metaDataFields = [
     // Basic fields
     'title',
@@ -185,8 +184,8 @@ const formatMetaData = (
   metaDataFields.forEach((field) => {
     if (!field) return;
     const rawValue = formatMetaDataField(
-      streamTags as any,
-      formatTags as any,
+      metaData.streams[0]?.tags,
+      metaData.format?.tags,
       field
     );
     // because you can break the entire ffmpegCommand with meta data
@@ -213,7 +212,7 @@ const formatMetaData = (
     : ' -ac 2';
   const metaDataString = metaDataDataArray.join(' ');
 
-  if ((process.env as any)['DEBUG']) {
+  if (process.env.DEBUG) {
     console.log(
       '10 metaDataarray metadataService line 173: ',
       metaDataDataArray
@@ -232,8 +231,8 @@ export const formatMetaDataArgs = (
     return { metaDataArgs: [], channelsArgs: ['-ac', '2'] };
   }
 
-  const streamTags = (metaData.streams[0] as any)?.tags || {};
-  const formatTags = (metaData.format as any)?.tags || {};
+  const streamTags = metaData.streams[0]?.tags;
+  const formatTags = metaData.format?.tags;
 
   const fields = [
     'title',
@@ -316,8 +315,7 @@ export const formatMetaDataArgs = (
 
   const metaDataArgs: string[] = [];
   for (const field of fields) {
-    const raw =
-      formatMetaDataField(streamTags as any, formatTags as any, field) || '';
+    const raw = formatMetaDataField(streamTags, formatTags, field) || '';
     const clean = raw
       .split('\u0000')
       .join('')
@@ -332,15 +330,15 @@ export const formatMetaDataArgs = (
     metaDataArgs.push('-metadata', `${key}=${clean}`);
   }
 
-  const ch = (metaData.streams[0] as any)?.channels
-    ? String((metaData.streams[0] as any).channels)
+  const ch = metaData.streams[0]?.channels
+    ? String(metaData.streams[0].channels)
     : '2';
   const channelsArgs = ['-ac', ch];
   return { metaDataArgs, channelsArgs };
 };
 
 // Get loop points from metaData
-export const getLoopPoints = (metaData: any) => {
+export const getLoopPoints = (metaData: AudioMetadata | null | undefined) => {
   if (!metaData) return { loopStart: NaN, loopLength: NaN };
 
   // Helper function to check multiple tag variants
@@ -377,19 +375,22 @@ export const getLoopPoints = (metaData: any) => {
     return null;
   };
 
-  const loopStart = parseInt(getTagValue('LOOPSTART') || null);
-  const loopLength = parseInt(getTagValue('LOOPLENGTH') || null);
+  const loopStartRaw = getTagValue('LOOPSTART');
+  const loopLengthRaw = getTagValue('LOOPLENGTH');
+
+  const loopStart = loopStartRaw ? parseInt(loopStartRaw, 10) : NaN;
+  const loopLength = loopLengthRaw ? parseInt(loopLengthRaw, 10) : NaN;
 
   return { loopStart, loopLength };
 };
 
 // Convert loop points for different sample rates
 export const convertLoopPoints = (
-  metaData: any,
+  metaData: AudioMetadata | null,
   outputFormat: string,
   oggCodec: string
 ) => {
-  if (!metaData || !metaData.streams) {
+  if (!metaData || !metaData.streams || !metaData.streams[0]) {
     return {
       newSampleRate: null,
       loopStart: NaN,
@@ -427,15 +428,13 @@ export const convertLoopPoints = (
 
   if (sampleRateNumber >= 32000) {
     newSampleRate = 48000;
-  } else if (sampleRateNumber >= 22050) {
-    newSampleRate = 24000;
   } else if (sampleRateNumber > 16000) {
     newSampleRate = 24000;
   } else if (sampleRateNumber > 12000) {
     newSampleRate = 16000;
-  } else if (sampleRateNumber >= 8000) {
+  } else if (sampleRateNumber > 8000) {
     newSampleRate = 12000;
-  } else if (sampleRateNumber < 8000) {
+  } else if (sampleRateNumber <= 8000) {
     newSampleRate = 8000;
   }
 
@@ -452,8 +451,8 @@ export const convertLoopPoints = (
 };
 
 // Format loop data for ffmpeg command
-export const formatLoopData = (loopStart: any, loopLength: any) => {
-  if (isNaN(loopStart) || isNaN(loopLength)) return '';
+export const formatLoopData = (loopStart: number, loopLength: number) => {
+  if (Number.isNaN(loopStart) || Number.isNaN(loopLength)) return '';
 
   // Only include the standard variants that are most widely supported
   return (

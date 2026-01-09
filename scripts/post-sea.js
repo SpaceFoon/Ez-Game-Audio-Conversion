@@ -81,7 +81,9 @@ function ensureDocsStaged({ requirePdf }) {
   if (requirePdf) {
     requiredDocs.push('README.pdf');
   }
-  const missing = requiredDocs.filter((name) => !existsSync(join(readmesDir, name)));
+  const missing = requiredDocs.filter(
+    (name) => !existsSync(join(readmesDir, name))
+  );
   if (missing.length > 0) {
     throw new Error(
       `[post-sea] Missing documentation files in ${readmesDir}: ${missing.join(
@@ -93,7 +95,9 @@ function ensureDocsStaged({ requirePdf }) {
 
 function generateChecksum(filePath) {
   if (!existsSync(filePath)) {
-    console.warn(`[post-sea] Cannot create checksum; file not found: ${filePath}`);
+    console.warn(
+      `[post-sea] Cannot create checksum; file not found: ${filePath}`
+    );
     return null;
   }
   try {
@@ -101,10 +105,7 @@ function generateChecksum(filePath) {
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
     const checksumPath = `${filePath}.sha256`;
     const lineEnding = isWindows ? '\r\n' : '\n';
-    writeFileSync(
-      checksumPath,
-      `${hash} *${basename(filePath)}${lineEnding}`
-    );
+    writeFileSync(checksumPath, `${hash} *${basename(filePath)}${lineEnding}`);
     return checksumPath;
   } catch (error) {
     console.warn(
@@ -138,7 +139,9 @@ try {
   if (existsSync(bundledWorkerDir)) {
     copyDir(bundledWorkerDir, join(stageDir, 'dist'));
   } else {
-    console.warn('[post-sea] Warning: Bundled worker not found at release/dist');
+    console.warn(
+      '[post-sea] Warning: Bundled worker not found at release/dist'
+    );
   }
 
   // Copy ffmpeg binaries (entire folder to mirror legacy behavior)
@@ -275,28 +278,28 @@ try {
         `"${sevenZip}" a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on "${tempSeven}" "${stageDir}\\*"`,
         { stdio: 'inherit' }
       );
-    safeRemove(sevenPath);
-    try {
-      renameSync(tempSeven, sevenPath);
-      artifactPaths.push(sevenPath);
-      const sevenChecksum = generateChecksum(sevenPath);
-      if (sevenChecksum) {
-        artifactPaths.push(sevenChecksum);
-      }
-    } catch {
-      const fallback = join(
-        releaseDir,
-        `EZ-Game-Audio-Conversion-${Date.now()}.7z`
-      );
-      renameSync(tempSeven, fallback);
-      artifactPaths.push(fallback);
-      const fallbackChecksum = generateChecksum(fallback);
-      if (fallbackChecksum) {
-        artifactPaths.push(fallbackChecksum);
-      }
-      console.warn(
-        `[post-sea] Existing .7z archive is in use. Saved new file as ${fallback}`
-      );
+      safeRemove(sevenPath);
+      try {
+        renameSync(tempSeven, sevenPath);
+        artifactPaths.push(sevenPath);
+        const sevenChecksum = generateChecksum(sevenPath);
+        if (sevenChecksum) {
+          artifactPaths.push(sevenChecksum);
+        }
+      } catch {
+        const fallback = join(
+          releaseDir,
+          `EZ-Game-Audio-Conversion-${Date.now()}.7z`
+        );
+        renameSync(tempSeven, fallback);
+        artifactPaths.push(fallback);
+        const fallbackChecksum = generateChecksum(fallback);
+        if (fallbackChecksum) {
+          artifactPaths.push(fallbackChecksum);
+        }
+        console.warn(
+          `[post-sea] Existing .7z archive is in use. Saved new file as ${fallback}`
+        );
       }
     } else {
       console.warn('[post-sea] 7-Zip not found. Skipping .7z archive.');

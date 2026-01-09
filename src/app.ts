@@ -13,7 +13,7 @@ import ExitProgramError from './exitProgramError.js';
 import './types/global.js';
 
 import type { Settings } from './types/settings.js';
-import type { ConversionJob } from './types/audio.js';
+import type { ConversionItem, ConversionJob } from './types/audio.js';
 
 config();
 
@@ -51,7 +51,11 @@ async function runApp(): Promise<void> {
   if (isSeaRuntime) {
     // Fallback banner for SEA runtime where cfonts fonts aren't available
     console.log(chalk.green.bold('\n  ╔═══════════════════════════════╗'));
-    console.log(chalk.green.bold('  ║') + chalk.yellow.bold('     EZ Game Audio Converter    ') + chalk.green.bold('║'));
+    console.log(
+      chalk.green.bold('  ║') +
+        chalk.yellow.bold('     EZ Game Audio Converter    ') +
+        chalk.green.bold('║')
+    );
     console.log(chalk.green.bold('  ╚═══════════════════════════════╝\n'));
   } else {
     // Dynamic import to avoid loading cfonts in SEA (it errors even at import time)
@@ -80,18 +84,14 @@ async function runApp(): Promise<void> {
       //go through list of input files and make output list.
       //there can be multiple outputs and user input is needed here for conflicting output files
       // that already exist.
-      .then((files: any) => {
-        return createConversionList(files);
-      })
+      .then((files: string[]) => createConversionList(files))
       // Manages workers threads in a pool.
-      .then((files: any) => {
-        return convertFiles(files);
-      })
+      .then((files: ConversionItem[]) => convertFiles(files))
       // Print the final results of all conversions.
       .then(({ failedFiles, successfulFiles, jobStartTime }: ConversionJob) => {
         finalize(failedFiles, successfulFiles, jobStartTime);
       })
-      .catch((error: any) => {
+      .catch((error: unknown) => {
         if (error instanceof ExitProgramError) {
           // Silent exit, do nothing
           return;

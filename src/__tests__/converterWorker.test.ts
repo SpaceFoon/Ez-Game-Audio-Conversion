@@ -22,7 +22,6 @@ jest.unstable_mockModule('../utils.js', () => ({
 
 jest.unstable_mockModule('../metadataService.js', () => ({
   getMetaData: jest.fn(),
-  formatMetaData: jest.fn(),
   formatMetaDataArgs: jest.fn(),
   convertLoopPoints: jest.fn(),
   formatLoopData: jest.fn(),
@@ -84,9 +83,9 @@ describe('converterWorker.js', () => {
     metadataService.getMetaData.mockResolvedValue({
       streams: [{ sample_rate: 44100 }],
     });
-    metadataService.formatMetaData.mockReturnValue({
-      metaData: '-metadata title=Test',
-      channels: '-ac 2',
+    metadataService.formatMetaDataArgs.mockReturnValue({
+      metaDataArgs: ['-metadata', 'title=Test'],
+      channelsArgs: ['-ac', '2'],
     });
     metadataService.convertLoopPoints.mockReturnValue({
       newSampleRate: null,
@@ -135,18 +134,21 @@ describe('converterWorker.js', () => {
     }
   }, 10000);
 
-  it('fails on non-ASCII output path', async () => {
+  it('allows Unicode characters in output path', async () => {
     fs.existsSync.mockReturnValue(true);
-    await expect(
-      converterWorker({
-        file: {
-          inputFile: 'in.wav',
-          outputFile: 'out-ü.mp3',
-          outputFormat: 'mp3',
-        },
-        settings: { oggCodec: 'vorbis' },
-      })
-    ).rejects.toThrow(/Non-ASCII/);
+    // Should NOT throw - Unicode is now allowed
+    await converterWorker({
+      file: {
+        inputFile: 'in.wav',
+        outputFile: 'out-ü.mp3',
+        outputFormat: 'mp3',
+      },
+      settings: { oggCodec: 'vorbis' },
+    });
+    expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+      type: 'code',
+      data: 0,
+    });
   }, 10000);
 
   it('successfully runs the conversion', async () => {
@@ -252,9 +254,9 @@ describe('converterWorker.js', () => {
       streams: [{ sample_rate: 44100 }],
       format: { tags: { LOOPSTART: '1000', LOOPLENGTH: '10000' } },
     });
-    metadataService.formatMetaData.mockReturnValue({
-      metaData: '-metadata title=Test',
-      channels: '-ac 2',
+    metadataService.formatMetaDataArgs.mockReturnValue({
+      metaDataArgs: ['-metadata', 'title=Test'],
+      channelsArgs: ['-ac', '2'],
     });
     metadataService.convertLoopPoints.mockReturnValue({
       newSampleRate: 44100,

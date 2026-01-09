@@ -7,7 +7,7 @@ import globals from 'globals';
 export default [
   js.configs.recommended,
   {
-    files: ['**/*.{ts,tsx,js,jsx}'],
+    files: ['**/*.{ts,tsx,js,jsx,mjs,cjs}'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -40,6 +40,14 @@ export default [
       '@typescript-eslint/no-var-requires': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       'no-console': 'off',
+    },
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      // TypeScript already checks global existence; ESLint's no-undef is JS-only and
+      // will falsely flag TS namespaces like `NodeJS`.
+      'no-undef': 'off',
     },
   },
   {

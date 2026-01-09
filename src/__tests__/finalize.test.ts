@@ -35,16 +35,16 @@ const { spawn } = await import('child_process');
 const { rl } = await import('../utils.js');
 const { default: finalize } = await import('../finalize.js');
 
-interface ConversionResult {
-  outputFile: string;
-}
+import type { ConversionResult } from '../types/audio.js';
 
 describe('finalize', () => {
   let exitSpy: ReturnType<typeof jest.spyOn>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    exitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {}) as () => never);
+    exitSpy = jest
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as () => never);
     (performance.now as Mock).mockReturnValueOnce(0).mockReturnValueOnce(10000);
   });
 
@@ -54,8 +54,12 @@ describe('finalize', () => {
 
   it('logs successful and failed files and restarts', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const failedFiles: ConversionResult[] = [{ outputFile: 'fail.mp3' }];
-    const successfulFiles: ConversionResult[] = [{ outputFile: 'ok.mp3' }];
+    const failedFiles: ConversionResult[] = [
+      { success: false, inputFile: 'in.wav', outputFile: 'fail.mp3' },
+    ];
+    const successfulFiles: ConversionResult[] = [
+      { success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' },
+    ];
     await finalize(failedFiles, successfulFiles, 0);
     expect(logSpy).toHaveBeenCalled();
     logSpy.mockRestore();
@@ -63,7 +67,9 @@ describe('finalize', () => {
 
   it('logs when there are no successful files', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const failedFiles: ConversionResult[] = [{ outputFile: 'fail.mp3' }];
+    const failedFiles: ConversionResult[] = [
+      { success: false, inputFile: 'in.wav', outputFile: 'fail.mp3' },
+    ];
     const successfulFiles: ConversionResult[] = [];
     await finalize(failedFiles, successfulFiles, 0);
     expect(logSpy).toHaveBeenCalledWith(
@@ -75,7 +81,9 @@ describe('finalize', () => {
   it('logs when there are no failed files', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const failedFiles: ConversionResult[] = [];
-    const successfulFiles: ConversionResult[] = [{ outputFile: 'ok.mp3' }];
+    const successfulFiles: ConversionResult[] = [
+      { success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' },
+    ];
     await finalize(failedFiles, successfulFiles, 0);
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('No conversions failed')
@@ -96,16 +104,28 @@ describe('finalize', () => {
   });
 
   it('calls rl.question and rl.close', async () => {
-    (rl.question as Mock).mockImplementation((_msg: string, cb: () => void) => cb());
+    (rl.question as Mock<(...args: unknown[]) => unknown>).mockImplementation(
+      (_msg: unknown, cb: unknown) => (cb as () => void)()
+    );
     (rl.close as Mock).mockImplementation(() => {});
-    await finalize([], [{ outputFile: 'ok.mp3' }], 0);
+    await finalize(
+      [],
+      [{ success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' }],
+      0
+    );
     expect(rl.question).toHaveBeenCalled();
     expect(rl.close).toHaveBeenCalled();
   });
 
   it('calls spawn and process.exit for restart', async () => {
-    const localExitSpy = jest.spyOn(process, 'exit').mockImplementation((() => {}) as () => never);
-    await finalize([], [{ outputFile: 'ok.mp3' }], 0);
+    const localExitSpy = jest
+      .spyOn(process, 'exit')
+      .mockImplementation((() => {}) as () => never);
+    await finalize(
+      [],
+      [{ success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' }],
+      0
+    );
     expect(spawn).toHaveBeenCalled();
     expect(localExitSpy).toHaveBeenCalled();
     localExitSpy.mockRestore();
@@ -113,7 +133,11 @@ describe('finalize', () => {
 
   it('handles undefined arguments gracefully', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    await finalize(undefined as unknown as ConversionResult[], undefined as unknown as ConversionResult[], 0);
+    await finalize(
+      undefined as unknown as ConversionResult[],
+      undefined as unknown as ConversionResult[],
+      0
+    );
     expect(logSpy).toHaveBeenCalled();
     logSpy.mockRestore();
   });

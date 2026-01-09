@@ -22,7 +22,6 @@ jest.unstable_mockModule('../utils.js', () => ({
 
 jest.unstable_mockModule('../metadataService.js', () => ({
   getMetaData: jest.fn(),
-  formatMetaData: jest.fn(),
   formatMetaDataArgs: jest.fn(),
   convertLoopPoints: jest.fn(),
   formatLoopData: jest.fn(),
@@ -84,9 +83,9 @@ describe('converterWorker.js', () => {
     metadataService.getMetaData.mockResolvedValue({
       streams: [{ sample_rate: 44100 }],
     });
-    metadataService.formatMetaData.mockReturnValue({
-      metaData: '-metadata title=Test',
-      channels: '-ac 2',
+    metadataService.formatMetaDataArgs.mockReturnValue({
+      metaDataArgs: ['-metadata', 'title=Test'],
+      channelsArgs: ['-ac', '2'],
     });
     metadataService.convertLoopPoints.mockReturnValue({
       newSampleRate: null,
@@ -135,19 +134,152 @@ describe('converterWorker.js', () => {
     }
   }, 10000);
 
-  it('fails on non-ASCII output path', async () => {
-    fs.existsSync.mockReturnValue(true);
-    await expect(
-      converterWorker({
+  describe('Unicode path validation', () => {
+    it('allows Unicode characters in output path (German umlauts)', async () => {
+      fs.existsSync.mockReturnValue(true);
+      // Should NOT throw - Unicode is allowed
+      await converterWorker({
         file: {
           inputFile: 'in.wav',
           outputFile: 'out-ü.mp3',
           outputFormat: 'mp3',
         },
         settings: { oggCodec: 'vorbis' },
-      })
-    ).rejects.toThrow(/Non-ASCII/);
-  }, 10000);
+      });
+      expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+
+    it('allows Chinese characters in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: '测试音频.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      });
+      expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+
+    it('allows Japanese characters in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'テスト音楽.flac',
+          outputFormat: 'flac',
+        },
+        settings: { oggCodec: 'vorbis' },
+      });
+      expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+
+    it('allows Arabic characters in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'اختبار.ogg',
+          outputFormat: 'ogg',
+        },
+        settings: { oggCodec: 'vorbis' },
+      });
+      expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+
+    it('allows mixed Unicode scripts in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'Test-测试-тест-café.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      });
+      expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+
+    it('allows accented European characters in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'café-naïve-señor-über.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      });
+      expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+
+    it('rejects Windows-invalid characters in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+
+      // Test each invalid character
+      const invalidChars = ['<', '>', ':', '|', '?', '*'];
+
+      for (const char of invalidChars) {
+        await expect(
+          converterWorker({
+            file: {
+              inputFile: 'in.wav',
+              outputFile: `out${char}file.mp3`,
+              outputFormat: 'mp3',
+            },
+            settings: { oggCodec: 'vorbis' },
+          })
+        ).rejects.toThrow(/invalid characters/);
+      }
+    }, 30000);
+
+    it('rejects control characters in output path', async () => {
+      fs.existsSync.mockReturnValue(true);
+
+      // Test null byte
+      await expect(
+        converterWorker({
+          file: {
+            inputFile: 'in.wav',
+            outputFile: 'out\x00file.mp3',
+            outputFormat: 'mp3',
+          },
+          settings: { oggCodec: 'vorbis' },
+        })
+      ).rejects.toThrow(/invalid characters/);
+
+      // Test tab character
+      await expect(
+        converterWorker({
+          file: {
+            inputFile: 'in.wav',
+            outputFile: 'out\tfile.mp3',
+            outputFormat: 'mp3',
+          },
+          settings: { oggCodec: 'vorbis' },
+        })
+      ).rejects.toThrow(/invalid characters/);
+    }, 10000);
+  });
 
   it('successfully runs the conversion', async () => {
     fs.existsSync.mockReturnValue(true);
@@ -212,8 +344,12 @@ describe('converterWorker.js', () => {
     expect(args).toEqual(expect.arrayContaining(['-ar', '48000']));
 
     // Loop points are passed through as ffmpeg metadata args
-    expect(args).toEqual(expect.arrayContaining(['-metadata', 'LOOPSTART=123']));
-    expect(args).toEqual(expect.arrayContaining(['-metadata', 'LOOPLENGTH=456']));
+    expect(args).toEqual(
+      expect.arrayContaining(['-metadata', 'LOOPSTART=123'])
+    );
+    expect(args).toEqual(
+      expect.arrayContaining(['-metadata', 'LOOPLENGTH=456'])
+    );
   }, 10000);
 
   it('handles directory creation error gracefully', async () => {
@@ -300,9 +436,9 @@ describe('converterWorker.js', () => {
       streams: [{ sample_rate: 44100 }],
       format: { tags: { LOOPSTART: '1000', LOOPLENGTH: '10000' } },
     });
-    metadataService.formatMetaData.mockReturnValue({
-      metaData: '-metadata title=Test',
-      channels: '-ac 2',
+    metadataService.formatMetaDataArgs.mockReturnValue({
+      metaDataArgs: ['-metadata', 'title=Test'],
+      channelsArgs: ['-ac', '2'],
     });
     metadataService.convertLoopPoints.mockReturnValue({
       newSampleRate: 44100,
