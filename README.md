@@ -1,6 +1,6 @@
 <!-- # <span style="color:red">EZ Game Audio Conversion </span> -->
 
-![Title Image](dist/assets/title3.webp)
+![Title Image](media/title3.webp)
 
 <p align="center">
   <img src="https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total" alt="GitHub Downloads (all assets, all releases)">
@@ -20,7 +20,7 @@
 
 ## Why I built Ez Game Audio Converter
 
-I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real headache and a huge time sink. If you spend all day learning how audio files work, you just spent all day getting nothing done in your project. You shouldn't have to be a audio engineer or terminal wizard just to have audio in the right format.
+I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real time sink. If you spend all day learning how audio files work, you just spent all day not working on your project. You shouldn't have to be a audio engineer or terminal wizard just to have audio files in the right format/codec/bitrate.
 
 The Problem: Game devs and anyone else who needs to convert audio files for whatever reason, need to know a lot about digital audio before they can even get started. This is a huge barrier to entry for new game devs and a time sink for experienced ones.
 
@@ -58,6 +58,18 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 1. **Download** [Latest Release](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases)
 2. **Extract** Folder "EZ-Game-Audio-Converter"
 3. **Run** File "EZ-Game-Audio.exe"
+
+## Checksums (SHA-256)
+
+Release archives include a matching `.sha256` file for integrity verification. You can verify the download before running it.
+
+**Windows (PowerShell):**
+Get-FileHash .\EZ-Game-Audio-Conversion.zip -Algorithm SHA256
+
+**macOS/Linux:**
+shasum -a 256 EZ-Game-Audio-Conversion.zip
+
+Compare the output hash to the contents of the `.sha256` file.
 
 ## Prerequisites
 
@@ -208,10 +220,10 @@ Source: [Ren'Py Documentation](https://www.renpy.org/doc/html/audio.html)
 
 ## License
 
-This project is licensed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+[Licence](/LICENSE)
 
-If you would like to use this software for commercial purposes, please contact me on [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion) or [GameJolt](https://gamejolt.com/@Fooney) for licensing options. I just want to get paid if you are selling my work.
 
+If you would like to use this software for commercial purposes, please contact me on [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion) 
 ### Attribution
 
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
@@ -234,8 +246,9 @@ src/__tests__/
 To run tests:
 
 - `npm test` - Run all Jest tests
-- `npm run test:unit` - Run only unit tests
-- `npm run test:integration` - Run only integration tests
-- `npm run test:formats` - Test just the format support
+- `npm run test:ci` - Run tests with open handle detection (CI-safe)
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run smoke` - Build/package and run the smoke test
 
-For more details about testing, see [TEST-README.md](TEST-README.md).
+CI runs the same checks in the workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml).
+Release steps are documented in [.github/workflows/RELEASE-GUIDE.md](.github/workflows/RELEASE-GUIDE.md).

@@ -18,6 +18,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   rl: { question: jest.fn(), close: jest.fn() },
   isPackagedRuntime: false,
   runtimeBaseDir: '/mock/base',
+  writeSummaryToLogs: jest.fn(),
 }));
 
 jest.unstable_mockModule('chalk', () => ({
@@ -32,7 +33,7 @@ jest.unstable_mockModule('child_process', () => ({
 // Dynamic imports after mock declarations
 const { performance } = await import('perf_hooks');
 const { spawn } = await import('child_process');
-const { rl } = await import('../utils.js');
+const { rl, writeSummaryToLogs } = await import('../utils.js');
 const { default: finalize } = await import('../finalize.js');
 
 import type { ConversionResult } from '../types/audio.js';
@@ -140,5 +141,38 @@ describe('finalize', () => {
     );
     expect(logSpy).toHaveBeenCalled();
     logSpy.mockRestore();
+  });
+
+  it('calls writeSummaryToLogs with correct arguments', async () => {
+    const failedFiles: ConversionResult[] = [
+      { success: false, inputFile: 'in1.wav', outputFile: 'fail1.mp3' },
+      { success: false, inputFile: 'in2.wav', outputFile: 'fail2.mp3' },
+    ];
+    const successfulFiles: ConversionResult[] = [
+      { success: true, inputFile: 'in3.wav', outputFile: 'ok1.mp3' },
+      { success: true, inputFile: 'in4.wav', outputFile: 'ok2.mp3' },
+      { success: true, inputFile: 'in5.wav', outputFile: 'ok3.mp3' },
+    ];
+
+    await finalize(failedFiles, successfulFiles, 0);
+
+    // Total = 5, Success = 3, Failed = 2
+    expect(writeSummaryToLogs).toHaveBeenCalledWith(
+      5, // total files
+      3, // success count
+      2, // fail count
+      expect.any(Number) // duration in seconds
+    );
+  });
+
+  it('calls writeSummaryToLogs even with empty arrays', async () => {
+    await finalize([], [], 0);
+
+    expect(writeSummaryToLogs).toHaveBeenCalledWith(
+      0, // total files
+      0, // success count
+      0, // fail count
+      expect.any(Number) // duration
+    );
   });
 });

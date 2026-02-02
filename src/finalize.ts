@@ -1,5 +1,11 @@
 import { performance } from 'perf_hooks';
-import { settings, rl, isPackagedRuntime, runtimeBaseDir } from './utils.js';
+import {
+  settings,
+  rl,
+  isPackagedRuntime,
+  runtimeBaseDir,
+  writeSummaryToLogs,
+} from './utils.js';
 import { spawn } from 'child_process';
 import chalk from 'chalk';
 import type { ConversionResult } from './types/audio.js';
@@ -22,6 +28,13 @@ const finalize = async (
       2
     )} seconds\n    Average task duration ${average.toFixed(2)} seconds\n`
   );
+
+  const successCount = successfulFiles?.length || 0;
+  const failCount = failedFiles?.length || 0;
+  const totalFiles = successCount + failCount;
+
+  // Write summary to CSV files
+  writeSummaryToLogs(totalFiles, successCount, failCount, totalTime);
 
   if (successfulFiles && successfulFiles.length > 0) {
     console.log(

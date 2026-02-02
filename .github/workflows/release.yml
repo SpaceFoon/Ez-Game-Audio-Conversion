@@ -92,7 +92,7 @@ jobs:
         run: npm run package
 
       - name: Run smoke test on packaged binary
-        run: npm run smoke:postpackage
+        run: npm run test:smoke
 
       # Rename archives with platform name
       - name: Rename archives (Windows)
@@ -153,5 +153,6 @@ jobs:
           files: |
             artifacts/**/*.zip
             artifacts/**/*.7z
+            artifacts/**/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -15,7 +15,9 @@
       "Bash(npm run format:*)",
       "Bash(cat:*)",
       "Bash(npm test:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(grep:*)",
+      "Bash(npx jest:*)"
     ],
     "deny": [],
     "ask": []

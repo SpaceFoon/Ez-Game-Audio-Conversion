@@ -23,8 +23,54 @@ const releaseDir = join(rootDir, 'release');
 const stageDir = join(releaseDir, 'package');
 const readmesDir = join(stageDir, 'readmes');
 const isWindows = platform() === 'win32';
-const executableName = isWindows ? 'EZ-Game-Audio.exe' : 'EZ-Game-Audio';
+
+// Detect if we're building for Windows (even when running in WSL)
+// Check for existing .exe file first, then fall back to platform detection
+function detectExecutableName() {
+  const winExeName = 'EZ-Game-Audio.exe';
+  const unixExeName = 'EZ-Game-Audio';
+
+  // Check which executable actually exists in the release directory
+  if (existsSync(join(releaseDir, winExeName))) {
+    return winExeName;
+  }
+  if (existsSync(join(releaseDir, unixExeName))) {
+    // If we're on a non-Windows platform but have a non-.exe file,
+    // check if we should be building for Windows (e.g., running in WSL)
+    // For safety, always use .exe for Windows distribution
+    console.log(
+      '[post-sea] Found executable without .exe extension. Renaming for Windows compatibility.'
+    );
+    try {
+      renameSync(join(releaseDir, unixExeName), join(releaseDir, winExeName));
+      return winExeName;
+    } catch (err) {
+      console.warn('[post-sea] Could not rename executable:', err.message);
+      return unixExeName;
+    }
+  }
+
+  // Fallback to platform detection
+  return isWindows ? winExeName : unixExeName;
+}
+
+const executableName = detectExecutableName();
 const builtExePath = join(releaseDir, executableName);
+
+function getPackageVersion() {
+  try {
+    const pkgPath = join(rootDir, 'package.json');
+    const raw = readFileSync(pkgPath, 'utf8');
+    const pkg = JSON.parse(raw);
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+  } catch (error) {
+    console.warn(
+      '[post-sea] Unable to read package.json version:',
+      error instanceof Error ? error.message : String(error)
+    );
+    return '0.0.0';
+  }
+}
 
 function posixPath(p) {
   return p.split('\\').join('/');
@@ -74,6 +120,14 @@ function cleanupIntermediateArtifacts() {
   safeRemove(join(releaseDir, 'app.bundle.cjs'));
   safeRemove(join(releaseDir, 'sea-prep.blob'));
   safeRemove(join(releaseDir, 'smoke-temp'));
+  // Clean up loose files that should only be in archives
+  safeRemove(join(releaseDir, 'dist'));
+  safeRemove(join(releaseDir, 'ffmpeg-bin'));
+  safeRemove(join(releaseDir, 'readmes'));
+  safeRemove(join(releaseDir, 'add_context_menu.bat'));
+  safeRemove(join(releaseDir, 'remove_context_menu.bat'));
+  // Clean up any leftover folders from old builds
+  safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion'));
 }
 
 function ensureDocsStaged({ requirePdf }) {
@@ -114,6 +168,53 @@ function generateChecksum(filePath) {
     );
     return null;
   }
+}
+
+function computeSha256(filePath) {
+  if (!existsSync(filePath)) {
+    console.warn(
+      `[post-sea] Cannot compute SHA256; file not found: ${filePath}`
+    );
+    return '';
+  }
+  try {
+    const fileBuffer = readFileSync(filePath);
+    return createHash('sha256').update(fileBuffer).digest('hex');
+  } catch (error) {
+    console.warn(
+      `[post-sea] Unable to compute SHA256 for ${filePath}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    return '';
+  }
+}
+
+function writeUpdateManifest(artifacts) {
+  const version = getPackageVersion();
+  const publishedAt = new Date().toISOString();
+  const files = artifacts
+    .filter((filePath) => /\.(zip|7z)$/i.test(filePath))
+    .map((filePath) => {
+      const fileName = basename(filePath);
+      const sha256 = computeSha256(filePath);
+      return {
+        file: fileName,
+        sha256,
+      };
+    })
+    .filter((entry) => entry.sha256 !== ''); // Exclude files with failed SHA256 computation
+
+  if (files.length === 0) return;
+
+  const manifest = {
+    version,
+    publishedAt,
+    files,
+  };
+
+  const manifestPath = join(releaseDir, 'update.json');
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  artifactPaths.push(manifestPath);
 }
 
 console.log('\n[post-sea] Preparing release artifacts...');
@@ -306,6 +407,7 @@ try {
     }
   }
 
+  writeUpdateManifest(artifactPaths);
   releaseReady = true;
 } finally {
   cleanupIntermediateArtifacts();

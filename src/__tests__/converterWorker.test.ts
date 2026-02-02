@@ -6,6 +6,7 @@ import {
   beforeEach,
   afterEach,
 } from '@jest/globals';
+import type { ChildProcessWithoutNullStreams } from 'child_process';
 
 // ESM mocks must be declared BEFORE dynamic imports
 jest.unstable_mockModule('fs', () => ({
@@ -35,8 +36,8 @@ jest.unstable_mockModule('worker_threads', () => ({
 // Default child_process mock: simulate success exit
 jest.unstable_mockModule('child_process', () => ({
   spawn: jest.fn(() => {
-    const mockProcess = {
-      on: jest.fn((event, callback) => {
+    const mockProcess: MockSpawnProcess = {
+      on: jest.fn((event: string, callback: (code: number) => void) => {
         if (event === 'exit') {
           setTimeout(() => callback(0), 0);
         }
@@ -52,25 +53,51 @@ jest.unstable_mockModule('child_process', () => ({
 
 // Mock the path module to return predictable paths
 jest.unstable_mockModule('path', () => ({
-  join: jest.fn((...args) => args.join('/')),
-  dirname: jest.fn((path) => path.split('/').slice(0, -1).join('/')),
-  basename: jest.fn((path) => path.split('/').pop()),
-  extname: jest.fn((path) => {
+  join: jest.fn((...args: string[]) => args.join('/')),
+  dirname: jest.fn((path: string) => path.split('/').slice(0, -1).join('/')),
+  basename: jest.fn((path: string) => path.split('/').pop()),
+  extname: jest.fn((path: string) => {
     const parts = path.split('.');
     return parts.length > 1 ? `.${parts.pop()}` : '';
   }),
 }));
 
 // Dynamic imports after mock declarations
-const fs = await import('fs');
-const metadataService = await import('../metadataService.js');
+const fs = jest.mocked(await import('fs'), { shallow: true });
+const metadataService = jest.mocked(await import('../metadataService.js'), {
+  shallow: true,
+});
 const workerThreads = await import('worker_threads');
-const { spawn } = await import('child_process');
+const childProcess = jest.mocked(await import('child_process'), {
+  shallow: true,
+});
+const spawnMock = childProcess.spawn as unknown as jest.MockedFunction<any>;
 const { runConversion, converterWorker } =
   await import('../converterWorker.js');
 
+type MockSpawnProcess = {
+  stderr: { on: jest.Mock<any> };
+  on: jest.Mock<any>;
+};
+
+const getMetaDataMock = metadataService.getMetaData as jest.MockedFunction<
+  typeof metadataService.getMetaData
+>;
+const formatMetaDataArgsMock =
+  metadataService.formatMetaDataArgs as jest.MockedFunction<
+    typeof metadataService.formatMetaDataArgs
+  >;
+const convertLoopPointsMock =
+  metadataService.convertLoopPoints as jest.MockedFunction<
+    typeof metadataService.convertLoopPoints
+  >;
+const formatLoopDataMock =
+  metadataService.formatLoopData as jest.MockedFunction<
+    typeof metadataService.formatLoopData
+  >;
+
 describe('converterWorker.js', () => {
-  let originalEnv;
+  let originalEnv: string | undefined;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -80,19 +107,34 @@ describe('converterWorker.js', () => {
     process.env.NODE_ENV = 'test';
 
     // Setup default mocks for metadataService
-    metadataService.getMetaData.mockResolvedValue({
-      streams: [{ sample_rate: 44100 }],
+    getMetaDataMock.mockResolvedValue({
+      streams: [
+        {
+          index: 0,
+          codec_name: 'vorbis',
+          codec_type: 'audio',
+          sample_rate: '44100',
+          channels: 2,
+        },
+      ],
+      format: {
+        filename: 'in.wav',
+        format_name: 'wav',
+        duration: '0',
+        size: '0',
+        bit_rate: '0',
+      },
     });
-    metadataService.formatMetaDataArgs.mockReturnValue({
+    formatMetaDataArgsMock.mockReturnValue({
       metaDataArgs: ['-metadata', 'title=Test'],
       channelsArgs: ['-ac', '2'],
     });
-    metadataService.convertLoopPoints.mockReturnValue({
+    convertLoopPointsMock.mockReturnValue({
       newSampleRate: null,
-      loopStart: null,
-      loopLength: null,
+      loopStart: NaN,
+      loopLength: NaN,
     });
-    metadataService.formatLoopData.mockReturnValue('');
+    formatLoopDataMock.mockReturnValue('');
   });
 
   afterEach(() => {
@@ -103,6 +145,28 @@ describe('converterWorker.js', () => {
   it('handles missing input file error', async () => {
     fs.existsSync.mockReturnValue(false);
     await expect(runConversion()).rejects.toThrow();
+  }, 10000);
+
+  it('infers output format from extension when none provided', async () => {
+    fs.existsSync.mockReturnValue(true);
+    await converterWorker({
+      file: { inputFile: 'in.wav', outputFile: 'out.mp3', outputFormat: '' },
+      settings: { oggCodec: 'vorbis' },
+    });
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
+      type: 'code',
+      data: 0,
+    });
+  }, 10000);
+
+  it('handles missing output file error', async () => {
+    fs.existsSync.mockReturnValue(true);
+    await expect(
+      converterWorker({
+        file: { inputFile: 'in.wav', outputFile: '', outputFormat: 'mp3' },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/Missing output file/i);
   }, 10000);
 
   // Skip: This test requires complex mocking of the packaged runtime check
@@ -145,10 +209,68 @@ describe('converterWorker.js', () => {
       },
       settings: { oggCodec: 'vorbis' },
     });
-    expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
       type: 'code',
       data: 0,
     });
+  }, 10000);
+
+  it('rejects output paths containing quotes or newlines', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'bad"name.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/quotes/);
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'bad\nname.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/line breaks/);
+  }, 10000);
+
+  it('rejects Windows-invalid characters in output path', async () => {
+    fs.existsSync.mockReturnValue(true);
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'C:\\\\temp\\\\bad|name.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/invalid characters/);
+  }, 10000);
+
+  it('warns when output path length exceeds 250 characters', async () => {
+    fs.existsSync.mockReturnValue(true);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const longName = 'C:\\\\'.padEnd(255, 'a') + '.mp3';
+
+    await converterWorker({
+      file: {
+        inputFile: 'in.wav',
+        outputFile: longName,
+        outputFormat: 'mp3',
+      },
+      settings: { oggCodec: 'vorbis' },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('very long'));
+    warnSpy.mockRestore();
   }, 10000);
 
   it('successfully runs the conversion', async () => {
@@ -164,7 +286,7 @@ describe('converterWorker.js', () => {
     });
 
     // Use the live worker_threads mock instance to avoid stale references across resetModules
-    expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
       type: 'code',
       data: 0,
     });
@@ -190,10 +312,62 @@ describe('converterWorker.js', () => {
 
     expect(fs.mkdirSync).toHaveBeenCalled();
     expect(fs.mkdirSync).toHaveBeenCalledWith('outdir', { recursive: true });
-    expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
       type: 'code',
       data: 0,
     });
+  }, 10000);
+
+  it('creates missing output directory successfully', async () => {
+    fs.existsSync.mockImplementation((p) => p === 'in.wav'); // directory missing
+
+    await converterWorker({
+      file: {
+        inputFile: 'in.wav',
+        outputFile: 'newdir/out.flac',
+        outputFormat: 'flac',
+      },
+      settings: { oggCodec: 'vorbis' },
+    });
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith('newdir', { recursive: true });
+  }, 10000);
+
+  it('aggregates stderr and rejects on non-zero exit code', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    spawnMock.mockImplementation(() => {
+      const mockProcess: MockSpawnProcess = {
+        stderr: {
+          on: jest.fn((event: string, cb: (buf: Buffer) => void) => {
+            if (event === 'data') cb(Buffer.from('bad!'));
+            return mockProcess;
+          }),
+        },
+        on: jest.fn((event: string, cb: (code: number) => void) => {
+          if (event === 'exit') {
+            setTimeout(() => cb(2), 0);
+          }
+          return mockProcess;
+        }),
+      };
+      return mockProcess as unknown as ChildProcessWithoutNullStreams;
+    });
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'out.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/ffmpeg exited with code 2/i);
+
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' })
+    );
   }, 10000);
 
   // This test is brittle due to event-loop timing and the module's fail() throwing inside event handlers.
@@ -202,9 +376,9 @@ describe('converterWorker.js', () => {
     process.env.NODE_ENV = 'test';
 
     // Mock spawn to exit with non-zero code
-    spawn.mockImplementation(() => {
-      const mockProcess = {
-        on: jest.fn((event, callback) => {
+    spawnMock.mockImplementation(() => {
+      const mockProcess: MockSpawnProcess = {
+        on: jest.fn((event: string, callback: (code: number) => void) => {
           if (event === 'exit') {
             setTimeout(() => callback(1), 0);
           }
@@ -212,7 +386,7 @@ describe('converterWorker.js', () => {
         }),
         stderr: { on: jest.fn() },
       };
-      return mockProcess;
+      return mockProcess as unknown as ChildProcessWithoutNullStreams;
     });
 
     fs.existsSync.mockReturnValue(true);
@@ -236,9 +410,9 @@ describe('converterWorker.js', () => {
     fs.existsSync.mockReturnValue(true);
 
     // Force child_process to simulate successful exit for this test
-    spawn.mockImplementation(() => {
-      const mockProcess = {
-        on: jest.fn((event, callback) => {
+    spawnMock.mockImplementation(() => {
+      const mockProcess: MockSpawnProcess = {
+        on: jest.fn((event: string, callback: (code: number) => void) => {
           if (event === 'exit') {
             setTimeout(() => callback(0), 0);
           }
@@ -246,19 +420,35 @@ describe('converterWorker.js', () => {
         }),
         stderr: { on: jest.fn() },
       };
-      return mockProcess;
+      return mockProcess as unknown as ChildProcessWithoutNullStreams;
     });
 
     // Reconfigure metadata service for loop points present
-    metadataService.getMetaData.mockResolvedValue({
-      streams: [{ sample_rate: 44100 }],
-      format: { tags: { LOOPSTART: '1000', LOOPLENGTH: '10000' } },
+    getMetaDataMock.mockResolvedValue({
+      streams: [
+        {
+          index: 0,
+          codec_name: 'vorbis',
+          codec_type: 'audio',
+          sample_rate: '44100',
+          channels: 2,
+          tags: {},
+        },
+      ],
+      format: {
+        filename: 'loop.wav',
+        format_name: 'wav',
+        duration: '1',
+        size: '1',
+        bit_rate: '1',
+        tags: { LOOPSTART: '1000', LOOPLENGTH: '10000' },
+      },
     });
-    metadataService.formatMetaDataArgs.mockReturnValue({
+    formatMetaDataArgsMock.mockReturnValue({
       metaDataArgs: ['-metadata', 'title=Test'],
       channelsArgs: ['-ac', '2'],
     });
-    metadataService.convertLoopPoints.mockReturnValue({
+    convertLoopPointsMock.mockReturnValue({
       newSampleRate: 44100,
       loopStart: 1000,
       loopLength: 10000,
@@ -285,5 +475,17 @@ describe('converterWorker.js', () => {
     );
 
     consoleLogSpy.mockRestore();
+  }, 10000);
+
+  it('blocks outputs marked as "Skipped!"', async () => {
+    fs.existsSync.mockReturnValue(true);
+    // Mutate live workerData binding
+    workerThreads.workerData.file = {
+      inputFile: 'in.wav',
+      outputFile: 'out Skipped!.mp3',
+      outputFormat: 'mp3',
+    };
+
+    await expect(runConversion()).rejects.toThrow(/Skipped!/);
   }, 10000);
 });

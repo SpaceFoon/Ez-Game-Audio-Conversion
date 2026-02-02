@@ -52,6 +52,7 @@ const {
   addToLog,
   checkDiskSpace,
   __setLogFileStateForTests,
+  writeSummaryToLogs,
 } = await import('../utils.js');
 
 describe('utils module', () => {
@@ -263,6 +264,125 @@ describe('utils module', () => {
 
       // Now appendFileSync should have been called
       expect(_appendFileSync).toHaveBeenCalled();
+    });
+  });
+
+  describe('writeSummaryToLogs function', () => {
+    beforeEach(() => {
+      // Set up log file paths
+      __setLogFileStateForTests(
+        '/test/output/logs.csv',
+        '/test/output/error.csv'
+      );
+      jest.clearAllMocks();
+    });
+
+    it('should write summary to logs.csv when it exists', () => {
+      _existsSync.mockReturnValue(true);
+
+      writeSummaryToLogs(100, 95, 5, 123.45);
+
+      expect(_appendFileSync).toHaveBeenCalledWith(
+        '/test/output/logs.csv',
+        expect.stringContaining('SUMMARY:')
+      );
+    });
+
+    it('should write summary to error.csv when it exists', () => {
+      _existsSync.mockReturnValue(true);
+
+      writeSummaryToLogs(100, 95, 5, 123.45);
+
+      expect(_appendFileSync).toHaveBeenCalledWith(
+        '/test/output/error.csv',
+        expect.stringContaining('SUMMARY:')
+      );
+    });
+
+    it('should include total, passed, failed counts in summary', () => {
+      _existsSync.mockReturnValue(true);
+
+      writeSummaryToLogs(100, 95, 5, 123.45);
+
+      const logCall = _appendFileSync.mock.calls.find(
+        (call) => call[0] === '/test/output/logs.csv'
+      );
+      expect(logCall).toBeDefined();
+      const csvRow = logCall[1];
+      expect(csvRow).toContain('Total=100');
+      expect(csvRow).toContain('Passed=95');
+      expect(csvRow).toContain('Failed=5');
+    });
+
+    it('should include duration in summary with 2 decimal places', () => {
+      _existsSync.mockReturnValue(true);
+
+      writeSummaryToLogs(50, 50, 0, 45.6789);
+
+      const logCall = _appendFileSync.mock.calls.find(
+        (call) => call[0] === '/test/output/logs.csv'
+      );
+      expect(logCall).toBeDefined();
+      const csvRow = logCall[1];
+      expect(csvRow).toContain('Duration=45.68s');
+    });
+
+    it('should format as valid CSV row with empty exit code column', () => {
+      _existsSync.mockReturnValue(true);
+
+      writeSummaryToLogs(10, 8, 2, 5.0);
+
+      const logCall = _appendFileSync.mock.calls.find(
+        (call) => call[0] === '/test/output/logs.csv'
+      );
+      expect(logCall).toBeDefined();
+      const csvRow = logCall[1];
+
+      // Should be: timestamp,,summary,\n (empty exit code, empty output)
+      // Format: Timestamp,"Exit Code",Input,Output
+      const parts = csvRow.split(',');
+      expect(parts.length).toBeGreaterThanOrEqual(4);
+      expect(parts[1]).toBe(''); // Empty exit code column
+      expect(csvRow).toMatch(/\n$/); // Ends with newline
+    });
+
+    it('should not write if logs.csv does not exist', () => {
+      _existsSync.mockReturnValue(false);
+
+      writeSummaryToLogs(10, 10, 0, 1.0);
+
+      // appendFileSync should not be called for non-existent files
+      expect(_appendFileSync).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully', () => {
+      _existsSync.mockReturnValue(true);
+      _appendFileSync.mockImplementationOnce(() => {
+        throw new Error('Write failed');
+      });
+
+      // Should not throw
+      expect(() => writeSummaryToLogs(10, 10, 0, 1.0)).not.toThrow();
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error writing summary')
+      );
+    });
+
+    it('should write to both log files when both exist', () => {
+      _existsSync.mockReturnValue(true);
+
+      writeSummaryToLogs(20, 15, 5, 10.0);
+
+      // Should append to both files
+      expect(_appendFileSync).toHaveBeenCalledTimes(2);
+      expect(_appendFileSync).toHaveBeenCalledWith(
+        '/test/output/logs.csv',
+        expect.any(String)
+      );
+      expect(_appendFileSync).toHaveBeenCalledWith(
+        '/test/output/error.csv',
+        expect.any(String)
+      );
     });
   });
 });

@@ -7,24 +7,23 @@
   "bin": {
     "ez-game-audio-conversion": "dist/app.js"
   },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
-    "readme": "echo '\n📚 Available CLI Commands:\n\n🔧 Development:\n  npm run dev         - Run with ts-node ESM loader\n  npm run dev:watch   - Run with nodemon and auto-restart\n  npm run dev:js      - Build then run JS version\n\n🏗️  Building:\n  npm run build:ts    - Compile TypeScript to ESM\n  npm run build:watch - Compile with watch mode\n  npm run build:sea   - Build Single Executable Application\n  npm run package     - Full package: SEA + docs + ZIP/7z archives\n  npm run build       - Alias for build:ts\n\n🧪 Testing:\n  npm run test        - Run Jest tests\n  npm run test:ci     - Run tests for CI\n  npm run test:coverage - Run with coverage report\n  npm run smoke       - Run smoke tests\n\n✨ Code Quality:\n  npm run lint        - Run ESLint\n  npm run format      - Format with Prettier\n  npm run clean       - Remove dist/release folders\n\n📖 Help:\n  npm run readme      - Show this help\n'",
-    "dev": "npm run dev:js",
-    "dev:watch": "npm run dev:js",
-    "dev:js": "npm run build:ts && node ./dist/app.js",
-    "build:ts": "tsc -p tsconfig.json",
+    "readme": "echo '\n📚 Getting Started:\n   nvm install && nvm use && npm install\n\n🔧 Development:\n   npm run dev          Build & run\n   npm run build:watch  Auto-rebuild while coding\n\n🧪 Testing:\n   npm run test         Run all tests\n   npm run test:coverage With coverage report\n\n✨ Quality:\n   npm run fix          Lint & format code\n\n🏗️  Release (Local):\n   npm run package      Build SEA + ZIP/7z\n   npm run smoke        Test the packaged binary\n\n🚀 Release (CI/CD):\n   git tag v1.x.x && git push origin v1.x.x\n   → Builds Windows, Linux, macOS automatically\n   → Or: GitHub Actions → Release Build → Run workflow\n\n🧹 Cleanup:\n   npm run clean        Remove dist/ & release/\n'",
+    "dev": "tsc -p tsconfig.json && node ./dist/app.js",
+    "build": "tsc -p tsconfig.json",
     "build:watch": "tsc -p tsconfig.json --watch",
-    "build": "npm run build:ts",
+    "build:sea": "npm run build && node scripts/build-sea.js",
     "package": "npm run build:sea && node scripts/post-sea.js",
-    "build:sea": "npm run build:ts && node scripts/build-sea.js",
     "clean": "rimraf dist/ release/",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --detectOpenHandles",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand",
-    "smoke": "npm run package && npm run smoke:postpackage",
-    "smoke:postpackage": "node src/__tests__/smokeTest.mjs",
-    "lint": "eslint . --ext .ts,.js",
-    "format": "prettier --write .",
+    "smoke": "npm run package && node src/__tests__/smokeTest.mjs",
+    "test:smoke": "node src/__tests__/smokeTest.mjs",
+    "fix": "eslint . --ext .ts,.js --fix && prettier --write .",
     "prepare": "husky"
   },
   "dependencies": {
@@ -44,7 +43,7 @@
     "transcoding"
   ],
   "author": "SpaceFoon",
-  "license": "CC-BY-NC-SA-4.0",
+  "license": "SEE LICENSE IN LICENSE",
   "bugs": {
     "url": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/issues"
   },

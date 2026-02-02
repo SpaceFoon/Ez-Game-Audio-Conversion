@@ -1,4 +1,4 @@
-import { convertLoopPoints } from '../metadataService';
+import { convertLoopPoints } from '../metadataService.ts';
 
 // Minimal fake metadata builder
 const makeMeta = (

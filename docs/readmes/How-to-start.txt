@@ -1,5 +1,6 @@
 1. Extract the entire folder from Zip. Cannot run from zip
-2. Open EZ-Game-Audio.exe
+2. Open EZ-Game-Audio.exe  OR
+2. Double click the context install and right click a file or folder you wish to convert.
 
 - If you change location of this extracted folder, your right click will not work unless you run the install script again.
 

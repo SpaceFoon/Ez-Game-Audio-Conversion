@@ -182,6 +182,21 @@ describe('metadataService', () => {
       );
     });
 
+    it('should resolve common alias spellings', () => {
+      const streamTags = {
+        ALBUMARTIST: 'Test Album Artist',
+        TRACKNUMBER: '3',
+        DISCNUMBER: '2',
+      };
+      const formatTags = {};
+
+      expect(formatMetaDataField(streamTags, formatTags, 'album_artist')).toBe(
+        'Test Album Artist'
+      );
+      expect(formatMetaDataField(streamTags, formatTags, 'track')).toBe('3');
+      expect(formatMetaDataField(streamTags, formatTags, 'disc')).toBe('2');
+    });
+
     it('should return empty string if field not found', () => {
       const streamTags = { title: 'Test Title' };
       const formatTags = { artist: 'Test Artist' };
@@ -254,7 +269,7 @@ describe('metadataService', () => {
       expect(result.channels).toMatch(/-ac 2/);
     });
 
-    it('should normalize track to trackNumber', () => {
+    it('should output canonical track key', () => {
       const metadata = {
         streams: [
           {
@@ -267,8 +282,44 @@ describe('metadataService', () => {
 
       const { metaData } = formatMetaData(metadata);
 
-      expect(metaData).toContain('-metadata trackNumber="5"');
-      expect(metaData).not.toContain('-metadata track="5"');
+      expect(metaData).toContain('-metadata track="5"');
+      expect(metaData).not.toContain('-metadata trackNumber="5"');
+    });
+
+    it('should normalize track/disc totals from slash notation', () => {
+      const metadata = {
+        streams: [
+          {
+            tags: {
+              TRACKNUMBER: '7/12',
+              DISCNUMBER: '1/2',
+            },
+          },
+        ],
+      };
+
+      const { metaData } = formatMetaData(metadata);
+
+      expect(metaData).toContain('-metadata track="7"');
+      expect(metaData).toContain('-metadata track_total="12"');
+      expect(metaData).toContain('-metadata disc="1"');
+      expect(metaData).toContain('-metadata disc_total="2"');
+    });
+
+    it('should pass through unknown tags', () => {
+      const metadata = {
+        streams: [
+          {
+            tags: {
+              CUSTOMTAG: 'Custom Value',
+            },
+          },
+        ],
+      };
+
+      const { metaData } = formatMetaData(metadata);
+
+      expect(metaData).toContain('-metadata CUSTOMTAG="Custom Value"');
     });
   });
 

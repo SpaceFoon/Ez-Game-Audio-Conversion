@@ -16,36 +16,31 @@ Ez Game Audio Conversion is a batch audio converter designed for game developers
 
 ```bash
 npm run dev              # Build TypeScript then run compiled JS
-npm run dev:js           # Same as dev (build TypeScript then run compiled JS)
 ```
-
-**Note:** The project uses ES modules. All dev commands compile TypeScript first, then run the compiled JavaScript.
 
 ### Building
 
 ```bash
-npm run build:ts         # Compile TypeScript to ES modules in dist/
+npm run build            # Compile TypeScript to ES modules in dist/
 npm run build:watch      # Watch mode compilation
 npm run build:sea        # Build Single Executable Application (SEA)
 npm run package          # Full release: SEA + docs + ffmpeg + archives
-npm run build            # Alias for build:ts
 npm run clean            # Remove dist/ and release/ folders
 ```
 
 **SEA Build Process (`npm run build:sea`):**
 1. Compiles TypeScript to ESM
-2. Generates SEA blob from `dist/app.js`
-3. Copies Node.js binary
-4. Injects application blob into executable using `postject`
-5. Outputs to `release/EZ-Game-Audio.exe` (Windows) or `release/EZ-Game-Audio` (Linux/macOS)
-6. Cleans up temporary files (sea-config.json, sea-prep.blob)
-
-**Note:** There's a case mismatch between build-sea.js (creates `EZ-Game-Audio`) and post-sea.js (expects `ez-game-audio` on non-Windows platforms). This may cause issues on Linux/macOS.
+2. Bundles application with esbuild to CJS for SEA compatibility
+3. Generates SEA blob from bundled app
+4. Copies Node.js binary
+5. Injects application blob into executable using `postject`
+6. Outputs to `release/EZ-Game-Audio.exe` (Windows) or `release/EZ-Game-Audio` (Linux/macOS)
+7. Cleans up temporary files (sea-config.json, sea-prep.blob)
 
 **Full Package Build (`npm run package`):**
 1. Runs SEA build
 2. Generates HTML/PDF documentation from README
-3. Copies platform-specific ffmpeg binaries from `ffmpeg-bin/{platform}/`
+3. Copies ffmpeg binaries from `ffmpeg-bin/{platform}/`
 4. Copies helper scripts (Windows .bat files)
 5. Creates ZIP and 7z archives
 6. Cleans up temporary files
@@ -64,7 +59,7 @@ npm run test:coverage    # Generate coverage report
 npm run smoke            # Package and run smoke tests
 
 # Run single test file:
-npx jest src/__tests__/app.test.js
+npx jest src/__tests__/app.test.ts
 
 # Run single test by name:
 npx jest -t "test name pattern"
@@ -73,8 +68,7 @@ npx jest -t "test name pattern"
 ### Code Quality
 
 ```bash
-npm run lint             # ESLint check
-npm run format           # Auto-format with Prettier
+npm run fix              # ESLint fix + Prettier format (combined)
 ```
 
 Pre-commit hooks automatically run ESLint and Prettier on staged files via Husky + lint-staged.
@@ -125,12 +119,12 @@ const workerPath = join(__dirname, 'converterWorker.js');
 
 ### Global Environment Configuration
 
-The application uses `globalThis.env` for runtime configuration (defined in `src/types/global.ts`):
+The application uses `globalThis.env` for runtime configuration (type defined in `src/types/global.ts`):
 
 - Platform detection (Windows/Mac/Linux)
-- Execution context (dev/debug/pkg)
+- Architecture info (arch, platform)
+- Execution context (isDev/isDebug/isPkg)
 - CPU core count
-- Command-line arguments
 
 This is initialized once at startup in `src/app.ts`.
 
@@ -148,7 +142,7 @@ When converting to Opus format, loop points must be adjusted for sample rate cha
 
 ### Metadata Preservation
 
-`src/metadataService.ts` extracts 60+ metadata fields using ffprobe and reapplies them via ffmpeg arguments. This includes:
+`src/metadataService.ts` extracts 100+ metadata fields using ffprobe and reapplies them via ffmpeg arguments. This includes:
 
 - Standard tags (title, artist, album, etc.)
 - iTunes-specific metadata
@@ -164,10 +158,10 @@ Workers use `spawn()` instead of `exec()` to prevent shell injection. Commands a
 
 ```typescript
 const args = ['-i', inputFile, '-c:a', codec, outputFile];
-spawn('ffmpeg', args, { windowsVerbatimArguments: true });
+spawn('ffmpeg', args, { shell: false });
 ```
 
-The `windowsVerbatimArguments: true` option ensures Windows compatibility.
+Using `shell: false` lets Node.js properly quote arguments containing spaces on all platforms.
 
 ### Conflict Resolution System
 
@@ -196,10 +190,9 @@ The project uses Node.js 24's built-in SEA feature to create standalone executab
 
 **Important Notes:**
 - Requires Node.js 24+ (ESM support in SEA)
-- Worker threads work seamlessly in SEA (no special configuration needed)
-- The SEA blob includes all ESM imports
-- `useCodeCache: false` - Code cache doesn't work with ESM
-- External Requirements: `ffmpeg` and `ffprobe` must be in the same directory as the executable
+- Application is bundled to CJS via esbuild before SEA packaging
+- Worker threads are bundled separately (cannot be inlined in SEA)
+- `useCodeCache: true` - Code caching enabled for faster startup
 - Platform-specific signing may be required (macOS: codesign, Linux: chmod +x)
 
 ## FFmpeg Binaries
@@ -223,7 +216,7 @@ ffmpeg-bin/
 **Important:**
 - Binaries are NOT committed to git (.gitignored)
 - Each developer/CI runner downloads them once
-- `npm run package` automatically copies the correct platform's binaries
+- `npm run package` copies the `ffmpeg-bin/` directory into the release
 - Download links: See `ffmpeg-bin/README.md`
 
 **GitHub Actions automatically downloads ffmpeg during release builds**
@@ -232,8 +225,8 @@ ffmpeg-bin/
 
 Tests are located in `src/__tests__/`:
 
-- **Unit tests**: `*.test.js` - Test individual modules with ESM mocking
-- **Integration tests**: `integration/*.test.js` - Test complete workflows
+- **Unit tests**: `*.test.ts` - Test individual modules with ESM mocking
+- **Integration tests**: `integration/*.test.ts` - Test complete workflows
 - **Smoke test**: `smokeTest.mjs` - Verifies packaged binary starts correctly
 - **Test utilities**: `test-utils/` - Shared helpers and mock data generators
 
@@ -241,7 +234,7 @@ Tests are located in `src/__tests__/`:
 
 All tests run sequentially (`--runInBand`) to prevent file system race conditions.
 
-Coverage thresholds: 40% branches, 50% functions, 55% lines/statements.
+**Test count:** 400+ tests across 25 test files.
 
 ## TypeScript Configuration
 
@@ -262,10 +255,10 @@ Coverage thresholds: 40% branches, 50% functions, 55% lines/statements.
 Codecs are hardcoded in `src/converterWorker.ts`:
 
 - **MP3**: libmp3lame with VBR quality 4 (~160kbps)
-- **OGG**: libopus (preferred) or libvorbis with quality 6
+- **OGG**: libopus at 64k bitrate, or libvorbis with VBR quality 1.2
 - **M4A**: AAC at 256k fixed bitrate
 - **WAV/AIFF**: pcm_s16le (16-bit uncompressed)
-- **FLAC**: Compression level 9 (maximum)
+- **FLAC**: Compression level 9 (minimal compression)
 
 To modify bitrates or codecs, edit the `formatConfig` object and `getFormatConfig()` function in `src/converterWorker.ts`.
 
@@ -281,10 +274,10 @@ The project uses GitHub Actions to automatically build releases for all platform
 1. Builds on Windows, Linux, and macOS runners in parallel
 2. Downloads platform-specific ffmpeg binaries automatically
 3. Runs `npm run package` on each platform
-4. Creates platform-specific archives:
-   - `EZ-Game-Audio-Windows.zip` + `.7z`
-   - `EZ-Game-Audio-Linux.zip`
-   - `EZ-Game-Audio-macOS.zip`
+4. Creates platform-specific archives with SHA256 checksums:
+   - `EZ-Game-Audio-Windows.zip` + `.7z` + `.sha256`
+   - `EZ-Game-Audio-Linux.zip` + `.sha256`
+   - `EZ-Game-Audio-macOS.zip` + `.sha256`
 5. Creates a **DRAFT** GitHub Release with all artifacts
 
 **Manual trigger:**
@@ -294,9 +287,9 @@ The project uses GitHub Actions to automatically build releases for all platform
 ### CI Workflow (`.github/workflows/ci.yml`)
 
 Runs on every push/PR to `dev` or `main`:
-- Linting
+- Linting and formatting
 - TypeScript compilation
-- Tests (100 tests total, 94+ passing)
+- Tests with coverage (400+ tests)
 - Build verification
 
 ### Creating a Release
@@ -329,5 +322,6 @@ See `.github/workflows/RELEASE-GUIDE.md` for detailed instructions.
 - Cannot cross-compile: Must build on each target platform (handled by GitHub Actions)
 
 ## Known Issues
+When switching between Windows and WSL/Linux in the same working copy, `node_modules` can become incompatible (native binaries and resolved paths differ). If you switch environments, run `npm install` again before `npm run dev` or `npm run build`.
 
-None currently tracked.
+No other known issues currently tracked.

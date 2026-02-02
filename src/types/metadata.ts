@@ -13,6 +13,7 @@ export interface AudioStream {
 
 export interface AudioFormat {
   filename: string;
+  format_name: string;
   duration: string;
   size: string;
   bit_rate: string;

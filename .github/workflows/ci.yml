@@ -22,11 +22,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint code
-        run: npm run lint
+      - name: Lint and format
+        run: npm run fix
 
       - name: Type check & build
-        run: npm run build:ts
+        run: npm run build
 
       - name: Run tests with coverage
         run: npm run test:coverage

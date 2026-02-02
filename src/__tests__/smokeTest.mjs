@@ -4,7 +4,7 @@
  Assumes `npm run package` has produced binaries in `release/`.
 */
 import { spawnSync } from 'child_process';
-import { existsSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
 
 const isWindows = process.platform === 'win32';
@@ -12,7 +12,9 @@ const isWindows = process.platform === 'win32';
 function findBinary() {
   const dir = join(process.cwd(), 'release');
   const candidates = [
-    isWindows ? 'ez-game-audio.exe' : 'ez-game-audio',
+    isWindows ? 'EZ-Game-Audio.exe' : 'EZ-Game-Audio',
+    'EZ-Game-Audio.exe', // Always check for .exe even on non-Windows (WSL scenario)
+    'ez-game-audio.exe',
     'ez-game-audio-conversion-win32-x64.exe',
     'ez-game-audio-conversion-linux-x64',
   ];
@@ -48,34 +50,60 @@ function prepTemp() {
   return { tmpDir };
 }
 
+function cleanupTemp(tmpDir) {
+  if (existsSync(tmpDir)) {
+    try {
+      rmSync(tmpDir, { recursive: true, force: true });
+      console.log('Smoke test: cleaned up temporary directory.');
+    } catch (error) {
+      console.warn(
+        'Smoke test: could not clean up temp directory:',
+        error.message
+      );
+    }
+  }
+}
+
 function run() {
   const bin = findBinary();
   const { tmpDir } = prepTemp();
-  // Provide dummy input folder argument (the temp dir) so program skips interactive folder prompt.
-  const res = spawnSync(bin, [tmpDir], { encoding: 'utf8', timeout: 15000 });
-  if (res.error) {
-    console.error('Smoke test failed to run binary:', res.error);
-    process.exit(1);
+
+  let exitCode = 0;
+  try {
+    // Provide dummy input folder argument (the temp dir) so program skips interactive folder prompt.
+    const res = spawnSync(bin, [tmpDir], { encoding: 'utf8', timeout: 15000 });
+    if (res.error) {
+      console.error('Smoke test failed to run binary:', res.error);
+      exitCode = 1;
+    } else if (res.status !== 0) {
+      console.warn(
+        'Binary exited non-zero (expected for early exit / prompts). Code:',
+        res.status
+      );
+    }
+    // Basic sanity checks on stdout
+    const out = res.stdout || '';
+    if (
+      !out.includes('Input Folder') &&
+      !out.includes('Processing single file') &&
+      !out.includes('Conversion parameters')
+    ) {
+      console.warn(
+        'Smoke test: did not see expected startup text; stdout length:',
+        out.length
+      );
+    } else {
+      console.log(
+        'Smoke test passed: binary produced expected output fragment.'
+      );
+    }
+  } finally {
+    // Clean up temp directory
+    cleanupTemp(tmpDir);
   }
-  if (res.status !== 0) {
-    console.warn(
-      'Binary exited non-zero (expected for early exit / prompts). Code:',
-      res.status
-    );
-  }
-  // Basic sanity checks on stdout
-  const out = res.stdout || '';
-  if (
-    !out.includes('Input Folder') &&
-    !out.includes('Processing single file') &&
-    !out.includes('Conversion parameters')
-  ) {
-    console.warn(
-      'Smoke test: did not see expected startup text; stdout length:',
-      out.length
-    );
-  } else {
-    console.log('Smoke test passed: binary produced expected output fragment.');
+
+  if (exitCode !== 0) {
+    process.exit(exitCode);
   }
 }
 

@@ -24,6 +24,21 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 
+const PLATFORM_SLUG =
+  process.platform === 'win32'
+    ? 'windows'
+    : process.platform === 'darwin'
+      ? 'macos'
+      : 'linux';
+const FFMPEG_EXE = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+const BUNDLED_FFMPEG = join(
+  process.cwd(),
+  'ffmpeg-bin',
+  PLATFORM_SLUG,
+  FFMPEG_EXE
+);
+const FFMPEG_CMD = existsSync(BUNDLED_FFMPEG) ? BUNDLED_FFMPEG : 'ffmpeg';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -35,9 +50,10 @@ const OUTPUT_DIR = join(TEST_DIR, 'output');
 // Check if ffmpeg is available
 const checkFfmpegAvailable = (): boolean => {
   try {
-    const result = spawnSync('ffmpeg', ['-version'], {
+    const result = spawnSync(FFMPEG_CMD, ['-version'], {
       encoding: 'utf8',
       timeout: 5000,
+      windowsHide: true,
     });
     return result.status === 0;
   } catch {
@@ -55,7 +71,7 @@ const generateTestWav = (filePath: string): void => {
 
   // Use ffmpeg to generate a short silent WAV file
   const result = spawnSync(
-    'ffmpeg',
+    FFMPEG_CMD,
     [
       '-y',
       '-f',
@@ -68,7 +84,7 @@ const generateTestWav = (filePath: string): void => {
       'pcm_s16le',
       filePath,
     ],
-    { encoding: 'utf8', timeout: 10000 }
+    { encoding: 'utf8', timeout: 10000, windowsHide: true }
   );
 
   if (result.status !== 0) {
@@ -100,9 +116,9 @@ const testConversion = (
   }
 
   const result = spawnSync(
-    'ffmpeg',
+    FFMPEG_CMD,
     ['-y', '-i', inputFile, ...codecArgs, '-vn', outputFile],
-    { encoding: 'utf8', timeout: 30000 }
+    { encoding: 'utf8', timeout: 30000, windowsHide: true }
   );
 
   if (result.status === 0 && existsSync(outputFile)) {

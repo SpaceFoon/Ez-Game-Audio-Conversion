@@ -246,6 +246,24 @@ const initFileName = (basePath: string, fileName: string): string => {
   return fullFileName;
 };
 
+/**
+ * Escapes a value for CSV format.
+ * If the value contains commas, quotes, or newlines, wrap it in quotes and escape internal quotes.
+ * This is platform-agnostic - works on Windows, Mac, and Linux.
+ */
+export function escapeCsvField(value: string): string {
+  if (
+    value.includes(',') ||
+    value.includes('"') ||
+    value.includes('\n') ||
+    value.includes('\r')
+  ) {
+    // Escape double quotes by doubling them, then wrap in quotes
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
 export const addToLog = async (
   log: LogEntry,
   file?: FileInfo
@@ -255,18 +273,26 @@ export const addToLog = async (
     initializeFileNames();
   }
   const timestamp = moment().format('DD-MM-YYYY HH:mm:ss');
-  const time = timestamp.replaceAll(',', '');
-  const data = log.data?.toString().replaceAll(',', '') || 'Unknown Error';
-  const inputFile =
-    file?.inputFile?.replaceAll(',', '') || 'Unknown Input File';
+  const time = timestamp;
+  const data = log.data != null ? String(log.data) : 'Unknown Error';
+  const inputFile = file?.inputFile || 'Unknown Input File';
   // Only warn on unknown error for error/stderr logs
-  const outputFile =
-    file?.outputFile?.replaceAll(',', '') || 'Unknown Output File';
+  const outputFile = file?.outputFile || 'Unknown Output File';
   const isErr = log.type === 'stderr' || log.type === 'error';
   if (isErr && data === 'Unknown Error') {
     console.error('Unknown Error log, details:', log, file);
   }
   // const logPath = settings.outputFilePath;
+
+  // Extract exit code for error logs
+  let exitCode = '';
+  if (log.type === 'code') {
+    exitCode = String(log.data);
+  } else if (isErr && typeof data === 'string') {
+    // Try to parse exit code from error message like "ffmpeg exited with code 123"
+    const match = data.match(/exited with code (\d+)/i);
+    exitCode = (match && match[1]) || 'N/A';
+  }
 
   // Determine if the log is an error or not.
   if (isErr) {
@@ -279,8 +305,10 @@ export const addToLog = async (
       try {
         writeFileSync(
           fileNameE,
-          'Timestamp, Error, Input File, Output File\n',
-          { encoding: 'utf8' }
+          '\uFEFF' + 'Timestamp,"Exit Code",Error,"Input File","Output File"\n',
+          {
+            encoding: 'utf8',
+          }
         );
         // Header created; continue to write the current log line below
       } catch (error) {
@@ -293,13 +321,45 @@ export const addToLog = async (
     try {
       if (fileNameE) await isFileBusy(fileNameE);
       const csvRow =
-        `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, '') +
-        '\n';
+        [
+          escapeCsvField(time),
+          escapeCsvField(exitCode),
+          escapeCsvField(data.replace(/[\r\n]+/g, ' ')),
+          escapeCsvField(inputFile),
+          escapeCsvField(outputFile),
+        ].join(',') + '\n';
       if (fileNameE) appendFileSync(fileNameE, csvRow);
     } catch (error) {
       console.error(`🚨🚨⛔ Error writing to ${fileNameE}: ${error} ⛔🚨🚨`);
       return false;
     }
+
+    // Also log errors to logs.csv
+    try {
+      if (fileNameL && !existsSync(fileNameL)) {
+        await isFileBusy(fileNameL);
+        writeFileSync(
+          fileNameL,
+          '\uFEFF' + 'Timestamp,"Exit Code",Input,Output\n',
+          {
+            encoding: 'utf8',
+          }
+        );
+      }
+      if (fileNameL) await isFileBusy(fileNameL);
+      const logCsvRow =
+        [
+          escapeCsvField(time),
+          escapeCsvField(exitCode),
+          escapeCsvField(inputFile),
+          escapeCsvField(outputFile),
+        ].join(',') + '\n';
+      if (fileNameL) appendFileSync(fileNameL, logCsvRow);
+    } catch (error) {
+      console.error(`🚨🚨⛔ Error writing to ${fileNameL}: ${error} ⛔🚨🚨`);
+      return false;
+    }
+
     return;
   }
 
@@ -307,9 +367,14 @@ export const addToLog = async (
   if (fileNameL && !existsSync(fileNameL)) {
     await isFileBusy(fileNameL);
     try {
-      writeFileSync(fileNameL, 'Timestamp, Exit Code, Input, Output\n', {
-        encoding: 'utf8',
-      });
+      // Create log file with BOM for UTF-8. Hopefully avoids software not detecting this is CSV.
+      writeFileSync(
+        fileNameL,
+        '\uFEFF' + 'Timestamp,"Exit Code",Input,Output\n',
+        {
+          encoding: 'utf8',
+        }
+      );
     } catch (error) {
       console.error(
         `🚨🚨⛔ Error creating file or making header to ${fileNameL}: ${error} ⛔🚨🚨`
@@ -321,8 +386,12 @@ export const addToLog = async (
   try {
     if (fileNameL) await isFileBusy(fileNameL);
     const csvRow =
-      `${time},${data},${inputFile},${outputFile}`.replace(/[\r\n]+/g, '') +
-      '\n';
+      [
+        escapeCsvField(time),
+        escapeCsvField(data.replace(/[\r\n]+/g, ' ')),
+        escapeCsvField(inputFile),
+        escapeCsvField(outputFile),
+      ].join(',') + '\n';
     if (fileNameL) appendFileSync(fileNameL, csvRow);
   } catch (error) {
     console.error(`🚨🚨⛔ Error writing log to ${fileNameL}: ${error} ⛔🚨🚨`);
@@ -339,6 +408,41 @@ export function handleExit(
     spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' });
   }
   process.exit(code);
+}
+
+export function writeSummaryToLogs(
+  totalFiles: number,
+  successCount: number,
+  failCount: number,
+  durationSeconds: number
+): void {
+  const timestamp = moment().format('DD-MM-YYYY HH:mm:ss');
+  const summary = `SUMMARY: Total=${totalFiles}, Passed=${successCount}, Failed=${failCount}, Duration=${durationSeconds.toFixed(2)}s`;
+
+  // Write to logs.csv
+  try {
+    if (fileNameL && existsSync(fileNameL)) {
+      const logRow =
+        [escapeCsvField(timestamp), '', escapeCsvField(summary), ''].join(',') +
+        '\n';
+      appendFileSync(fileNameL, logRow);
+    }
+  } catch (error) {
+    console.error(`Error writing summary to logs: ${error}`);
+  }
+
+  // Write to error.csv
+  try {
+    if (fileNameE && existsSync(fileNameE)) {
+      const errorRow =
+        [escapeCsvField(timestamp), '', escapeCsvField(summary), '', ''].join(
+          ','
+        ) + '\n';
+      appendFileSync(fileNameE, errorRow);
+    }
+  } catch (error) {
+    console.error(`Error writing summary to errors: ${error}`);
+  }
 }
 
 export { rl };
