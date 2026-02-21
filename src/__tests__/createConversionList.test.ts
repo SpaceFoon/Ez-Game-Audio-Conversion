@@ -47,6 +47,8 @@ jest.unstable_mockModule('../utils.js', () => ({
   getAnswer: jest.fn(),
   settings: {},
   handleExit: jest.fn(),
+  getErrorMessage: (error: unknown) =>
+    error instanceof Error ? error.message : String(error || 'Unknown error'),
 }));
 
 // Dynamic imports after mock declarations

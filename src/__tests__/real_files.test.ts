@@ -9,7 +9,7 @@ import {
   copyFileSync,
 } from 'fs';
 import { join, dirname, basename, extname } from 'path';
-import { convertFiles } from '../../src/convertFiles.js';
+import { convertFiles } from '../../src/converterManager.js';
 import { settings } from '../../src/utils.js';
 
 // ESM equivalent of __dirname

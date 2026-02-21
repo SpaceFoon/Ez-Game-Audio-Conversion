@@ -84,7 +84,7 @@ describe('metadataService ffprobe path resolution', () => {
     );
   }, 10000);
 
-  it('falls back to PATH (ffprobe) when no files exist', async () => {
+  it('returns null when no ffprobe candidates exist', async () => {
     config = {
       sep: '/',
       runtimeBaseDir: '/app',
@@ -93,9 +93,10 @@ describe('metadataService ffprobe path resolution', () => {
     };
 
     const { getMetaData } = await importSubject();
-    await getMetaData('/in/in.mp3');
+    const result = await getMetaData('/in/in.mp3');
 
-    expect(spawnSyncMock).toHaveBeenCalled();
-    expect((spawnSyncMock.mock.calls as any[][]).at(-1)?.[0]).toBe('ffprobe');
+    // No ffprobe found, spawnSync never called, returns null
+    expect(spawnSyncMock).not.toHaveBeenCalled();
+    expect(result).toBeNull();
   }, 10000);
 });

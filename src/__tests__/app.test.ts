@@ -21,7 +21,7 @@ jest.unstable_mockModule('../createConversionList.js', () => ({
   default: jest.fn(),
 }));
 
-jest.unstable_mockModule('../convertFiles.js', () => ({
+jest.unstable_mockModule('../converterManager.js', () => ({
   convertFiles: jest.fn(),
 }));
 
@@ -57,7 +57,7 @@ const { default: getUserInput } = await import('../getUserInput.js');
 const { default: searchFiles } = await import('../searchFiles.js');
 const { default: createConversionList } =
   await import('../createConversionList.js');
-const { convertFiles } = await import('../convertFiles.js');
+const { convertFiles } = await import('../converterManager.js');
 const { default: finalize } = await import('../finalize.js');
 const { default: runApp } = await import('../app.js');
 

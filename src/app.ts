@@ -5,7 +5,7 @@ import { config } from 'dotenv';
 import getUserInput from './getUserInput.js';
 import searchFiles from './searchFiles.js';
 import createConversionList from './createConversionList.js';
-import { convertFiles } from './convertFiles.js';
+import { convertFiles } from './converterManager.js';
 import { settings, isSeaRuntime } from './utils.js';
 import finalize from './finalize.js';
 import ExitProgramError from './exitProgramError.js';

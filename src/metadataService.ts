@@ -277,12 +277,12 @@ const getMetaData = async (
     join(runtimeBaseDir, 'ffmpeg-bin', platformSlug, executableName),
     join(process.cwd(), executableName),
     join(process.cwd(), 'bin', executableName),
-    executableName, // Allow system PATH resolution as last resort
+    join(process.cwd(), 'ffmpeg-bin', platformSlug, executableName),
   ];
 
   let lastError: unknown;
   for (const ffprobePath of searchPaths) {
-    if (ffprobePath !== executableName && !existsSync(ffprobePath)) continue;
+    if (!existsSync(ffprobePath)) continue;
     try {
       const output = spawnSync(
         ffprobePath,
@@ -344,7 +344,7 @@ const formatMetaData = (
 ): { metaData: string; channels: string } => {
   if (!metaData || !metaData.streams) {
     if (inputFile) {
-      console.warn(`\n No meta data found in ${inputFile}`);
+      console.warn(`\n No metadata found in ${inputFile}`);
     }
     // Maintain legacy spacing contract: channels string includes leading space
     return { metaData: '', channels: ' -ac 2' };
@@ -375,10 +375,7 @@ const formatMetaData = (
   const metaDataString = metaDataDataArray.join(' ');
 
   if (process.env.DEBUG) {
-    console.log(
-      '10 metaDataarray metadataService line 173: ',
-      metaDataDataArray
-    );
+    console.log('formatMetaData output:', metaDataDataArray);
   }
   return { metaData: metaDataString, channels };
 };
@@ -389,7 +386,7 @@ export const formatMetaDataArgs = (
   inputFile?: string
 ): { metaDataArgs: string[]; channelsArgs: string[] } => {
   if (!metaData || !metaData.streams) {
-    if (inputFile) console.warn(`\n No meta data found in ${inputFile}`);
+    if (inputFile) console.warn(`\n No metadata found in ${inputFile}`);
     return { metaDataArgs: [], channelsArgs: ['-ac', '2'] };
   }
 
@@ -487,12 +484,6 @@ export const convertLoopPoints = (
   // Get original values
   const sampleRate = metaData.streams[0].sample_rate;
   const { loopStart, loopLength } = getLoopPoints(metaData);
-
-  // console.log("convertLoopPoints - Original values:", {
-  //   sampleRate,
-  //   loopStart,
-  //   loopLength,
-  // });
 
   // If not converting to opus or no valid loop points, return original values
   if (

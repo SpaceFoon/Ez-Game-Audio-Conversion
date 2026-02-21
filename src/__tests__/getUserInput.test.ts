@@ -17,7 +17,6 @@ jest.unstable_mockModule('chalk', () => ({
 }));
 
 jest.unstable_mockModule('../utils.js', () => ({
-  checkDiskSpace: jest.fn(),
   getAnswer: jest.fn(),
 }));
 

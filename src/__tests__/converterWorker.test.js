@@ -18,6 +18,8 @@ jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   isPackagedRuntime: false,
   platformSlug: 'windows',
+  getErrorMessage: (error) =>
+    error instanceof Error ? error.message : String(error || 'Unknown error'),
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -356,7 +358,12 @@ describe('converterWorker.js', () => {
     process.env.NODE_ENV = 'test';
 
     // Force directory creation path and throw error
-    fs.existsSync.mockImplementation((p) => (p === 'in.wav' ? true : false));
+    // Must include ffmpeg in exists check so code doesn't fail early
+    fs.existsSync.mockImplementation((p) => {
+      if (p === 'in.wav') return true;
+      if (typeof p === 'string' && p.includes('ffmpeg')) return true;
+      return false;
+    });
     fs.mkdirSync.mockImplementation(() => {
       throw new Error('mkdir error');
     });

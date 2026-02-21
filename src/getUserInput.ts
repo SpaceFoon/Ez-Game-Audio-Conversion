@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, statSync } from 'fs';
 import chalk from 'chalk';
-import { checkDiskSpace, getAnswer } from './utils.js';
+import { getAnswer } from './utils.js';
 import path from 'path';
 import type { Settings } from './types/settings.js';
 import type { AudioFormat } from './types/audio.js';
@@ -70,7 +70,6 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       console.log(
         chalk.green.italic(`\n📝 Output Folder: ${outputFilePath} ✅`)
       );
-      checkDiskSpace(outputFilePath);
       break;
     }
 
@@ -196,7 +195,6 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
     settings.outputFilePath = outputFilePath;
     console.log(chalk.green.italic(`\n📝 Output Folder: ${outputFilePath} ✅`));
-    checkDiskSpace(outputFilePath);
     break;
   }
 

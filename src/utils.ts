@@ -5,7 +5,6 @@ import {
   existsSync,
   appendFileSync,
   writeFileSync,
-  statSync,
   mkdirSync,
 } from 'fs';
 import moment from 'moment';
@@ -15,8 +14,34 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import type { Settings, LogEntry, FileInfo } from './types/settings.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// In the SEA build, the app is bundled to CJS and `import.meta.url` may be
+// missing/undefined. Fall back to CJS globals when available.
+declare const __dirname: string | undefined;
+declare const __filename: string | undefined;
+
+const moduleFilename = (() => {
+  try {
+    if (typeof import.meta?.url === 'string' && import.meta.url) {
+      return fileURLToPath(import.meta.url);
+    }
+  } catch {
+    // ignore
+  }
+  if (typeof __filename === 'string' && __filename) {
+    return __filename;
+  }
+  return '';
+})();
+
+const moduleDirname = (() => {
+  if (moduleFilename) {
+    return dirname(moduleFilename);
+  }
+  if (typeof __dirname === 'string' && __dirname) {
+    return __dirname;
+  }
+  return process.cwd();
+})();
 
 const seaFuseKey = Object.keys(process.env).find((key) =>
   key.startsWith('NODE_SEA_FUSE_')
@@ -28,13 +53,17 @@ export const isPackagedRuntime =
   process.env.PKG_ENV === 'packaging';
 export const runtimeBaseDir = isPackagedRuntime
   ? dirname(process.execPath)
-  : join(__dirname, '..');
+  : join(moduleDirname, '..');
 export const platformSlug =
   process.platform === 'win32'
     ? 'windows'
     : process.platform === 'darwin'
       ? 'macos'
       : 'linux';
+
+/** Extract error message from unknown caught value */
+export const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error || 'Unknown error');
 
 export let settings: Settings = {
   inputFilePath: '',
@@ -44,8 +73,6 @@ export let settings: Settings = {
   oggCodec: null,
   singleFileMode: false,
   singleFilePath: '',
-  //bitrate: 0, placeholder for future options
-  //quality: 2,
   userOS: null,
 };
 
@@ -141,32 +168,6 @@ console.warn = function (...args) {
   originalConsoleWarn.apply(console, coloredArgs);
 };
 
-// If a file is not writing, check the disk space.
-export const checkDiskSpace = (directory?: string): boolean => {
-  // If directory is empty or undefined, warn and continue
-  if (!directory) {
-    console.warn(
-      chalk.yellow.bold(
-        '\nWARNING: No directory provided for disk space check. Unable to verify available space; assuming enough disk for now.'
-      )
-    );
-    return true;
-  }
-
-  try {
-    // On Windows, this approach is more reliable
-    statSync(directory);
-
-    // Windows doesn't reliably provide blocks/blksize
-    // Instead, use freespace directly if available, or a reasonable default
-    return true;
-  } catch (error) {
-    console.error(`Error checking disk space: ${(error as Error).message}`);
-    // Default to true so conversion isn't blocked by disk space check errors
-    return true;
-  }
-};
-
 // If a file fails to read or write, check if it is busy.
 export const isFileBusy = async (file: string): Promise<boolean> => {
   if (!existsSync(file)) return false;
@@ -184,7 +185,7 @@ export const isFileBusy = async (file: string): Promise<boolean> => {
       );
       return false;
     } else if (err?.code === 'ENOENT') {
-      console.error('code', String(error));
+      console.error('ENOENT while checking file status:', String(error));
       return false;
     } else {
       console.error(
@@ -296,8 +297,6 @@ export const addToLog = async (
 
   // Determine if the log is an error or not.
   if (isErr) {
-    // console.log("log in utils", log);
-
     if (fileNameE) await isFileBusy(fileNameE);
 
     // Create error log file and header if none exists.

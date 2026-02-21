@@ -80,6 +80,8 @@ jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/app',
   isPackagedRuntime: false,
   platformSlug: 'windows',
+  getErrorMessage: (error: unknown) =>
+    error instanceof Error ? error.message : String(error || 'Unknown error'),
 }));
 
 // Import converterWorker (metadataService is NOT mocked - uses real functions)

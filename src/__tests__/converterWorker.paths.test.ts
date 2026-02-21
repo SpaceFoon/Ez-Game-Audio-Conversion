@@ -62,6 +62,8 @@ jest.unstable_mockModule('../utils.js', () => ({
   get isPackagedRuntime() {
     return config.isPackagedRuntime;
   },
+  getErrorMessage: (error: unknown) =>
+    error instanceof Error ? error.message : String(error || 'Unknown error'),
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -184,9 +186,9 @@ describe('converterWorker ffmpeg path resolution', () => {
     process.env.NODE_ENV = originalEnv;
   }, 10000);
 
-  it('allows PATH fallback outside production (packaged linux)', async () => {
+  it('throws helpful error when no ffmpeg candidates exist (packaged linux)', async () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'test';
+    process.env.NODE_ENV = 'production';
 
     const outputFile = '/out/out.mp3';
 
@@ -195,23 +197,22 @@ describe('converterWorker ffmpeg path resolution', () => {
       runtimeBaseDir: '/app',
       platformSlug: 'linux',
       isPackagedRuntime: true,
-      exists: new Set<string>(['/out']),
+      exists: new Set<string>(['/out']), // no ffmpeg candidates
     };
 
     jest.resetModules();
     const { converterWorker } = await import('../converterWorker.js');
 
-    await converterWorker({
-      file: {
-        inputFile: '/in/in.wav',
-        outputFile,
-        outputFormat: 'mp3',
-      },
-      settings: { oggCodec: 'vorbis' },
-    });
-
-    expect(spawnMock).toHaveBeenCalled();
-    expect((spawnMock.mock.calls as any[][])[0][0]).toBe('ffmpeg');
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: '/in/in.wav',
+          outputFile,
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/ffmpeg not found/i);
 
     process.env.NODE_ENV = originalEnv;
   }, 10000);

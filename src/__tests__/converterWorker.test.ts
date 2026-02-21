@@ -19,6 +19,8 @@ jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   isPackagedRuntime: false,
   platformSlug: 'win32-x64',
+  getErrorMessage: (error: unknown) =>
+    error instanceof Error ? error.message : String(error || 'Unknown error'),
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -296,7 +298,12 @@ describe('converterWorker.js', () => {
     process.env.NODE_ENV = 'test';
 
     // Force directory creation path and throw error
-    fs.existsSync.mockImplementation((p) => (p === 'in.wav' ? true : false));
+    // Must include ffmpeg in exists check so code doesn't fail early
+    fs.existsSync.mockImplementation((p) => {
+      if (p === 'in.wav') return true;
+      if (typeof p === 'string' && p.includes('ffmpeg')) return true;
+      return false;
+    });
     fs.mkdirSync.mockImplementation(() => {
       throw new Error('mkdir error');
     });
@@ -319,7 +326,12 @@ describe('converterWorker.js', () => {
   }, 10000);
 
   it('creates missing output directory successfully', async () => {
-    fs.existsSync.mockImplementation((p) => p === 'in.wav'); // directory missing
+    // Must include ffmpeg in exists check so code doesn't fail early
+    fs.existsSync.mockImplementation((p) => {
+      if (p === 'in.wav') return true;
+      if (typeof p === 'string' && p.includes('ffmpeg')) return true;
+      return false; // directory missing
+    });
 
     await converterWorker({
       file: {

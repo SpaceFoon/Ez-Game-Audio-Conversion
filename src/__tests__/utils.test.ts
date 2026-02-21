@@ -15,7 +15,6 @@ jest.unstable_mockModule('fs', () => ({
   closeSync: jest.fn(),
   writeFileSync: jest.fn(),
   appendFileSync: jest.fn(),
-  statSync: jest.fn(),
   mkdirSync: jest.fn(),
 }));
 
@@ -40,7 +39,6 @@ const {
   closeSync: _closeSync,
   writeFileSync: _writeFileSync,
   appendFileSync: _appendFileSync,
-  statSync: _statSync,
 } = await import('fs');
 
 const {
@@ -50,7 +48,6 @@ const {
   getAnswer,
   isFileBusy,
   addToLog,
-  checkDiskSpace,
   __setLogFileStateForTests,
   writeSummaryToLogs,
 } = await import('../utils.js');
@@ -100,7 +97,6 @@ describe('utils module', () => {
     expect(typeof getAnswer).toBe('function');
     expect(typeof isFileBusy).toBe('function');
     expect(typeof addToLog).toBe('function');
-    expect(typeof checkDiskSpace).toBe('function');
   });
 
   it('should have correct structure in settings object', () => {
@@ -126,29 +122,6 @@ describe('utils module', () => {
       // Arrays are joined with space
       expect(console.log).toHaveBeenCalledWith('Test question');
       expect(rl.question).toHaveBeenCalledWith('', expect.any(Function));
-    });
-  });
-
-  describe('checkDiskSpace function', () => {
-    it('should return true when disk space check succeeds', () => {
-      _statSync.mockReturnValueOnce({ isFile: () => false });
-      expect(checkDiskSpace('/test/dir')).toBe(true);
-      expect(_statSync).toHaveBeenCalledWith('/test/dir');
-    });
-
-    it('should return true when directory is not provided', () => {
-      // When no directory provided, it warns and returns true without calling statSync
-      expect(checkDiskSpace()).toBe(true);
-      expect(console.warn).toHaveBeenCalled();
-      expect(_statSync).not.toHaveBeenCalled();
-    });
-
-    it('should return true even when errors occur (fail-safe)', () => {
-      _statSync.mockImplementationOnce(() => {
-        throw new Error('Test error');
-      });
-      expect(checkDiskSpace('/test/dir')).toBe(true);
-      // Error is logged but returns true anyway
     });
   });
 

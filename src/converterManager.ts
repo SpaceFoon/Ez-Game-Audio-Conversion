@@ -17,7 +17,6 @@ import {
   initializeFileNames,
   addToLog,
   settings,
-  checkDiskSpace,
   getAnswer,
   runtimeBaseDir,
   isPackagedRuntime,
@@ -28,6 +27,37 @@ type WorkerManagerMessage =
   | { type: 'error'; data: string }
   | { type: 'code'; data: number }
   | { type: string; data?: unknown; [key: string]: unknown };
+
+type FatalFfmpegErrorKind = 'disk-space' | 'permission' | null;
+
+const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
+  const text = stderrText.toLowerCase();
+
+  const diskSpacePatterns = [
+    /\benospc\b/i,
+    /no space left/i,
+    /not enough space/i,
+    /disk full/i,
+  ];
+
+  if (diskSpacePatterns.some((pattern) => pattern.test(text))) {
+    return 'disk-space';
+  }
+
+  const permissionPatterns = [
+    /\beacces\b/i,
+    /\beperm\b/i,
+    /permission denied/i,
+    /access is denied/i,
+    /operation not permitted/i,
+  ];
+
+  if (permissionPatterns.some((pattern) => pattern.test(text))) {
+    return 'permission';
+  }
+
+  return null;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -63,8 +93,19 @@ const convertFiles = async (
   );
   const failedFiles: ConversionResult[] = [];
   const successfulFiles: ConversionResult[] = [];
+
+  /** De-duplicate and record a failed conversion */
+  const recordFailure = (file: ConversionItem) => {
+    if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
+      failedFiles.push({
+        success: false,
+        inputFile: file.inputFile,
+        outputFile: file.outputFile,
+      });
+    }
+  };
   console.info('\n   Detected 🕵️‍♂️', cpuNumber, 'CPU Cores 🖥');
-  console.log('   Using', cpuNumber, 'concurrent 🧵 threads');
+  console.log('   Using', maxConcurrentWorkers, 'concurrent 🧵 threads');
 
   const processFile = async (
     file: ConversionItem,
@@ -73,10 +114,9 @@ const convertFiles = async (
     tasksLeft: number
   ): Promise<void> => {
     const workerStartTime = performance.now();
-    checkDiskSpace(settings.outputFilePath);
     console.log(
       chalk.cyanBright(
-        `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left on output file:\n   ${file.outputFile}📤`
+        `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left. Output file:\n   ${file.outputFile}📤`
       )
     );
 
@@ -101,6 +141,11 @@ const convertFiles = async (
         // Search multiple candidate locations for the worker file
         const workerCandidates = isPackagedRuntime
           ? [
+              join(runtimeBaseDir, 'dist', 'converterWorker.cjs'),
+              join(runtimeBaseDir, 'converterWorker.cjs'),
+              join(dirname(process.execPath), 'dist', 'converterWorker.cjs'),
+
+              // Back-compat (older packages)
               join(runtimeBaseDir, 'dist', 'converterWorker.js'),
               join(runtimeBaseDir, 'converterWorker.js'),
               join(dirname(process.execPath), 'dist', 'converterWorker.js'),
@@ -109,6 +154,11 @@ const convertFiles = async (
               join(__dirname_resolved, '..', 'dist', 'converterWorker.js'),
               join(__dirname_resolved, 'converterWorker.js'),
               join(process.cwd(), 'dist', 'converterWorker.js'),
+
+              // Fallback (bundled worker)
+              join(__dirname_resolved, '..', 'dist', 'converterWorker.cjs'),
+              join(__dirname_resolved, 'converterWorker.cjs'),
+              join(process.cwd(), 'dist', 'converterWorker.cjs'),
             ];
 
         const workerPath = workerCandidates.find((p) => existsSync(p));
@@ -133,6 +183,7 @@ const convertFiles = async (
         // Accumulate stderr for final error log
         let stderrOutput = '';
         let errorLogged = false;
+        let fatalExitRequested = false;
 
         worker.on('message', (message: unknown) => {
           if (!isRecord(message) || typeof message.type !== 'string') return;
@@ -143,16 +194,26 @@ const convertFiles = async (
             const stderrMessage = String(typedMessage.data ?? '');
             stderrOutput += stderrMessage + ' ';
             console.error(
-              'ERROR MESSAGE FROM FFMPEG:',
+              'FFmpeg stderr:',
               stderrMessage,
               String(file.inputFile ?? ''),
               String(file.outputFile ?? '')
             );
-            // Catch disk space errors and stop a runaway process
-            if (/no space left/i.test(stderrMessage)) {
-              console.error(
-                '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
-              );
+
+            const fatalKind = detectFatalFfmpegError(stderrOutput);
+            if (fatalKind && !fatalExitRequested) {
+              fatalExitRequested = true;
+
+              if (fatalKind === 'disk-space') {
+                console.error(
+                  '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
+                );
+              } else {
+                console.error(
+                  '\n 🚨⛔🚨 Stopping due to file permission/access error! 🚨🔐🚨'
+                );
+              }
+
               void getAnswer('Press ENTER to exit...').then(() =>
                 process.exit(1)
               );
@@ -176,13 +237,7 @@ const convertFiles = async (
                 )
               );
 
-              if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-                failedFiles.push({
-                  success: false,
-                  inputFile: file.inputFile,
-                  outputFile: file.outputFile,
-                });
-              }
+              recordFailure(file);
               resolveOnce();
             }
             return;
@@ -234,13 +289,7 @@ const convertFiles = async (
                 )
               );
 
-              if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-                failedFiles.push({
-                  success: false,
-                  inputFile: file.inputFile,
-                  outputFile: file.outputFile,
-                });
-              }
+              recordFailure(file);
               resolveOnce();
             }
           }
@@ -262,13 +311,7 @@ const convertFiles = async (
             },
             file
           );
-          if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-            failedFiles.push({
-              success: false,
-              inputFile: file.inputFile,
-              outputFile: file.outputFile,
-            });
-          }
+          recordFailure(file);
           resolveOnce();
         });
 
@@ -302,24 +345,12 @@ const convertFiles = async (
               `\n ❌ Error: ${file.outputFile}\n   Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
             )
           );
-          if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-            failedFiles.push({
-              success: false,
-              inputFile: file.inputFile,
-              outputFile: file.outputFile,
-            });
-          }
+          recordFailure(file);
           resolveOnce();
         });
       } catch (error) {
         console.error('Error creating worker:', error);
-        if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
-          failedFiles.push({
-            success: false,
-            inputFile: file.inputFile,
-            outputFile: file.outputFile,
-          });
-        }
+        recordFailure(file);
         resolve();
       }
     });

@@ -75,7 +75,6 @@ async function setupAndImportConverterManager(options: SetupOptions) {
       outputFilePath: cwdDir,
       oggCodec: 'vorbis',
     },
-    checkDiskSpace: jest.fn(),
     getAnswer: jest.fn(async () => ''),
     runtimeBaseDir,
     isPackagedRuntime: options.isPackagedRuntime,
@@ -177,10 +176,10 @@ describe('converterManager worker path resolution', () => {
     });
 
     const expectedCandidates = [
-      env.join(env.runtimeBaseDir, 'dist', 'converterWorker.js'),
-      env.join(env.runtimeBaseDir, 'converterWorker.js'),
+      env.join(env.runtimeBaseDir, 'dist', 'converterWorker.cjs'),
+      env.join(env.runtimeBaseDir, 'converterWorker.cjs'),
       // converterManager also checks dirname(process.execPath)/dist
-      env.join(env.moduleDir, 'dist', 'converterWorker.js'),
+      env.join(env.moduleDir, 'dist', 'converterWorker.cjs'),
     ];
 
     env.existsSyncMock.mockImplementation(
@@ -210,9 +209,9 @@ describe('converterManager worker path resolution', () => {
     });
 
     const expectedCandidates = [
-      env.join(env.runtimeBaseDir, 'dist', 'converterWorker.js'),
-      env.join(env.runtimeBaseDir, 'converterWorker.js'),
-      env.join(env.moduleDir, 'dist', 'converterWorker.js'),
+      env.join(env.runtimeBaseDir, 'dist', 'converterWorker.cjs'),
+      env.join(env.runtimeBaseDir, 'converterWorker.cjs'),
+      env.join(env.moduleDir, 'dist', 'converterWorker.cjs'),
     ];
 
     env.existsSyncMock.mockImplementation(

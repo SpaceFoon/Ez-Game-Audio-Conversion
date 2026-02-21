@@ -36,7 +36,6 @@ jest.unstable_mockModule('../utils.js', () => ({
   isFileBusy: jest.fn(),
   addToLog: jest.fn(),
   settings: { oggCodec: 'vorbis' },
-  checkDiskSpace: jest.fn(),
   initializeFileNames: jest.fn(),
   rl: { question: jest.fn((question, callback) => callback()) },
   getAnswer: jest.fn(),
@@ -51,7 +50,7 @@ jest.unstable_mockModule('os', () => ({
 // Dynamic imports after mock declarations
 const { Worker } = await import('worker_threads');
 const os = await import('os');
-const { convertFiles } = await import('../convertFiles.js');
+const { convertFiles } = await import('../converterManager.js');
 import events from 'events';
 
 events.defaultMaxListeners = 20;

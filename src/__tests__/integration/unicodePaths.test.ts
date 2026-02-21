@@ -37,7 +37,8 @@ const BUNDLED_FFMPEG = join(
   PLATFORM_SLUG,
   FFMPEG_EXE
 );
-const FFMPEG_CMD = existsSync(BUNDLED_FFMPEG) ? BUNDLED_FFMPEG : 'ffmpeg';
+// Only use bundled ffmpeg - no system PATH fallback
+const FFMPEG_CMD = BUNDLED_FFMPEG;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

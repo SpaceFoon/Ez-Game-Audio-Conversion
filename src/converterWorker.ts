@@ -1,5 +1,5 @@
 // converterWorker.ts
-// Worker runs ffprobe to get meta data then ffmpeg to convert on one file.
+// Worker runs ffprobe to get metadata, then ffmpeg to convert one file.
 import { spawn } from 'child_process';
 import { workerData, parentPort } from 'worker_threads';
 import { join, dirname } from 'path';
@@ -10,7 +10,7 @@ import {
   convertLoopPoints,
   formatLoopData,
 } from './metadataService.js';
-import { runtimeBaseDir, isPackagedRuntime, platformSlug } from './utils.js';
+import { runtimeBaseDir, platformSlug, getErrorMessage } from './utils.js';
 import type { LoopDataMode } from './types/settings.js';
 
 type WorkerFileContext = {
@@ -68,9 +68,7 @@ function ensureDirectoryExists(filePath: string): void {
     mkdirSync(dir, { recursive: true });
     console.log(`Created directory: ${dir}`);
   } catch (err) {
-    console.error(
-      `Failed to create directory: ${err instanceof Error ? err.message : String(err)}`
-    );
+    console.error(`Failed to create directory: ${getErrorMessage(err)}`);
   }
 }
 
@@ -106,7 +104,7 @@ const converterWorker = async ({
       }
     } catch (error) {
       failWorker(
-        `Missing output format and error extracting extension: ${error instanceof Error ? error.message : String(error)}`
+        `Missing output format and error extracting extension: ${getErrorMessage(error)}`
       );
       return;
     }
@@ -200,21 +198,17 @@ const converterWorker = async ({
     join(runtimeBaseDir, 'ffmpeg-bin', platformSlug, executableName),
     join(process.cwd(), executableName),
     join(process.cwd(), 'bin', executableName),
-    executableName, // PATH fallback
+    join(process.cwd(), 'ffmpeg-bin', platformSlug, executableName),
   ];
-  const ffmpegPath =
-    ffmpegCandidates.find(
-      (candidate) => candidate === executableName || existsSync(candidate)
-    ) || executableName;
+  const ffmpegPath = ffmpegCandidates.find((candidate) =>
+    existsSync(candidate)
+  );
 
-  if (
-    isPackagedRuntime &&
-    ffmpegPath === executableName &&
-    process.env.NODE_ENV === 'production'
-  ) {
+  if (!ffmpegPath) {
     const notFoundMsg =
       platformSlug === 'windows' ? 'ffmpeg.exe not found' : 'ffmpeg not found';
-    failWorker(notFoundMsg);
+    failWorker(`${notFoundMsg}. Searched:\n${ffmpegCandidates.join('\n')}`);
+    return; // unreachable but helps TypeScript
   }
 
   // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
@@ -474,7 +468,7 @@ const runFFMPEG = (
         reject(new Error(msg));
       });
     } catch (error) {
-      const msg = `Failed to start ffmpeg process: ${error instanceof Error ? error.message : String(error)}`;
+      const msg = `Failed to start ffmpeg process: ${getErrorMessage(error)}`;
       postError(msg, { inputFile, outputFile });
       reject(new Error(msg));
     }

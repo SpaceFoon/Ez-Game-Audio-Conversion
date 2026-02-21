@@ -11,7 +11,7 @@ export interface AudioStream {
   };
 }
 
-export interface AudioFormat {
+export interface FfprobeFormat {
   filename: string;
   format_name: string;
   duration: string;
@@ -24,7 +24,7 @@ export interface AudioFormat {
 
 export interface AudioMetadata {
   streams: AudioStream[];
-  format: AudioFormat;
+  format: FfprobeFormat;
 }
 
 export interface LoopPoint {

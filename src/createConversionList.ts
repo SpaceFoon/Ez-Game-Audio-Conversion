@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'fs';
 import { join, basename, extname, dirname, relative } from 'path';
 import chalk from 'chalk';
-import { getAnswer, settings, handleExit } from './utils.js';
+import { getAnswer, settings, handleExit, getErrorMessage } from './utils.js';
 import type { AudioFormat, ConversionItem, OggCodec } from './types/audio.js';
 
 // Get a unique output file name
@@ -83,7 +83,7 @@ const createConversionList = async (
     settings.oggCodec = 'vorbis';
   }
 
-  // Debug information
+  // Batch summary information
   console.log(chalk.blueBright('\n📝 Conversion parameters:'));
   console.log(chalk.blueBright(`  Files to process: ${files.length}`));
   console.log(
@@ -113,7 +113,7 @@ const createConversionList = async (
         const relPath = dirname(relative(inputFilePath, inputFile));
         outputDirs.add(join(outputFilePath, relPath));
       } catch {
-        // Will handle errors in main loop
+        // Path issues are handled later in the main loop
       }
     }
     console.log(chalk.cyan(`   Creating ${outputDirs.size} directories...`));
@@ -164,7 +164,7 @@ const createConversionList = async (
       } catch (error) {
         console.error(
           chalk.redBright(
-            `❌ Error calculating relative path: ${error instanceof Error ? error.message : String(error)}`
+            `❌ Error calculating relative path: ${getErrorMessage(error)}`
           )
         );
         relativePath = '';
@@ -195,7 +195,7 @@ const createConversionList = async (
       }
 
       // Stops from overwriting input file.
-      // Yes, both checks are required, no idea why..
+      // Keep both comparisons for robust path matching across environments.
       if (
         inputFile.toLowerCase() === outputFile.toLowerCase() ||
         inputFile === outputFile
