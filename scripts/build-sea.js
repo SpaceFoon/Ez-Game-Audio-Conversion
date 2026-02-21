@@ -55,7 +55,9 @@ writeFileSync(SEA_CONFIG_PATH, JSON.stringify(seaConfig, null, 2));
 
 // Step 2.5: Bundle and copy worker file (workers can't be inlined in SEA)
 console.log('[SEA] Bundling worker file...');
-const WORKER_BUNDLE = join(RELEASE_DIR, 'dist', 'converterWorker.js');
+// Use .cjs so the worker is always CommonJS, even if extracted under a
+// "type":"module" package scope (e.g., extracting into the repo folder).
+const WORKER_BUNDLE = join(RELEASE_DIR, 'dist', 'converterWorker.cjs');
 mkdirSync(join(RELEASE_DIR, 'dist'), { recursive: true });
 try {
   execSync(
