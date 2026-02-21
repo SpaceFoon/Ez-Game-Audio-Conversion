@@ -4,13 +4,67 @@
  Assumes `npm run package` has produced binaries in `release/`.
 */
 import { spawnSync } from 'child_process';
-import { existsSync, writeFileSync, mkdirSync, rmSync } from 'fs';
+import { execSync } from 'child_process';
+import {
+  existsSync,
+  writeFileSync,
+  mkdirSync,
+  rmSync,
+  readFileSync,
+  readdirSync,
+} from 'fs';
 import { join } from 'path';
 
 const isWindows = process.platform === 'win32';
 
-function findBinary() {
+function getPackageVersion() {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(process.cwd(), 'package.json'), 'utf8')
+    );
+    return typeof pkg.version === 'string' ? pkg.version : null;
+  } catch {
+    return null;
+  }
+}
+
+function findZip() {
   const dir = join(process.cwd(), 'release');
+  const version = getPackageVersion();
+  const preferred = version
+    ? join(dir, `EZ-Game-Audio-Conversion-v${version}.zip`)
+    : null;
+  if (preferred && existsSync(preferred)) return preferred;
+
+  const candidates = readdirSync(dir)
+    .filter((f) => f.toLowerCase().endsWith('.zip'))
+    .filter((f) => f.startsWith('EZ-Game-Audio-Conversion'))
+    .map((f) => join(dir, f));
+
+  if (candidates.length > 0) return candidates[0];
+
+  const legacy = join(dir, 'EZ-Game-Audio-Conversion.zip');
+  if (existsSync(legacy)) return legacy;
+
+  throw new Error('No ZIP archive found in release/.');
+}
+
+function extractZip(zipPath, extractDir) {
+  mkdirSync(extractDir, { recursive: true });
+  if (isWindows) {
+    execSync(
+      `powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${extractDir}' -Force"`,
+      { stdio: 'inherit' }
+    );
+  } else {
+    execSync(`unzip -q -o "${zipPath}" -d "${extractDir}"`, {
+      stdio: 'inherit',
+      shell: '/bin/bash',
+    });
+  }
+}
+
+function findBinary(dir) {
   const candidates = [
     isWindows ? 'EZ-Game-Audio.exe' : 'EZ-Game-Audio',
     'EZ-Game-Audio.exe', // Always check for .exe even on non-Windows (WSL scenario)
@@ -22,14 +76,16 @@ function findBinary() {
     const p = join(dir, c);
     if (existsSync(p)) return p;
   }
-  throw new Error('No packaged binary found in release/.');
+  throw new Error('No packaged binary found in extracted package.');
 }
 
 function prepTemp() {
   const tmpDir = join(process.cwd(), 'release', 'smoke-temp');
-  mkdirSync(tmpDir, { recursive: true });
+  const inputDir = join(tmpDir, 'input');
+  const extractDir = join(tmpDir, 'package');
+  mkdirSync(inputDir, { recursive: true });
   // create empty wav header (not a valid audio but tool should handle absence gracefully / proceed to prompts)
-  const dummy = join(tmpDir, 'dummy.wav');
+  const dummy = join(inputDir, 'dummy.wav');
   if (!existsSync(dummy)) {
     // 44 byte minimal header for PCM 16-bit 1ch 44100Hz 0 data
     const header = Buffer.alloc(44, 0);
@@ -47,7 +103,7 @@ function prepTemp() {
     header.writeUInt32LE(0, 40); // data chunk size
     writeFileSync(dummy, header);
   }
-  return { tmpDir };
+  return { tmpDir, inputDir, extractDir };
 }
 
 function cleanupTemp(tmpDir) {
@@ -65,13 +121,20 @@ function cleanupTemp(tmpDir) {
 }
 
 function run() {
-  const bin = findBinary();
-  const { tmpDir } = prepTemp();
+  const zipPath = findZip();
+  const { tmpDir, inputDir, extractDir } = prepTemp();
+
+  extractZip(zipPath, extractDir);
+  const bin = findBinary(extractDir);
 
   let exitCode = 0;
   try {
     // Provide dummy input folder argument (the temp dir) so program skips interactive folder prompt.
-    const res = spawnSync(bin, [tmpDir], { encoding: 'utf8', timeout: 15000 });
+    const res = spawnSync(bin, [inputDir], {
+      cwd: extractDir,
+      encoding: 'utf8',
+      timeout: 15000,
+    });
     if (res.error) {
       console.error('Smoke test failed to run binary:', res.error);
       exitCode = 1;

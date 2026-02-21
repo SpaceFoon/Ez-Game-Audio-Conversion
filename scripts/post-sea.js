@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import {
   copyFileSync,
   existsSync,
+  linkSync,
   mkdirSync,
   readdirSync,
   renameSync,
@@ -22,7 +23,7 @@ const rootDir = join(__dirname, '..');
 const releaseDir = join(rootDir, 'release');
 const stageDir = join(releaseDir, 'package');
 const readmesDir = join(stageDir, 'readmes');
-const isWindows = platform() === 'win32';
+const isHostWindows = platform() === 'win32';
 
 // Detect if we're building for Windows (even when running in WSL)
 // Check for existing .exe file first, then fall back to platform detection
@@ -51,11 +52,28 @@ function detectExecutableName() {
   }
 
   // Fallback to platform detection
-  return isWindows ? winExeName : unixExeName;
+  return isHostWindows ? winExeName : unixExeName;
 }
 
 const executableName = detectExecutableName();
 const builtExePath = join(releaseDir, executableName);
+
+const packageVersion = getPackageVersion();
+
+// Deterministic policy (no flags):
+// - CI: keep legacy (unversioned) filenames for workflows
+// - Local: produce versioned archives only
+const createLegacyNames = isCI();
+
+// The host OS (where this script runs) can differ from the target executable
+// we're packaging (e.g., building a Windows .exe from WSL). Use the executable
+// name to decide packaging behavior.
+const isTargetWindows = executableName.toLowerCase().endsWith('.exe');
+const targetPlatformSlug = isTargetWindows
+  ? 'windows'
+  : platform() === 'darwin'
+    ? 'macos'
+    : 'linux';
 
 function getPackageVersion() {
   try {
@@ -69,6 +87,53 @@ function getPackageVersion() {
       error instanceof Error ? error.message : String(error)
     );
     return '0.0.0';
+  }
+}
+
+function isCI() {
+  return (
+    process.env.CI === 'true' ||
+    process.env.GITHUB_ACTIONS === 'true' ||
+    process.env.BUILD_BUILDID !== undefined
+  );
+}
+
+function tryUpdateLegacyAlias({ sourcePath, legacyPath, label }) {
+  if (!existsSync(sourcePath)) {
+    console.warn(
+      `[post-sea] Cannot create legacy alias for ${label}; source missing: ${sourcePath}`
+    );
+    return false;
+  }
+
+  // Best-effort: replace legacyPath if it exists. If it's locked (Explorer preview,
+  // AV scan, 7-Zip open, etc), skip without spamming multiple warnings.
+  if (existsSync(legacyPath)) {
+    try {
+      rmSync(legacyPath, { force: true });
+    } catch (error) {
+      console.warn(
+        `[post-sea] Legacy ${label} appears locked; leaving it unchanged: ${legacyPath}`,
+        error instanceof Error ? error.message : String(error)
+      );
+      return false;
+    }
+  }
+
+  try {
+    linkSync(sourcePath, legacyPath);
+    return true;
+  } catch {
+    try {
+      copyFileSync(sourcePath, legacyPath);
+      return true;
+    } catch (error) {
+      console.warn(
+        `[post-sea] Unable to update legacy ${label} at ${legacyPath} (file may be in use):`,
+        error instanceof Error ? error.message : String(error)
+      );
+      return false;
+    }
   }
 }
 
@@ -107,6 +172,23 @@ function emptyDir(dir) {
   mkdirSync(dir, { recursive: true });
 }
 
+function removeFilesMatching(dir, namePattern) {
+  if (!existsSync(dir)) return;
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (!namePattern.test(entry.name)) continue;
+      safeRemove(join(dir, entry.name));
+    }
+  } catch (error) {
+    console.warn(
+      `[post-sea] Unable to scan ${dir} for cleanup:`,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
 function ensureFile(filePath, message) {
   if (!existsSync(filePath)) {
     throw new Error(message);
@@ -115,19 +197,39 @@ function ensureFile(filePath, message) {
 
 function cleanupIntermediateArtifacts() {
   console.log('[post-sea] Cleaning up intermediate files...');
-  // Remove staging/temp artifacts but keep runnable binaries in release/ for smoke tests.
+  // Remove staging/temp artifacts.
   safeRemove(stageDir);
   safeRemove(join(releaseDir, 'app.bundle.cjs'));
   safeRemove(join(releaseDir, 'sea-prep.blob'));
   safeRemove(join(releaseDir, 'smoke-temp'));
-  // Clean up loose files that should only be in archives
+  // Clean up any leftover folders from old builds
+  safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion'));
+
+  // Clean up loose artifacts that should live only inside archives.
   safeRemove(join(releaseDir, 'dist'));
   safeRemove(join(releaseDir, 'ffmpeg-bin'));
   safeRemove(join(releaseDir, 'readmes'));
   safeRemove(join(releaseDir, 'add_context_menu.bat'));
   safeRemove(join(releaseDir, 'remove_context_menu.bat'));
-  // Clean up any leftover folders from old builds
-  safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion'));
+  safeRemove(join(releaseDir, 'exe_run.log'));
+
+  // Clean up old timestamped fallback archives from earlier script versions.
+  removeFilesMatching(releaseDir, /^EZ-Game-Audio-Conversion-\d+\.7z$/i);
+  removeFilesMatching(
+    releaseDir,
+    /^EZ-Game-Audio-Conversion-\d+\.7z\.sha256$/i
+  );
+
+  // Local runs should be versioned-only; remove legacy unversioned files from prior runs.
+  if (!isCI()) {
+    safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion.zip'));
+    safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion.zip.sha256'));
+    safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion.7z'));
+    safeRemove(join(releaseDir, 'EZ-Game-Audio-Conversion.7z.sha256'));
+  }
+
+  // Keep the release folder clean: the runnable distribution is inside the archives.
+  safeRemove(builtExePath);
 }
 
 function ensureDocsStaged({ requirePdf }) {
@@ -158,7 +260,7 @@ function generateChecksum(filePath) {
     const fileBuffer = readFileSync(filePath);
     const hash = createHash('sha256').update(fileBuffer).digest('hex');
     const checksumPath = `${filePath}.sha256`;
-    const lineEnding = isWindows ? '\r\n' : '\n';
+    const lineEnding = isTargetWindows ? '\r\n' : '\n';
     writeFileSync(checksumPath, `${hash} *${basename(filePath)}${lineEnding}`);
     return checksumPath;
   } catch (error) {
@@ -223,6 +325,7 @@ ensureFile(
   'SEA executable not found. Run npm run build:sea first.'
 );
 const artifactPaths = [];
+const manifestArtifactPaths = [];
 let releaseReady = false;
 
 try {
@@ -248,8 +351,23 @@ try {
   // Copy ffmpeg binaries (entire folder to mirror legacy behavior)
   const ffmpegSource = join(rootDir, 'ffmpeg-bin');
   if (existsSync(ffmpegSource)) {
-    console.log('[post-sea] Copying ffmpeg-bin directory...');
-    copyDir(ffmpegSource, join(stageDir, 'ffmpeg-bin'));
+    console.log(`[post-sea] Copying ffmpeg-bin for ${targetPlatformSlug}...`);
+    const ffmpegDest = join(stageDir, 'ffmpeg-bin');
+    mkdirSync(ffmpegDest, { recursive: true });
+
+    const ffmpegReadme = join(ffmpegSource, 'README.md');
+    if (existsSync(ffmpegReadme)) {
+      copyFileSync(ffmpegReadme, join(ffmpegDest, 'README.md'));
+    }
+
+    const platformDir = join(ffmpegSource, targetPlatformSlug);
+    if (existsSync(platformDir)) {
+      copyDir(platformDir, join(ffmpegDest, targetPlatformSlug));
+    } else {
+      console.warn(
+        `[post-sea] Warning: ffmpeg-bin/${targetPlatformSlug} not found.`
+      );
+    }
   } else {
     console.warn('[post-sea] Warning: ffmpeg-bin directory not found.');
   }
@@ -283,6 +401,7 @@ try {
   }
 
   const shouldSkipPdf = process.env.POST_SEA_SKIP_PDF === '1';
+  const shouldRequirePdf = process.env.POST_SEA_REQUIRE_PDF === '1';
   const wkhtmlLocations = [
     'wkhtmltopdf',
     'C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe',
@@ -306,6 +425,28 @@ try {
     return null;
   }
 
+  // Ensure README assets are available for both ZIP and PDF rendering.
+  const repoMediaDir = join(rootDir, 'media');
+  if (existsSync(repoMediaDir)) {
+    copyDir(repoMediaDir, join(readmesDir, 'media'));
+  }
+
+  // Copy existing docs/readmes if present
+  const legacyDocsDir = join(rootDir, 'docs', 'readmes');
+  if (existsSync(legacyDocsDir)) {
+    // Do not overwrite the freshly generated README.html/README.pdf.
+    // The legacy versions can contain stale asset paths.
+    const entries = readdirSync(legacyDocsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      if (/^README\.(html|pdf)$/i.test(entry.name)) continue;
+      copyFileSync(
+        join(legacyDocsDir, entry.name),
+        join(readmesDir, entry.name)
+      );
+    }
+  }
+
   if (shouldSkipPdf) {
     console.log(
       '[post-sea] Skipping README.pdf generation (POST_SEA_SKIP_PDF=1)'
@@ -318,11 +459,14 @@ try {
       );
     } else {
       try {
+        const htmlSource = join(readmesDir, 'README.html');
         const pdfDest = join(readmesDir, 'README.pdf');
-        execSync(`"${wkhtml}" README.md "${pdfDest}"`, {
-          cwd: rootDir,
-          stdio: 'inherit',
-        });
+        // wkhtmltopdf does not understand Markdown directly. Render the generated
+        // README.html instead, and allow local file access for any assets.
+        execSync(
+          `"${wkhtml}" --enable-local-file-access --load-error-handling ignore "${htmlSource}" "${pdfDest}"`,
+          { cwd: rootDir, stdio: 'inherit' }
+        );
       } catch (error) {
         console.warn(
           '[post-sea] wkhtmltopdf failed to create README.pdf:',
@@ -332,19 +476,20 @@ try {
     }
   }
 
-  // Copy existing docs/readmes if present
-  const legacyDocsDir = join(rootDir, 'docs', 'readmes');
-  if (existsSync(legacyDocsDir)) {
-    copyDir(legacyDocsDir, readmesDir);
-  }
-
-  ensureDocsStaged({ requirePdf: !shouldSkipPdf });
+  ensureDocsStaged({ requirePdf: shouldRequirePdf && !shouldSkipPdf });
 
   // Create ZIP archive from staged folder
-  const zipPath = join(releaseDir, 'EZ-Game-Audio-Conversion.zip');
+  const legacyZipPath = join(releaseDir, 'EZ-Game-Audio-Conversion.zip');
+  const versionedZipPath = join(
+    releaseDir,
+    `EZ-Game-Audio-Conversion-v${packageVersion}.zip`
+  );
+
+  // Create the versioned ZIP first (to avoid issues overwriting a locked legacy file).
+  const zipPath = createLegacyNames ? legacyZipPath : versionedZipPath;
   safeRemove(zipPath);
   console.log('[post-sea] Creating ZIP archive...');
-  if (isWindows) {
+  if (isTargetWindows || isHostWindows) {
     execSync(
       `powershell -Command "Compress-Archive -Path '${stageDir}\\*' -DestinationPath '${zipPath}' -Force -CompressionLevel Optimal"`,
       { stdio: 'inherit' }
@@ -357,13 +502,30 @@ try {
   }
 
   artifactPaths.push(zipPath);
+  manifestArtifactPaths.push(zipPath);
   const zipChecksum = generateChecksum(zipPath);
   if (zipChecksum) {
     artifactPaths.push(zipChecksum);
   }
 
+  // Also produce legacy (unversioned) name for compatibility (tests/workflows).
+  if (createLegacyNames && zipPath !== legacyZipPath) {
+    const ok = tryUpdateLegacyAlias({
+      sourcePath: zipPath,
+      legacyPath: legacyZipPath,
+      label: 'ZIP',
+    });
+    if (ok) {
+      artifactPaths.push(legacyZipPath);
+      const legacyZipChecksum = generateChecksum(legacyZipPath);
+      if (legacyZipChecksum) {
+        artifactPaths.push(legacyZipChecksum);
+      }
+    }
+  }
+
   // Create 7z archive on Windows (if 7z is installed)
-  if (isWindows) {
+  if (isTargetWindows || isHostWindows) {
     const sevenZipPaths = [
       'C:\\Program Files\\7-Zip\\7z.exe',
       'C:\\Program Files\\7-Zip\\7zG.exe',
@@ -371,43 +533,57 @@ try {
     ];
     const sevenZip = sevenZipPaths.find((candidate) => existsSync(candidate));
     if (sevenZip) {
-      const sevenPath = join(releaseDir, 'EZ-Game-Audio-Conversion.7z');
-      const tempSeven = `${sevenPath}.tmp`;
+      const legacySevenPath = join(releaseDir, 'EZ-Game-Audio-Conversion.7z');
+      const versionedSevenPath = join(
+        releaseDir,
+        `EZ-Game-Audio-Conversion-v${packageVersion}.7z`
+      );
+      const sevenPath = createLegacyNames
+        ? legacySevenPath
+        : versionedSevenPath;
+
+      const tempSeven = join(
+        releaseDir,
+        `${basename(sevenPath)}.${Date.now()}.tmp`
+      );
       safeRemove(tempSeven);
       console.log('[post-sea] Creating 7z archive...');
       execSync(
         `"${sevenZip}" a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on "${tempSeven}" "${stageDir}\\*"`,
         { stdio: 'inherit' }
       );
+
       safeRemove(sevenPath);
-      try {
-        renameSync(tempSeven, sevenPath);
-        artifactPaths.push(sevenPath);
-        const sevenChecksum = generateChecksum(sevenPath);
-        if (sevenChecksum) {
-          artifactPaths.push(sevenChecksum);
+      renameSync(tempSeven, sevenPath);
+
+      artifactPaths.push(sevenPath);
+      manifestArtifactPaths.push(sevenPath);
+      const sevenChecksum = generateChecksum(sevenPath);
+      if (sevenChecksum) {
+        artifactPaths.push(sevenChecksum);
+      }
+
+      // Also produce legacy (unversioned) name for compatibility (tests/workflows).
+      if (createLegacyNames && sevenPath !== legacySevenPath) {
+        const ok = tryUpdateLegacyAlias({
+          sourcePath: sevenPath,
+          legacyPath: legacySevenPath,
+          label: '7z',
+        });
+        if (ok) {
+          artifactPaths.push(legacySevenPath);
+          const legacySevenChecksum = generateChecksum(legacySevenPath);
+          if (legacySevenChecksum) {
+            artifactPaths.push(legacySevenChecksum);
+          }
         }
-      } catch {
-        const fallback = join(
-          releaseDir,
-          `EZ-Game-Audio-Conversion-${Date.now()}.7z`
-        );
-        renameSync(tempSeven, fallback);
-        artifactPaths.push(fallback);
-        const fallbackChecksum = generateChecksum(fallback);
-        if (fallbackChecksum) {
-          artifactPaths.push(fallbackChecksum);
-        }
-        console.warn(
-          `[post-sea] Existing .7z archive is in use. Saved new file as ${fallback}`
-        );
       }
     } else {
       console.warn('[post-sea] 7-Zip not found. Skipping .7z archive.');
     }
   }
 
-  writeUpdateManifest(artifactPaths);
+  writeUpdateManifest(manifestArtifactPaths);
   releaseReady = true;
 } finally {
   cleanupIntermediateArtifacts();

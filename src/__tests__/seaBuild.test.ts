@@ -23,8 +23,41 @@ const isWindows = platform() === 'win32';
 
 // Expected artifact names
 const EXPECTED_EXE_NAME = 'EZ-Game-Audio.exe';
-const EXPECTED_ZIP_NAME = 'EZ-Game-Audio-Conversion.zip';
-const EXPECTED_7Z_NAME = 'EZ-Game-Audio-Conversion.7z';
+const EXPECTED_ZIP_NAME = 'EZ-Game-Audio-Conversion.zip'; // legacy
+const EXPECTED_7Z_NAME = 'EZ-Game-Audio-Conversion.7z'; // legacy
+
+function getPackageVersion(): string | null {
+  try {
+    const raw = readFileSync(join(ROOT_DIR, 'package.json'), 'utf8');
+    const pkg = JSON.parse(raw);
+    return typeof pkg.version === 'string' ? pkg.version : null;
+  } catch {
+    return null;
+  }
+}
+
+function findArchive(ext: 'zip' | '7z'): string | null {
+  if (!existsSync(RELEASE_DIR)) return null;
+
+  const version = getPackageVersion();
+  const versioned = version
+    ? join(RELEASE_DIR, `EZ-Game-Audio-Conversion-v${version}.${ext}`)
+    : null;
+  if (versioned && existsSync(versioned)) return versioned;
+
+  const legacy = join(
+    RELEASE_DIR,
+    ext === 'zip' ? EXPECTED_ZIP_NAME : EXPECTED_7Z_NAME
+  );
+  if (existsSync(legacy)) return legacy;
+
+  // fallback: any matching file
+  const files = readdirSync(RELEASE_DIR).filter((f) =>
+    f.toLowerCase().endsWith('.' + ext)
+  );
+  const candidate = files.find((f) => f.startsWith('EZ-Game-Audio-Conversion'));
+  return candidate ? join(RELEASE_DIR, candidate) : null;
+}
 
 /**
  * Helper to list files in a ZIP archive
@@ -136,6 +169,17 @@ describe('SEA Build Tests', () => {
       const exeWithoutExt = join(RELEASE_DIR, 'EZ-Game-Audio');
       const files = readdirSync(RELEASE_DIR);
 
+      // After cleanup, the loose exe is removed (it lives only inside archives).
+      // If archives exist but no loose exe, that's expected — skip this check.
+      const hasArchive = files.some((f) => /\.(zip|7z)$/i.test(f));
+      const hasLooseExe = files.includes(EXPECTED_EXE_NAME);
+      if (hasArchive && !hasLooseExe) {
+        console.log(
+          'Loose exe cleaned up (lives inside archives) — skipping loose exe check.'
+        );
+        return;
+      }
+
       // Skip if no executable files exist yet (build not run)
       const hasAnyExe = files.some((f) => f.startsWith('EZ-Game-Audio'));
       if (!hasAnyExe) {
@@ -168,13 +212,13 @@ describe('SEA Build Tests', () => {
         console.warn('Skipping: release directory does not exist');
         return;
       }
-      const zipPath = join(RELEASE_DIR, EXPECTED_ZIP_NAME);
+      const zipPath = findArchive('zip');
       // Skip if release dir exists but is from partial build
       if (!readdirSync(RELEASE_DIR).some((f) => f.endsWith('.zip'))) {
         console.warn('Skipping: no ZIP files found (run npm run package)');
         return;
       }
-      expect(existsSync(zipPath)).toBe(true);
+      expect(Boolean(zipPath && existsSync(zipPath))).toBe(true);
     });
 
     test('ZIP checksum file exists', () => {
@@ -182,13 +226,14 @@ describe('SEA Build Tests', () => {
         console.warn('Skipping: release directory does not exist');
         return;
       }
-      const checksumPath = join(RELEASE_DIR, `${EXPECTED_ZIP_NAME}.sha256`);
+      const zipPath = findArchive('zip');
+      const checksumPath = zipPath ? `${zipPath}.sha256` : '';
       // Skip if no checksum files exist
       if (!readdirSync(RELEASE_DIR).some((f) => f.endsWith('.sha256'))) {
         console.warn('Skipping: no checksum files found (run npm run package)');
         return;
       }
-      expect(existsSync(checksumPath)).toBe(true);
+      expect(Boolean(checksumPath && existsSync(checksumPath))).toBe(true);
     });
 
     test('update.json manifest exists', () => {
@@ -260,10 +305,9 @@ describe('SEA Build Tests', () => {
     let zipContents: string[] = [];
 
     beforeAll(() => {
-      const zipPath = join(RELEASE_DIR, EXPECTED_ZIP_NAME);
-      if (existsSync(zipPath)) {
+      const zipPath = findArchive('zip');
+      if (zipPath && existsSync(zipPath))
         zipContents = listZipContents(zipPath);
-      }
     });
 
     test('ZIP contains executable with .exe extension', () => {
@@ -286,7 +330,10 @@ describe('SEA Build Tests', () => {
     test('ZIP contains worker file', () => {
       if (zipContents.length > 0) {
         const hasWorker = zipContents.some(
-          (f) => f.includes('converterWorker.js') || f.includes('dist/')
+          (f) =>
+            f.includes('converterWorker.cjs') ||
+            f.includes('converterWorker.js') ||
+            f.includes('dist/')
         );
         expect(hasWorker).toBe(true);
       }
@@ -326,12 +373,11 @@ describe('SEA Build Tests', () => {
 
   describe('7z archive contents (if exists)', () => {
     let sevenZContents: string[] = [];
-    const sevenZPath = join(RELEASE_DIR, EXPECTED_7Z_NAME);
+    const sevenZPath = findArchive('7z');
 
     beforeAll(() => {
-      if (existsSync(sevenZPath)) {
+      if (sevenZPath && existsSync(sevenZPath))
         sevenZContents = list7zContents(sevenZPath);
-      }
     });
 
     test('7z contains executable with .exe extension (if archive exists)', () => {
@@ -346,10 +392,15 @@ describe('SEA Build Tests', () => {
 
   describe('Checksum verification', () => {
     test('ZIP checksum matches file content', () => {
-      const zipPath = join(RELEASE_DIR, EXPECTED_ZIP_NAME);
-      const checksumPath = join(RELEASE_DIR, `${EXPECTED_ZIP_NAME}.sha256`);
+      const zipPath = findArchive('zip');
+      const checksumPath = zipPath ? `${zipPath}.sha256` : '';
 
-      if (existsSync(zipPath) && existsSync(checksumPath)) {
+      if (
+        zipPath &&
+        existsSync(zipPath) &&
+        checksumPath &&
+        existsSync(checksumPath)
+      ) {
         const checksumContent = readFileSync(checksumPath, 'utf8').trim();
         const expectedHash = checksumContent.split(/\s+/)[0];
 
@@ -389,16 +440,7 @@ describe('SEA Build Tests', () => {
 
 describe('Smoke Test Cleanup', () => {
   test('smokeTest.mjs should clean up smoke-temp directory', () => {
-    // This test documents that smoke-temp should be cleaned up
-    // The actual cleanup logic needs to be added to smokeTest.mjs
     const smokeTempPath = join(RELEASE_DIR, 'smoke-temp');
-
-    // After running smoke tests, this directory should not exist
-    // Currently this is a known issue that needs fixing
-    if (existsSync(smokeTempPath)) {
-      console.warn(
-        'TODO: smokeTest.mjs needs to clean up smoke-temp directory'
-      );
-    }
+    expect(existsSync(smokeTempPath)).toBe(false);
   });
 });
