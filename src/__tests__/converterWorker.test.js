@@ -20,6 +20,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   platformSlug: 'windows',
   getErrorMessage: (error) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
+  findBinary: () => '/mock/base/ffmpeg.exe',
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -53,15 +54,19 @@ jest.unstable_mockModule('child_process', () => ({
 }));
 
 // Mock the path module to return predictable paths
-jest.unstable_mockModule('path', () => ({
-  join: jest.fn((...args) => args.join('/')),
-  dirname: jest.fn((path) => path.split('/').slice(0, -1).join('/')),
-  basename: jest.fn((path) => path.split('/').pop()),
-  extname: jest.fn((path) => {
-    const parts = path.split('.');
-    return parts.length > 1 ? `.${parts.pop()}` : '';
-  }),
-}));
+jest.unstable_mockModule('path', () => {
+  const { resolve: realResolve } = jest.requireActual('path');
+  return {
+    join: jest.fn((...args) => args.join('/')),
+    dirname: jest.fn((path) => path.split('/').slice(0, -1).join('/')),
+    basename: jest.fn((path) => path.split('/').pop()),
+    extname: jest.fn((path) => {
+      const parts = path.split('.');
+      return parts.length > 1 ? `.${parts.pop()}` : '';
+    }),
+    resolve: jest.fn((...args) => realResolve(...args)),
+  };
+});
 
 // Dynamic imports after mock declarations
 const fs = await import('fs');
@@ -83,7 +88,7 @@ describe('converterWorker.js', () => {
 
     // Setup default mocks for metadataService
     metadataService.getMetaData.mockResolvedValue({
-      streams: [{ sample_rate: 44100 }],
+      streams: [{ sample_rate: '44100' }],
     });
     metadataService.formatMetaDataArgs.mockReturnValue({
       metaDataArgs: ['-metadata', 'title=Test'],
@@ -379,10 +384,12 @@ describe('converterWorker.js', () => {
 
     expect(fs.mkdirSync).toHaveBeenCalled();
     expect(fs.mkdirSync).toHaveBeenCalledWith('outdir', { recursive: true });
-    expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith({
-      type: 'code',
-      data: 0,
-    });
+    expect(workerThreads.parentPort.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        data: expect.stringContaining('Failed to create output directory'),
+      })
+    );
   }, 10000);
 
   // This test is brittle due to event-loop timing and the module's fail() throwing inside event handlers.

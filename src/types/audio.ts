@@ -16,7 +16,7 @@ export interface AudioFile {
 export interface ConversionItem {
   inputFile: string;
   outputFile: string;
-  outputFormat?: AudioFormat;
+  outputFormat: AudioFormat;
 }
 
 export interface ConversionResult {

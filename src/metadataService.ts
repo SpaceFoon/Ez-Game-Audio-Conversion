@@ -2,9 +2,7 @@
 import type { AudioMetadata } from './types/metadata.js';
 
 import { spawnSync } from 'child_process';
-import { join } from 'path';
-import { existsSync } from 'fs';
-import { runtimeBaseDir, platformSlug } from './utils.js';
+import { platformSlug, findBinary } from './utils.js';
 
 const CANONICAL_FIELDS = [
   // Basic fields (ffmpeg canonical keys)
@@ -186,15 +184,14 @@ const resolveCanonicalKey = (key: string): string | undefined => {
   return EXTRA_ALIASES[normalized] || CANONICAL_BY_NORMALIZED.get(normalized);
 };
 
-const sanitizeMetaValue = (raw: string): string =>
-  raw
+const isSafeMetaKey = (key: string): boolean => /^[A-Za-z0-9_.:-]+$/.test(key);
+
+export const sanitizeMetaValueForArgs = (raw: string): string =>
+  String(raw)
     .split('\u0000')
     .join('')
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"')
-    .replace(/\r\n/g, '\\n')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '\\n')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
     .trim();
 
 const parseNumberAndTotal = (
@@ -270,117 +267,54 @@ const getMetaData = async (
 ): Promise<AudioMetadata | null> => {
   // Determine executable name based on platform
   const executableName = platformSlug === 'windows' ? 'ffprobe.exe' : 'ffprobe';
+  const ffprobePath = findBinary(executableName, [
+    `ffmpeg-bin/${platformSlug}`,
+  ]);
 
-  const searchPaths = [
-    join(runtimeBaseDir, executableName),
-    join(runtimeBaseDir, 'bin', executableName),
-    join(runtimeBaseDir, 'ffmpeg-bin', platformSlug, executableName),
-    join(process.cwd(), executableName),
-    join(process.cwd(), 'bin', executableName),
-    join(process.cwd(), 'ffmpeg-bin', platformSlug, executableName),
-  ];
+  if (!ffprobePath) {
+    console.error(
+      `${executableName} not found. Place it in ffmpeg-bin/${platformSlug}/`
+    );
+    return null;
+  }
 
-  let lastError: unknown;
-  for (const ffprobePath of searchPaths) {
-    if (!existsSync(ffprobePath)) continue;
-    try {
-      const output = spawnSync(
-        ffprobePath,
-        [
-          '-v',
-          'quiet',
-          '-print_format',
-          'json',
-          '-show_format',
-          '-show_streams',
-          inputFile,
-        ],
-        { encoding: 'utf8' }
+  try {
+    const output = spawnSync(
+      ffprobePath,
+      [
+        '-v',
+        'quiet',
+        '-print_format',
+        'json',
+        '-show_format',
+        '-show_streams',
+        inputFile,
+      ],
+      { encoding: 'utf8' }
+    );
+    if (output.error) {
+      throw output.error;
+    }
+    if (output.status !== 0) {
+      throw new Error(
+        output.stderr?.trim() || `ffprobe failed (code ${output.status})`
       );
-      if (output.error) {
-        throw output.error;
-      }
-      if (!output.stdout) {
-        throw new Error('ffprobe returned no output');
-      }
-      const metaData: AudioMetadata = JSON.parse(output.stdout);
-      return metaData;
-    } catch (error: unknown) {
-      // Try next candidate
-      lastError = error;
-      continue;
     }
-  }
-
-  console.error(
-    `Error running ${executableName}:`,
-    lastError instanceof Error
-      ? lastError.message
-      : String(lastError || 'ffprobe not found or failed')
-  );
-  return null;
-};
-
-// Extract metaData fields from tags
-const formatMetaDataField = (
-  streamTags: Record<string, string> | undefined,
-  formatTags: Record<string, string> | undefined,
-  field: string
-): string => {
-  if (!streamTags && !formatTags) return '';
-
-  const canonicalKey = resolveCanonicalKey(field);
-  const { canonical } = collectNormalizedTags(streamTags, formatTags);
-  if (canonicalKey && canonical.has(canonicalKey)) {
-    return canonical.get(canonicalKey) || '';
-  }
-  return '';
-};
-
-// Format metaData for ffmpeg command (legacy string version)
-const formatMetaData = (
-  metaData: AudioMetadata | null,
-  inputFile?: string
-): { metaData: string; channels: string } => {
-  if (!metaData || !metaData.streams) {
-    if (inputFile) {
-      console.warn(`\n No metadata found in ${inputFile}`);
+    if (!output.stdout) {
+      throw new Error('ffprobe returned no output');
     }
-    // Maintain legacy spacing contract: channels string includes leading space
-    return { metaData: '', channels: ' -ac 2' };
+    const metaData: AudioMetadata = JSON.parse(output.stdout);
+    return metaData;
+  } catch (error: unknown) {
+    console.error(
+      `Error running ${executableName}:`,
+      error instanceof Error ? error.message : String(error)
+    );
+    return null;
   }
-  const metaDataDataArray: string[] = [];
-  const { canonical, passthrough } = collectNormalizedTags(
-    metaData.streams[0]?.tags,
-    metaData.format?.tags
-  );
-
-  for (const field of CANONICAL_FIELDS) {
-    const rawValue = canonical.get(field);
-    if (!rawValue && rawValue !== '0') continue;
-    const cleanValue = sanitizeMetaValue(String(rawValue));
-    if (!cleanValue && cleanValue !== '0') continue;
-    metaDataDataArray.push(`-metadata ${field}="${cleanValue}"`);
-  }
-
-  for (const [key, value] of passthrough.entries()) {
-    const cleanValue = sanitizeMetaValue(String(value));
-    if (!cleanValue && cleanValue !== '0') continue;
-    metaDataDataArray.push(`-metadata ${key}="${cleanValue}"`);
-  }
-
-  const channels = metaData.streams[0]
-    ? ` -ac ${metaData.streams[0].channels}`
-    : ' -ac 2';
-  const metaDataString = metaDataDataArray.join(' ');
-
-  if (process.env.DEBUG) {
-    console.log('formatMetaData output:', metaDataDataArray);
-  }
-  return { metaData: metaDataString, channels };
 };
 
-// New: Build metadata/channel args as arrays to avoid shell splitting issues
+// Build metadata/channel args as arrays to avoid shell splitting issues
 export const formatMetaDataArgs = (
   metaData: AudioMetadata | null,
   inputFile?: string
@@ -402,13 +336,14 @@ export const formatMetaDataArgs = (
   for (const field of CANONICAL_FIELDS) {
     const raw = canonical.get(field);
     if (!raw && raw !== '0') continue;
-    const clean = sanitizeMetaValue(String(raw));
+    const clean = sanitizeMetaValueForArgs(String(raw));
     if (!clean && clean !== '0') continue;
     metaDataArgs.push('-metadata', `${field}=${clean}`);
   }
 
   for (const [key, value] of passthrough.entries()) {
-    const clean = sanitizeMetaValue(String(value));
+    if (!isSafeMetaKey(key)) continue;
+    const clean = sanitizeMetaValueForArgs(String(value));
     if (!clean && clean !== '0') continue;
     metaDataArgs.push('-metadata', `${key}=${clean}`);
   }
@@ -485,6 +420,17 @@ export const convertLoopPoints = (
   const sampleRate = metaData.streams[0].sample_rate;
   const { loopStart, loopLength } = getLoopPoints(metaData);
 
+  const sampleRateNumber = sampleRate
+    ? Number.parseInt(String(sampleRate), 10)
+    : NaN;
+  if (!Number.isFinite(sampleRateNumber) || sampleRateNumber <= 0) {
+    return {
+      newSampleRate: null,
+      loopStart,
+      loopLength,
+    };
+  }
+
   // If not converting to opus or no valid loop points, return original values
   if (
     outputFormat !== 'ogg' ||
@@ -500,7 +446,6 @@ export const convertLoopPoints = (
   }
 
   // Convert sample rate for opus
-  const sampleRateNumber = parseInt(sampleRate);
   let newSampleRate = null;
 
   if (sampleRateNumber >= 32000) {
@@ -538,4 +483,4 @@ export const formatLoopData = (loopStart: number, loopLength: number) => {
   );
 };
 
-export { getMetaData, formatMetaDataField, formatMetaData };
+export { getMetaData };

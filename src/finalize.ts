@@ -1,12 +1,4 @@
-import { performance } from 'perf_hooks';
-import {
-  settings,
-  rl,
-  isPackagedRuntime,
-  runtimeBaseDir,
-  writeSummaryToLogs,
-} from './utils.js';
-import { spawn } from 'child_process';
+import { settings, rl, writeSummaryToLogs } from './utils.js';
 import chalk from 'chalk';
 import type { ConversionResult } from './types/audio.js';
 
@@ -14,14 +6,14 @@ const finalize = async (
   failedFiles: ConversionResult[] = [],
   successfulFiles: ConversionResult[] = [],
   jobStartTime: Date | number = Date.now()
-): Promise<void> => {
-  const jobEndTime = performance.now();
+): Promise<boolean> => {
+  const jobEndTime = Date.now();
   const startMs =
     typeof jobStartTime === 'number' ? jobStartTime : jobStartTime.getTime();
   let totalTime = jobEndTime - startMs;
   totalTime = totalTime / 1000;
-  const count = Array.isArray(successfulFiles) ? successfulFiles.length : 0;
-  const average = count > 0 ? totalTime / count : 0;
+  const average =
+    successfulFiles.length > 0 ? totalTime / successfulFiles.length : 0;
 
   console.log(
     `\n    Total job duration: ${totalTime.toFixed(
@@ -29,8 +21,8 @@ const finalize = async (
     )} seconds\n    Average task duration ${average.toFixed(2)} seconds\n`
   );
 
-  const successCount = successfulFiles?.length || 0;
-  const failCount = failedFiles?.length || 0;
+  const successCount = successfulFiles.length;
+  const failCount = failedFiles.length;
   const totalFiles = successCount + failCount;
 
   // Write summary to CSV files
@@ -56,23 +48,35 @@ const finalize = async (
     console.log('No conversions failed.');
   }
 
-  console.log(
-    `Log files are in: ${settings.outputFilePath}. Press Enter to restart when ready.`
-  );
+  console.log(`Log files are in: ${settings.outputFilePath}.`);
 
-  const promptToRestart = () => {
-    rl.question(chalk.blue('Press ENTER to restart the program.'), () => {
-      rl.close();
-      console.log('Restarting the app...');
-      const exec = process.execPath;
-      const args = isPackagedRuntime ? [] : process.argv.slice(1);
-      const cwd = isPackagedRuntime ? runtimeBaseDir : process.cwd();
-      spawn(exec, args, { stdio: 'inherit', detached: false, cwd });
-      process.exit();
+  const promptToContinue = async (): Promise<boolean> =>
+    new Promise((resolve) => {
+      rl.question(
+        chalk.blue(
+          'Press ENTER to run another conversion, or type q then ENTER to quit.'
+        ),
+        (answer?: string) => {
+          const normalized = String(answer || '')
+            .trim()
+            .toLowerCase();
+          if (
+            normalized === 'q' ||
+            normalized === 'quit' ||
+            normalized === 'exit'
+          ) {
+            console.log('Exiting at user request.');
+            rl.close();
+            resolve(false);
+            return;
+          }
+
+          console.log('Restarting conversion flow...');
+          resolve(true);
+        }
+      );
     });
-  };
-
-  promptToRestart();
+  return await promptToContinue();
 };
 
 export default finalize;

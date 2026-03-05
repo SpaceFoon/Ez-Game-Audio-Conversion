@@ -71,6 +71,8 @@ jest.unstable_mockModule('child_process', () => ({
         bit_rate: '128000',
       },
     }),
+    stderr: '',
+    status: 0,
     error: null,
   })),
 }));
@@ -82,6 +84,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   platformSlug: 'windows',
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
+  findBinary: () => '/app/ffmpeg.exe',
 }));
 
 // Import converterWorker (metadataService is NOT mocked - uses real functions)
@@ -506,39 +509,6 @@ describe('ffmpeg argument building - Integration Tests', () => {
 
       expect(args[0]).toBe('-loglevel');
       expect(args[1]).toBe('error');
-    });
-  });
-
-  describe('format inference from extension', () => {
-    it('should infer mp3 format from .mp3 extension when format not provided', async () => {
-      await converterWorker({
-        file: {
-          inputFile: '/input/test.wav',
-          outputFile: '/output/test.mp3',
-          outputFormat: '', // Empty format
-        },
-        settings: { oggCodec: 'vorbis' },
-      });
-
-      const args = capturedSpawnArgs[0].args;
-
-      // Should have inferred mp3 and used libmp3lame
-      expect(args).toContain('libmp3lame');
-    });
-
-    it('should infer ogg format from .ogg extension', async () => {
-      await converterWorker({
-        file: {
-          inputFile: '/input/test.wav',
-          outputFile: '/output/test.ogg',
-          outputFormat: '', // Empty format
-        },
-        settings: { oggCodec: 'vorbis' },
-      });
-
-      const args = capturedSpawnArgs[0].args;
-
-      expect(args).toContain('libvorbis');
     });
   });
 });

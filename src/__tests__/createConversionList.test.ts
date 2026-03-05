@@ -8,8 +8,11 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 jest.unstable_mockModule('chalk', () => {
-  const makeFn = (_impl = (a) => (Array.isArray(a) ? a.join(' ') : a)) => {
-    const fn = jest.fn((...args) => args.join(' '));
+  const makeFn = () => {
+    const fn = jest.fn((...args: string[]) => args.join(' ')) as jest.Mock & {
+      italic: jest.Mock;
+      bold: jest.Mock;
+    };
     fn.italic = jest.fn((a) => a);
     fn.bold = jest.fn((a) => a);
     return fn;
@@ -57,6 +60,19 @@ const { getAnswer, settings, handleExit } = await import('../utils.js');
 const { default: createConversionList } =
   await import('../createConversionList.js');
 
+const existsSyncMock = fs.existsSync as unknown as jest.MockedFunction<
+  typeof fs.existsSync
+>;
+const mkdirSyncMock = fs.mkdirSync as unknown as jest.MockedFunction<
+  typeof fs.mkdirSync
+>;
+const getAnswerMock = getAnswer as unknown as jest.MockedFunction<
+  typeof getAnswer
+>;
+const handleExitMock = handleExit as unknown as jest.MockedFunction<
+  typeof handleExit
+>;
+
 describe('createConversionList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -65,14 +81,14 @@ describe('createConversionList', () => {
     settings.outputFormats = ['mp3'];
     settings.oggCodec = 'vorbis';
     settings.singleFileMode = false;
-    fs.existsSync.mockReturnValue(false);
-    fs.mkdirSync.mockImplementation(() => {});
+    existsSyncMock.mockReturnValue(false);
+    mkdirSyncMock.mockImplementation(() => undefined);
   });
 
   describe('basic conversion list creation', () => {
     it('creates one output per format for each input file', async () => {
       settings.outputFormats = ['mp3', 'ogg'];
-      getAnswer.mockResolvedValue('yes');
+      getAnswerMock.mockResolvedValue('yes');
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
@@ -89,7 +105,7 @@ describe('createConversionList', () => {
     it('preserves directory structure in output paths', async () => {
       settings.inputFilePath = '/input';
       settings.outputFilePath = '/output';
-      getAnswer.mockResolvedValue('yes');
+      getAnswerMock.mockResolvedValue('yes');
 
       const files = [join(settings.inputFilePath, 'subdir', 'song.wav')];
       const result = await createConversionList(files);
@@ -101,7 +117,7 @@ describe('createConversionList', () => {
     });
 
     it('handles multiple input files correctly', async () => {
-      getAnswer.mockResolvedValue('yes');
+      getAnswerMock.mockResolvedValue('yes');
 
       const files = ['a.wav', 'b.wav', 'c.wav'].map((name) =>
         join(settings.inputFilePath, name)
@@ -115,10 +131,10 @@ describe('createConversionList', () => {
 
   describe('file conflict handling', () => {
     it('renames output when user selects [r]ename for existing file', async () => {
-      fs.existsSync.mockImplementation(
-        (path) => path === join(settings.outputFilePath, 'song.mp3') // Only the original exists
+      existsSyncMock.mockImplementation(
+        (path) => String(path) === join(settings.outputFilePath, 'song.mp3') // Only the original exists
       );
-      getAnswer
+      getAnswerMock
         .mockResolvedValueOnce('r') // rename
         .mockResolvedValue('yes'); // confirm
 
@@ -129,10 +145,10 @@ describe('createConversionList', () => {
     });
 
     it('skips file when user selects [s]kip for existing file', async () => {
-      fs.existsSync.mockImplementation(
-        (path) => path === join(settings.outputFilePath, 'song.mp3')
+      existsSyncMock.mockImplementation(
+        (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
       );
-      getAnswer
+      getAnswerMock
         .mockResolvedValueOnce('s') // skip
         .mockResolvedValue('yes'); // confirm (but no files left)
 
@@ -140,18 +156,18 @@ describe('createConversionList', () => {
       await createConversionList(files);
 
       // All files skipped = exit with 0
-      expect(handleExit).toHaveBeenCalledWith(0);
+      expect(handleExitMock).toHaveBeenCalledWith(0);
     });
 
     it('applies rename-all (ra) to subsequent conflicts', async () => {
       settings.outputFormats = ['mp3'];
       // Both output files exist
-      fs.existsSync.mockImplementation(
+      existsSyncMock.mockImplementation(
         (path) =>
-          path === join(settings.outputFilePath, 'a.mp3') ||
-          path === join(settings.outputFilePath, 'b.mp3')
+          String(path) === join(settings.outputFilePath, 'a.mp3') ||
+          String(path) === join(settings.outputFilePath, 'b.mp3')
       );
-      getAnswer
+      getAnswerMock
         .mockResolvedValueOnce('ra') // rename all
         .mockResolvedValue('yes'); // confirm
 
@@ -166,12 +182,12 @@ describe('createConversionList', () => {
     });
 
     it('applies skip-all (sa) to subsequent conflicts', async () => {
-      fs.existsSync.mockImplementation(
+      existsSyncMock.mockImplementation(
         (path) =>
-          path === join(settings.outputFilePath, 'a.mp3') ||
-          path === join(settings.outputFilePath, 'b.mp3')
+          String(path) === join(settings.outputFilePath, 'a.mp3') ||
+          String(path) === join(settings.outputFilePath, 'b.mp3')
       );
-      getAnswer
+      getAnswerMock
         .mockResolvedValueOnce('sa') // skip all
         .mockResolvedValue('yes');
 
@@ -181,7 +197,7 @@ describe('createConversionList', () => {
       await createConversionList(files);
 
       // All files skipped = exit
-      expect(handleExit).toHaveBeenCalledWith(0);
+      expect(handleExitMock).toHaveBeenCalledWith(0);
     });
   });
 
@@ -190,7 +206,7 @@ describe('createConversionList', () => {
       settings.inputFilePath = '/input';
       settings.outputFilePath = '/input'; // Same as input!
       settings.outputFormats = ['mp3'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswerMock.mockResolvedValueOnce('yes').mockResolvedValue('yes');
 
       const files = [join(settings.inputFilePath, 'song.mp3')]; // Already mp3!
       const result = await createConversionList(files);
@@ -203,21 +219,21 @@ describe('createConversionList', () => {
       settings.inputFilePath = '/input';
       settings.outputFilePath = '/input';
       settings.outputFormats = ['mp3'];
-      getAnswer.mockResolvedValueOnce('no'); // No to same-type conversion
+      getAnswerMock.mockResolvedValueOnce('no'); // No to same-type conversion
 
       const files = [join(settings.inputFilePath, 'song.mp3')];
       await createConversionList(files);
 
       // No files to convert → exit
-      expect(handleExit).toHaveBeenCalledWith(0);
+      expect(handleExitMock).toHaveBeenCalledWith(0);
     });
   });
 
   describe('ogg codec selection', () => {
     it('prompts for ogg codec when not set and ogg is an output format', async () => {
       settings.outputFormats = ['ogg'];
-      settings.oggCodec = undefined;
-      getAnswer
+      settings.oggCodec = null;
+      getAnswerMock
         .mockResolvedValueOnce('opus') // codec selection
         .mockResolvedValue('yes'); // confirm
 
@@ -229,8 +245,8 @@ describe('createConversionList', () => {
 
     it('defaults to vorbis when user enters empty string for codec', async () => {
       settings.outputFormats = ['ogg'];
-      settings.oggCodec = undefined;
-      getAnswer
+      settings.oggCodec = null;
+      getAnswerMock
         .mockResolvedValueOnce('') // empty = vorbis default
         .mockResolvedValue('yes');
 
@@ -242,8 +258,8 @@ describe('createConversionList', () => {
 
     it('re-prompts on invalid codec input until valid', async () => {
       settings.outputFormats = ['ogg'];
-      settings.oggCodec = undefined;
-      getAnswer
+      settings.oggCodec = null;
+      getAnswerMock
         .mockResolvedValueOnce('invalid')
         .mockResolvedValueOnce('also-invalid')
         .mockResolvedValueOnce('vorbis')
@@ -254,32 +270,32 @@ describe('createConversionList', () => {
 
       expect(settings.oggCodec).toBe('vorbis');
       // getAnswer called 3 times for codec + 1 for confirm = 4 total
-      expect(getAnswer).toHaveBeenCalledTimes(4);
+      expect(getAnswerMock).toHaveBeenCalledTimes(4);
     });
   });
 
   describe('final confirmation', () => {
     it('returns conversion list when user confirms with yes', async () => {
-      getAnswer.mockResolvedValue('yes');
+      getAnswerMock.mockResolvedValue('yes');
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
 
       expect(result).toHaveLength(1);
-      expect(handleExit).not.toHaveBeenCalled();
+      expect(handleExitMock).not.toHaveBeenCalled();
     });
 
     it('exits when user declines final confirmation', async () => {
-      getAnswer.mockResolvedValue('no');
+      getAnswerMock.mockResolvedValue('no');
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       await createConversionList(files);
 
-      expect(handleExit).toHaveBeenCalledWith(0);
+      expect(handleExitMock).toHaveBeenCalledWith(0);
     });
 
     it('re-prompts on invalid confirmation input', async () => {
-      getAnswer
+      getAnswerMock
         .mockResolvedValueOnce('maybe') // invalid
         .mockResolvedValueOnce('sure') // invalid
         .mockResolvedValueOnce('yes'); // valid
@@ -288,16 +304,16 @@ describe('createConversionList', () => {
       const result = await createConversionList(files);
 
       expect(result).toHaveLength(1);
-      expect(getAnswer).toHaveBeenCalledTimes(3);
+      expect(getAnswerMock).toHaveBeenCalledTimes(3);
     });
   });
 
   describe('error handling', () => {
     it('exits with error when no input files provided', async () => {
-      const files = [];
+      const files: string[] = [];
       await createConversionList(files);
 
-      expect(handleExit).toHaveBeenCalledWith(1);
+      expect(handleExitMock).toHaveBeenCalledWith(1);
     });
 
     // Note: Directory creation failure is difficult to test with ESM mocks

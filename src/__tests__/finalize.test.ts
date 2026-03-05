@@ -1,18 +1,7 @@
-import {
-  jest,
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-} from '@jest/globals';
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import type { Mock } from 'jest-mock';
 
 // ESM mocks must be declared BEFORE dynamic imports
-jest.unstable_mockModule('perf_hooks', () => ({
-  performance: { now: jest.fn() },
-}));
-
 jest.unstable_mockModule('../utils.js', () => ({
   settings: { outputFilePath: '/output' },
   rl: { question: jest.fn(), close: jest.fn() },
@@ -26,31 +15,18 @@ jest.unstable_mockModule('chalk', () => ({
   blue: jest.fn((a: string) => a),
 }));
 
-jest.unstable_mockModule('child_process', () => ({
-  spawn: jest.fn(),
-}));
-
 // Dynamic imports after mock declarations
-const { performance } = await import('perf_hooks');
-const { spawn } = await import('child_process');
 const { rl, writeSummaryToLogs } = await import('../utils.js');
 const { default: finalize } = await import('../finalize.js');
 
 import type { ConversionResult } from '../types/audio.js';
 
 describe('finalize', () => {
-  let exitSpy: ReturnType<typeof jest.spyOn>;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    exitSpy = jest
-      .spyOn(process, 'exit')
-      .mockImplementation((() => {}) as () => never);
-    (performance.now as Mock).mockReturnValueOnce(0).mockReturnValueOnce(10000);
-  });
-
-  afterEach(() => {
-    if (exitSpy?.mockRestore) exitSpy.mockRestore();
+    (rl.question as Mock<(...args: unknown[]) => unknown>).mockImplementation(
+      (_msg: unknown, cb: unknown) => (cb as (answer: string) => void)('')
+    );
   });
 
   it('logs successful and failed files and restarts', async () => {
@@ -104,42 +80,43 @@ describe('finalize', () => {
     logSpy.mockRestore();
   });
 
-  it('calls rl.question and rl.close', async () => {
+  it('calls rl.question and returns true by default', async () => {
     (rl.question as Mock<(...args: unknown[]) => unknown>).mockImplementation(
       (_msg: unknown, cb: unknown) => (cb as () => void)()
     );
-    (rl.close as Mock).mockImplementation(() => {});
-    await finalize(
+    const shouldContinue = await finalize(
       [],
       [{ success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' }],
       0
     );
     expect(rl.question).toHaveBeenCalled();
-    expect(rl.close).toHaveBeenCalled();
+    expect(shouldContinue).toBe(true);
   });
 
-  it('calls spawn and process.exit for restart', async () => {
-    const localExitSpy = jest
-      .spyOn(process, 'exit')
-      .mockImplementation((() => {}) as () => never);
-    await finalize(
+  it('returns false and closes rl when user chooses quit', async () => {
+    (rl.question as Mock<(...args: unknown[]) => unknown>).mockImplementation(
+      (_msg: unknown, cb: unknown) => (cb as (answer: string) => void)('q')
+    );
+    (rl.close as Mock).mockImplementation(() => {});
+
+    const shouldContinue = await finalize(
       [],
       [{ success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' }],
       0
     );
-    expect(spawn).toHaveBeenCalled();
-    expect(localExitSpy).toHaveBeenCalled();
-    localExitSpy.mockRestore();
+    expect(shouldContinue).toBe(false);
+    expect(rl.close).toHaveBeenCalled();
   });
 
   it('handles undefined arguments gracefully', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    await finalize(
-      undefined as unknown as ConversionResult[],
-      undefined as unknown as ConversionResult[],
-      0
-    );
-    expect(logSpy).toHaveBeenCalled();
+    await expect(
+      finalize(
+        undefined as unknown as ConversionResult[],
+        undefined as unknown as ConversionResult[],
+        0
+      )
+    ).resolves.toBe(true);
     logSpy.mockRestore();
   });
 

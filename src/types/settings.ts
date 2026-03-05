@@ -11,7 +11,6 @@ export interface Settings {
   loopDataMode?: LoopDataMode;
   singleFileMode: boolean;
   singleFilePath: string;
-  userOS: string | null;
 }
 
 export interface LogEntry {

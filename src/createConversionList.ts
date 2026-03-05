@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync } from 'fs';
-import { join, basename, extname, dirname, relative } from 'path';
+import { join, basename, extname, dirname, relative, resolve } from 'path';
 import chalk from 'chalk';
 import { getAnswer, settings, handleExit, getErrorMessage } from './utils.js';
 import type { AudioFormat, ConversionItem, OggCodec } from './types/audio.js';
@@ -195,10 +195,9 @@ const createConversionList = async (
       }
 
       // Stops from overwriting input file.
-      // Keep both comparisons for robust path matching across environments.
+      // resolve() normalises .., ./, trailing slashes, and relative vs absolute.
       if (
-        inputFile.toLowerCase() === outputFile.toLowerCase() ||
-        inputFile === outputFile
+        resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()
       ) {
         console.log(
           chalk.yellow(

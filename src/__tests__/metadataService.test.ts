@@ -6,11 +6,12 @@ import {
   beforeEach,
   afterEach,
 } from '@jest/globals';
+import type { AudioMetadata } from '../types/metadata.js';
 
 // ESM mocks must be declared BEFORE dynamic imports
 jest.unstable_mockModule('path', () => ({
   join: jest.fn((...args) => args.join('/')),
-  extname: jest.fn((file) => {
+  extname: jest.fn((file: string) => {
     const parts = file.split('.');
     return parts.length > 1 ? `.${parts[parts.length - 1]}` : '';
   }),
@@ -24,6 +25,7 @@ jest.unstable_mockModule('fs', () => ({
 jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   platformSlug: 'windows',
+  findBinary: () => '/mock/base/ffprobe.exe',
 }));
 
 jest.unstable_mockModule('child_process', () => ({
@@ -34,14 +36,14 @@ jest.unstable_mockModule('child_process', () => ({
 // Dynamic imports after mock declarations
 const { existsSync } = await import('fs');
 const { spawnSync: _spawnSync } = await import('child_process');
-const {
-  getMetaData,
-  formatMetaDataField,
-  formatMetaData,
-  getLoopPoints,
-  convertLoopPoints,
-  formatLoopData,
-} = await import('../metadataService.js');
+const { getMetaData, getLoopPoints, convertLoopPoints, formatLoopData } =
+  await import('../metadataService.js');
+
+const existsSyncMock = existsSync as unknown as jest.MockedFunction<
+  typeof existsSync
+>;
+const spawnSyncMock = _spawnSync as unknown as jest.Mock;
+const asMeta = (value: unknown): AudioMetadata => value as AudioMetadata;
 
 describe('metadataService', () => {
   // Save original console methods
@@ -72,7 +74,7 @@ describe('metadataService', () => {
       jest.clearAllMocks();
 
       // Mock fs.existsSync to return true for file existence check
-      existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
     });
 
     it('should extract metadata from a file using ffprobe', async () => {
@@ -82,15 +84,17 @@ describe('metadataService', () => {
         format: { tags: { title: 'Test Song' } },
       };
 
-      _spawnSync.mockReturnValue({
+      spawnSyncMock.mockReturnValue({
         stdout: JSON.stringify(mockMetadata),
-        error: null,
+        stderr: '',
+        status: 0,
+        error: undefined,
       });
 
       const result = await getMetaData('test.mp3');
 
       expect(result).toEqual(mockMetadata);
-      expect(_spawnSync).toHaveBeenCalledWith(
+      expect(spawnSyncMock).toHaveBeenCalledWith(
         expect.stringContaining('ffprobe'),
         expect.any(Array),
         expect.objectContaining({ encoding: 'utf8' })
@@ -99,9 +103,11 @@ describe('metadataService', () => {
 
     it('should handle errors gracefully', async () => {
       // Mock spawnSync to throw an error
-      _spawnSync.mockReturnValue({
+      spawnSyncMock.mockReturnValue({
+        stderr: 'Command failed',
+        status: 1,
         error: new Error('Command failed'),
-        stdout: null,
+        stdout: '',
       });
 
       const result = await getMetaData('test.mp3');
@@ -116,18 +122,20 @@ describe('metadataService', () => {
     // Skip: The path resolution logic differs between packaged and dev modes
     it.skip('should handle file not found errors', async () => {
       // Mock file doesn't exist
-      existsSync.mockReturnValue(false);
+      existsSyncMock.mockReturnValue(false);
 
       // Mock spawnSync to still return something
-      _spawnSync.mockReturnValue({
+      spawnSyncMock.mockReturnValue({
         stdout: JSON.stringify({}),
-        error: null,
+        stderr: '',
+        status: 0,
+        error: undefined,
       });
 
       await getMetaData('nonexistent.mp3');
 
       // Function should still work, but with different ffprobe path
-      expect(_spawnSync).toHaveBeenCalledWith(
+      expect(spawnSyncMock).toHaveBeenCalledWith(
         expect.stringContaining('bin/ffprobe'),
         expect.any(Array),
         expect.objectContaining({ encoding: 'utf8' })
@@ -136,9 +144,11 @@ describe('metadataService', () => {
 
     it('should handle malformed JSON response', async () => {
       // Mock invalid JSON response
-      _spawnSync.mockReturnValue({
+      spawnSyncMock.mockReturnValue({
         stdout: 'Not valid JSON',
-        error: null,
+        stderr: '',
+        status: 0,
+        error: undefined,
       });
 
       const result = await getMetaData('test.mp3');
@@ -151,188 +161,16 @@ describe('metadataService', () => {
     });
   });
 
-  describe('formatMetaDataField', () => {
-    it('should get metadata field from streamTags', () => {
-      const streamTags = { title: 'Test Title' };
-      const formatTags = {};
-
-      const result = formatMetaDataField(streamTags, formatTags, 'title');
-
-      expect(result).toBe('Test Title');
-    });
-
-    it('should get metadata field from formatTags if not in streamTags', () => {
-      const streamTags = { title: 'Test Title' };
-      const formatTags = { artist: 'Test Artist' };
-
-      const result = formatMetaDataField(streamTags, formatTags, 'artist');
-
-      expect(result).toBe('Test Artist');
-    });
-
-    it('should handle case insensitive searches', () => {
-      const streamTags = { TITLE: 'Test Title' };
-      const formatTags = { ARTIST: 'Test Artist' };
-
-      expect(formatMetaDataField(streamTags, formatTags, 'title')).toBe(
-        'Test Title'
-      );
-      expect(formatMetaDataField(streamTags, formatTags, 'artist')).toBe(
-        'Test Artist'
-      );
-    });
-
-    it('should resolve common alias spellings', () => {
-      const streamTags = {
-        ALBUMARTIST: 'Test Album Artist',
-        TRACKNUMBER: '3',
-        DISCNUMBER: '2',
-      };
-      const formatTags = {};
-
-      expect(formatMetaDataField(streamTags, formatTags, 'album_artist')).toBe(
-        'Test Album Artist'
-      );
-      expect(formatMetaDataField(streamTags, formatTags, 'track')).toBe('3');
-      expect(formatMetaDataField(streamTags, formatTags, 'disc')).toBe('2');
-    });
-
-    it('should return empty string if field not found', () => {
-      const streamTags = { title: 'Test Title' };
-      const formatTags = { artist: 'Test Artist' };
-
-      const result = formatMetaDataField(streamTags, formatTags, 'album');
-
-      expect(result).toBe('');
-    });
-
-    it('should handle null/undefined tags', () => {
-      expect(formatMetaDataField(null, null, 'title')).toBe('');
-      expect(formatMetaDataField(undefined, undefined, 'title')).toBe('');
-    });
-  });
-
-  describe('formatMetaData', () => {
-    it('should format metadata correctly', () => {
-      const metadata = {
-        streams: [
-          {
-            tags: {
-              title: 'Test Title',
-              artist: 'Test Artist',
-            },
-            channels: 2,
-          },
-        ],
-        format: {
-          tags: {
-            album: 'Test Album',
-          },
-        },
-      };
-
-      const { metaData, channels } = formatMetaData(metadata);
-
-      expect(metaData).toContain('-metadata title="Test Title"');
-      expect(metaData).toContain('-metadata artist="Test Artist"');
-      expect(metaData).toContain('-metadata album="Test Album"');
-      expect(channels).toBe(' -ac 2');
-    });
-
-    it('should handle special characters in metadata', () => {
-      const metadata = {
-        streams: [
-          {
-            tags: {
-              title: 'Test "Title" with \\ backslash',
-              artist: 'Artist\nWith\nNewlines',
-            },
-            channels: 2,
-          },
-        ],
-      };
-
-      const { metaData } = formatMetaData(metadata);
-
-      // Expect properly escaped double quotes and backslashes
-      expect(metaData).toContain(
-        '-metadata title="Test \\"Title\\" with \\\\ backslash"'
-      );
-      // Expect newlines to be escaped as \n
-      expect(metaData).toContain('-metadata artist="Artist\\nWith\\nNewlines"');
-    });
-
-    it('should handle null/empty metadata', () => {
-      const result = formatMetaData(null);
-      expect(result.metaData).toBe('');
-      // Channels should default to stereo (-ac 2) when no metadata
-      expect(result.channels).toMatch(/-ac 2/);
-    });
-
-    it('should output canonical track key', () => {
-      const metadata = {
-        streams: [
-          {
-            tags: {
-              track: '5',
-            },
-          },
-        ],
-      };
-
-      const { metaData } = formatMetaData(metadata);
-
-      expect(metaData).toContain('-metadata track="5"');
-      expect(metaData).not.toContain('-metadata trackNumber="5"');
-    });
-
-    it('should normalize track/disc totals from slash notation', () => {
-      const metadata = {
-        streams: [
-          {
-            tags: {
-              TRACKNUMBER: '7/12',
-              DISCNUMBER: '1/2',
-            },
-          },
-        ],
-      };
-
-      const { metaData } = formatMetaData(metadata);
-
-      expect(metaData).toContain('-metadata track="7"');
-      expect(metaData).toContain('-metadata track_total="12"');
-      expect(metaData).toContain('-metadata disc="1"');
-      expect(metaData).toContain('-metadata disc_total="2"');
-    });
-
-    it('should pass through unknown tags', () => {
-      const metadata = {
-        streams: [
-          {
-            tags: {
-              CUSTOMTAG: 'Custom Value',
-            },
-          },
-        ],
-      };
-
-      const { metaData } = formatMetaData(metadata);
-
-      expect(metaData).toContain('-metadata CUSTOMTAG="Custom Value"');
-    });
-  });
-
   describe('getLoopPoints', () => {
     it('should extract loop points from metadata format tags', () => {
-      const metadata = {
+      const metadata = asMeta({
         format: {
           tags: {
             LOOPSTART: '1000',
             LOOPLENGTH: '5000',
           },
         },
-      };
+      });
 
       const { loopStart, loopLength } = getLoopPoints(metadata);
       expect(loopStart).toBe(1000);
@@ -340,7 +178,7 @@ describe('metadataService', () => {
     });
 
     it('should extract loop points from metadata stream tags', () => {
-      const metadata = {
+      const metadata = asMeta({
         streams: [
           {
             tags: {
@@ -349,7 +187,7 @@ describe('metadataService', () => {
             },
           },
         ],
-      };
+      });
 
       const { loopStart, loopLength } = getLoopPoints(metadata);
       expect(loopStart).toBe(1000);
@@ -357,14 +195,14 @@ describe('metadataService', () => {
     });
 
     it('should handle alternative tag formats', () => {
-      const metadata = {
+      const metadata = asMeta({
         format: {
           tags: {
             LOOP_START: '1000',
             LOOP_LENGTH: '5000',
           },
         },
-      };
+      });
 
       const { loopStart, loopLength } = getLoopPoints(metadata);
       expect(loopStart).toBe(1000);
@@ -372,14 +210,14 @@ describe('metadataService', () => {
     });
 
     it('should handle iTunes metadata tags', () => {
-      const metadata = {
+      const metadata = asMeta({
         format: {
           tags: {
             iTunes_LOOPSTART: '1000',
             iTunes_LOOPLENGTH: '5000',
           },
         },
-      };
+      });
 
       const { loopStart, loopLength } = getLoopPoints(metadata);
       expect(loopStart).toBe(1000);
@@ -387,13 +225,13 @@ describe('metadataService', () => {
     });
 
     it('should return null if loop points not found', () => {
-      const metadata = {
+      const metadata = asMeta({
         format: {
           tags: {
             ARTIST: 'Test',
           },
         },
-      };
+      });
 
       const { loopStart, loopLength } = getLoopPoints(metadata);
       expect(loopStart).toBeNaN();
@@ -403,7 +241,7 @@ describe('metadataService', () => {
 
   describe('convertLoopPoints', () => {
     it('should adjust loop points for opus format', () => {
-      const metadata = {
+      const metadata = asMeta({
         streams: [
           {
             sample_rate: '44100',
@@ -413,7 +251,7 @@ describe('metadataService', () => {
             },
           },
         ],
-      };
+      });
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
@@ -424,7 +262,7 @@ describe('metadataService', () => {
     });
 
     it('should not adjust loop points for non-opus formats', () => {
-      const metadata = {
+      const metadata = asMeta({
         streams: [
           {
             sample_rate: '44100',
@@ -434,9 +272,9 @@ describe('metadataService', () => {
             },
           },
         ],
-      };
+      });
 
-      const result = convertLoopPoints(metadata, 'mp3', null);
+      const result = convertLoopPoints(metadata, 'mp3', 'vorbis');
 
       expect(result.newSampleRate).toBeNull();
       expect(result.loopStart).toBe(1000);
@@ -475,7 +313,7 @@ describe('metadataService', () => {
       ];
 
       testCases.forEach(({ rate, expected }) => {
-        const metadata = {
+        const metadata = asMeta({
           streams: [
             {
               sample_rate: rate,
@@ -485,7 +323,7 @@ describe('metadataService', () => {
               },
             },
           ],
-        };
+        });
 
         const result = convertLoopPoints(metadata, 'ogg', 'opus');
         expect(result.newSampleRate).toBe(expected);
@@ -513,7 +351,7 @@ describe('metadataService', () => {
     });
 
     it('should format loop data for OGG correctly', () => {
-      const result = formatLoopData(1000, 5000, 'ogg');
+      const result = formatLoopData(1000, 5000);
 
       // Check that result is a string containing the expected metadata tags
       expect(result).toContain('-metadata LOOPSTART=1000');

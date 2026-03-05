@@ -11,6 +11,7 @@ import {
 import { join, dirname, basename, extname } from 'path';
 import { convertFiles } from '../../src/converterManager.js';
 import { settings } from '../../src/utils.js';
+import type { ConversionItem } from '../../src/types/audio.js';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -22,7 +23,7 @@ const TEST_INPUT_DIR = join(TEST_FILES_DIR, 'input');
 const TEST_OUTPUT_DIR = join(TEST_FILES_DIR, 'output');
 
 // Simplified version of deleteDuplicateFiles for test purposes only
-const handleDuplicateFiles = (files) => {
+const handleDuplicateFiles = (files: string[]) => {
   const priorityList = [
     '.midi',
     '.mid',
@@ -33,13 +34,13 @@ const handleDuplicateFiles = (files) => {
     '.flac',
     '.aiff',
   ];
-  const fileobjs = files.map((file) => [
+  const fileobjs: Array<[string, string]> = files.map((file) => [
     join(dirname(file), basename(file, extname(file))),
     extname(file),
   ]);
 
-  const uniq = new Map();
-  const droppedFiles = [];
+  const uniq = new Map<string, string>();
+  const droppedFiles: string[] = [];
 
   for (const [name, ext] of fileobjs) {
     if (!uniq.has(name)) {
@@ -48,6 +49,11 @@ const handleDuplicateFiles = (files) => {
     }
 
     const current = uniq.get(name);
+    if (!current) {
+      uniq.set(name, ext);
+      continue;
+    }
+
     if (priorityList.indexOf(ext) > priorityList.indexOf(current)) {
       droppedFiles.push(`${name}${current}`);
       uniq.set(name, ext);
@@ -57,8 +63,8 @@ const handleDuplicateFiles = (files) => {
   }
 
   const uniqueFiles = Array.from(uniq.entries()).reduce(
-    (p, c) => [...p, `${c[0]}${c[1]}`],
-    []
+    (p: string[], c: [string, string]) => [...p, `${c[0]}${c[1]}`],
+    [] as string[]
   );
 
   return {
@@ -119,6 +125,10 @@ const setupTestEnvironment = () => {
 const runTests = shouldRunTests();
 
 describe('Real file tests', () => {
+  let logSpy: ReturnType<typeof jest.spyOn> | undefined;
+  let errorSpy: ReturnType<typeof jest.spyOn> | undefined;
+  let warnSpy: ReturnType<typeof jest.spyOn> | undefined;
+
   // Skip all tests if no audio files are available
   beforeAll(() => {
     if (runTests) {
@@ -131,9 +141,9 @@ describe('Real file tests', () => {
     if (!runTests) return;
 
     // Capture console output
-    jest.spyOn(console, 'log').mockImplementation(() => {});
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   // Cleanup after each test
@@ -141,9 +151,9 @@ describe('Real file tests', () => {
     if (!runTests) return;
 
     // Restore console
-    console.log.mockRestore();
-    console.error.mockRestore();
-    console.warn.mockRestore();
+    logSpy?.mockRestore();
+    errorSpy?.mockRestore();
+    warnSpy?.mockRestore();
   });
 
   it('should find and process real audio files', async () => {
@@ -169,14 +179,16 @@ describe('Real file tests', () => {
     expect(Array.isArray(result.droppedFiles)).toBe(true);
 
     // Create conversion file list
-    const conversionList = result.uniqueFiles.map((inputFile) => ({
-      inputFile,
-      outputFile: join(
-        TEST_OUTPUT_DIR,
-        `${basename(inputFile, extname(inputFile))}.mp3`
-      ),
-      outputFormat: 'mp3',
-    }));
+    const conversionList: ConversionItem[] = result.uniqueFiles.map(
+      (inputFile) => ({
+        inputFile,
+        outputFile: join(
+          TEST_OUTPUT_DIR,
+          `${basename(inputFile, extname(inputFile))}.mp3`
+        ),
+        outputFormat: 'mp3',
+      })
+    );
 
     // Only test conversion if we have files
     if (conversionList.length > 0) {
@@ -224,7 +236,7 @@ describe('Real file tests', () => {
 
     // Create conversion list with first file only
     const testFile = files[0];
-    const conversionList = [
+    const conversionList: ConversionItem[] = [
       {
         inputFile: testFile,
         outputFile: join(TEST_OUTPUT_DIR, `metadata_test_mp3.mp3`),

@@ -9,17 +9,14 @@ import type {
 import { Worker } from 'worker_threads';
 import { performance } from 'perf_hooks';
 import { cpus } from 'os';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
 import chalk from 'chalk';
 import {
   initializeFileNames,
   addToLog,
   settings,
   getAnswer,
-  runtimeBaseDir,
   isPackagedRuntime,
+  findBinary,
 } from './utils.js';
 
 type WorkerManagerMessage =
@@ -31,8 +28,6 @@ type WorkerManagerMessage =
 type FatalFfmpegErrorKind = 'disk-space' | 'permission' | null;
 
 const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
-  const text = stderrText.toLowerCase();
-
   const diskSpacePatterns = [
     /\benospc\b/i,
     /no space left/i,
@@ -40,7 +35,7 @@ const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
     /disk full/i,
   ];
 
-  if (diskSpacePatterns.some((pattern) => pattern.test(text))) {
+  if (diskSpacePatterns.some((pattern) => pattern.test(stderrText))) {
     return 'disk-space';
   }
 
@@ -52,7 +47,7 @@ const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
     /operation not permitted/i,
   ];
 
-  if (permissionPatterns.some((pattern) => pattern.test(text))) {
+  if (permissionPatterns.some((pattern) => pattern.test(stderrText))) {
     return 'permission';
   }
 
@@ -62,22 +57,11 @@ const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-// Handle both ESM and bundled CJS contexts
-const __filename_esm =
-  typeof import.meta?.url === 'string' && import.meta.url
-    ? fileURLToPath(import.meta.url)
-    : '';
-const __filename_resolved =
-  __filename_esm || (typeof __filename !== 'undefined' ? __filename : '');
-const __dirname_resolved = __filename_resolved
-  ? dirname(__filename_resolved)
-  : '';
-
 const convertFiles = async (
   files: ConversionItem[]
 ): Promise<ConversionJob> => {
   initializeFileNames();
-  const jobStartTime = performance.now();
+  const jobStartTime = Date.now();
   let cpuNumber;
   try {
     cpuNumber = cpus().length;
@@ -88,11 +72,10 @@ const convertFiles = async (
     );
   }
 
-  const maxConcurrentWorkers = Math.round(
-    Math.min(cpuNumber, Array.isArray(files) ? files.length : 0)
-  );
+  const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, files.length));
   const failedFiles: ConversionResult[] = [];
   const successfulFiles: ConversionResult[] = [];
+  let abortRequested = false;
 
   /** De-duplicate and record a failed conversion */
   const recordFailure = (file: ConversionItem) => {
@@ -122,8 +105,7 @@ const convertFiles = async (
 
     return new Promise((resolve) => {
       try {
-        // Clone the data to prevent any circular references
-        const workerDataJson = JSON.stringify({
+        const workerData = {
           file: {
             inputFile: file.inputFile,
             outputFile: file.outputFile,
@@ -133,39 +115,15 @@ const convertFiles = async (
             oggCodec: settings.oggCodec || 'vorbis',
             loopDataMode: settings.loopDataMode || 'auto',
           },
-        });
+        };
 
-        const workerData = JSON.parse(workerDataJson);
-
-        // Determine the correct path for the worker based on runtime environment
-        // Search multiple candidate locations for the worker file
-        const workerCandidates = isPackagedRuntime
-          ? [
-              join(runtimeBaseDir, 'dist', 'converterWorker.cjs'),
-              join(runtimeBaseDir, 'converterWorker.cjs'),
-              join(dirname(process.execPath), 'dist', 'converterWorker.cjs'),
-
-              // Back-compat (older packages)
-              join(runtimeBaseDir, 'dist', 'converterWorker.js'),
-              join(runtimeBaseDir, 'converterWorker.js'),
-              join(dirname(process.execPath), 'dist', 'converterWorker.js'),
-            ]
-          : [
-              join(__dirname_resolved, '..', 'dist', 'converterWorker.js'),
-              join(__dirname_resolved, 'converterWorker.js'),
-              join(process.cwd(), 'dist', 'converterWorker.js'),
-
-              // Fallback (bundled worker)
-              join(__dirname_resolved, '..', 'dist', 'converterWorker.cjs'),
-              join(__dirname_resolved, 'converterWorker.cjs'),
-              join(process.cwd(), 'dist', 'converterWorker.cjs'),
-            ];
-
-        const workerPath = workerCandidates.find((p) => existsSync(p));
+        // Locate the worker file
+        const workerExt = isPackagedRuntime ? 'cjs' : 'js';
+        const workerPath = findBinary(`converterWorker.${workerExt}`, ['dist']);
 
         if (!workerPath) {
           throw new Error(
-            `Worker file not found. Searched:\n${workerCandidates.join('\n')}\nruntimeBaseDir: ${runtimeBaseDir}\n__dirname_resolved: ${__dirname_resolved}`
+            `Worker file converterWorker.${workerExt} not found in dist/`
           );
         }
 
@@ -196,13 +154,15 @@ const convertFiles = async (
             console.error(
               'FFmpeg stderr:',
               stderrMessage,
-              String(file.inputFile ?? ''),
-              String(file.outputFile ?? '')
+              file.inputFile,
+              file.outputFile
             );
 
             const fatalKind = detectFatalFfmpegError(stderrOutput);
             if (fatalKind && !fatalExitRequested) {
               fatalExitRequested = true;
+              abortRequested = true;
+              files.length = 0;
 
               if (fatalKind === 'disk-space') {
                 console.error(
@@ -214,9 +174,13 @@ const convertFiles = async (
                 );
               }
 
-              void getAnswer('Press ENTER to exit...').then(() =>
-                process.exit(1)
+              void getAnswer('Press ENTER to return to the main menu...').then(
+                () => {
+                  recordFailure(file);
+                  resolveOnce();
+                }
               );
+              return;
             }
             return;
           }
@@ -299,11 +263,7 @@ const convertFiles = async (
           const message = `Worker had an error: ${String(
             error instanceof Error ? error.message : error
           )}`;
-          console.error(
-            message,
-            String(file.inputFile ?? ''),
-            String(file.outputFile ?? '')
-          );
+          console.error(message, file.inputFile, file.outputFile);
           addToLog(
             {
               type: 'error' as const,
@@ -364,6 +324,7 @@ const convertFiles = async (
     workerPromises.push(
       (async () => {
         while (files.length > 0) {
+          if (abortRequested) break;
           const file = files.pop();
           try {
             const tasksLeft = files.length;

@@ -21,6 +21,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   platformSlug: 'win32-x64',
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
+  findBinary: () => '/mock/base/ffmpeg.exe',
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -54,15 +55,20 @@ jest.unstable_mockModule('child_process', () => ({
 }));
 
 // Mock the path module to return predictable paths
-jest.unstable_mockModule('path', () => ({
-  join: jest.fn((...args: string[]) => args.join('/')),
-  dirname: jest.fn((path: string) => path.split('/').slice(0, -1).join('/')),
-  basename: jest.fn((path: string) => path.split('/').pop()),
-  extname: jest.fn((path: string) => {
-    const parts = path.split('.');
-    return parts.length > 1 ? `.${parts.pop()}` : '';
-  }),
-}));
+jest.unstable_mockModule('path', () => {
+  const { resolve: realResolve } =
+    jest.requireActual<typeof import('path')>('path');
+  return {
+    join: jest.fn((...args: string[]) => args.join('/')),
+    dirname: jest.fn((path: string) => path.split('/').slice(0, -1).join('/')),
+    basename: jest.fn((path: string) => path.split('/').pop()),
+    extname: jest.fn((path: string) => {
+      const parts = path.split('.');
+      return parts.length > 1 ? `.${parts.pop()}` : '';
+    }),
+    resolve: jest.fn((...args: string[]) => realResolve(...args)),
+  };
+});
 
 // Dynamic imports after mock declarations
 const fs = jest.mocked(await import('fs'), { shallow: true });
@@ -147,18 +153,6 @@ describe('converterWorker.js', () => {
   it('handles missing input file error', async () => {
     fs.existsSync.mockReturnValue(false);
     await expect(runConversion()).rejects.toThrow();
-  }, 10000);
-
-  it('infers output format from extension when none provided', async () => {
-    fs.existsSync.mockReturnValue(true);
-    await converterWorker({
-      file: { inputFile: 'in.wav', outputFile: 'out.mp3', outputFormat: '' },
-      settings: { oggCodec: 'vorbis' },
-    });
-    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
-      type: 'code',
-      data: 0,
-    });
   }, 10000);
 
   it('handles missing output file error', async () => {
@@ -319,10 +313,12 @@ describe('converterWorker.js', () => {
 
     expect(fs.mkdirSync).toHaveBeenCalled();
     expect(fs.mkdirSync).toHaveBeenCalledWith('outdir', { recursive: true });
-    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
-      type: 'code',
-      data: 0,
-    });
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        data: expect.stringContaining('Failed to create output directory'),
+      })
+    );
   }, 10000);
 
   it('creates missing output directory successfully', async () => {
@@ -500,4 +496,64 @@ describe('converterWorker.js', () => {
 
     await expect(runConversion()).rejects.toThrow(/Skipped!/);
   }, 10000);
+
+  describe('self-overwrite defense in depth', () => {
+    it('rejects when output path is identical to input path', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await expect(
+        converterWorker({
+          file: {
+            inputFile: '/music/song.wav',
+            outputFile: '/music/song.wav',
+            outputFormat: 'wav',
+          },
+          settings: { oggCodec: 'vorbis' },
+        })
+      ).rejects.toThrow(/CRITICAL.*refusing to overwrite/i);
+    }, 10000);
+
+    it('rejects when paths differ only by case', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await expect(
+        converterWorker({
+          file: {
+            inputFile: '/music/Song.WAV',
+            outputFile: '/music/song.wav',
+            outputFormat: 'wav',
+          },
+          settings: { oggCodec: 'vorbis' },
+        })
+      ).rejects.toThrow(/CRITICAL.*refusing to overwrite/i);
+    }, 10000);
+
+    it('rejects when paths resolve to same file via ..', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await expect(
+        converterWorker({
+          file: {
+            inputFile: '/music/song.wav',
+            outputFile: '/music/sub/../song.wav',
+            outputFormat: 'wav',
+          },
+          settings: { oggCodec: 'vorbis' },
+        })
+      ).rejects.toThrow(/CRITICAL.*refusing to overwrite/i);
+    }, 10000);
+
+    it('allows conversion when input and output are different files', async () => {
+      fs.existsSync.mockReturnValue(true);
+      await converterWorker({
+        file: {
+          inputFile: '/music/song.wav',
+          outputFile: '/music/song.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      });
+      expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith({
+        type: 'code',
+        data: 0,
+      });
+    }, 10000);
+  });
 });

@@ -91,14 +91,6 @@ describe('utils module', () => {
     rl.question = origReadline;
   });
 
-  it('should export expected functions and objects', () => {
-    expect(settings).toBeDefined();
-    expect(typeof initializeFileNames).toBe('function');
-    expect(typeof getAnswer).toBe('function');
-    expect(typeof isFileBusy).toBe('function');
-    expect(typeof addToLog).toBe('function');
-  });
-
   it('should have correct structure in settings object', () => {
     expect(settings).toHaveProperty('inputFilePath');
     expect(settings).toHaveProperty('outputFilePath');

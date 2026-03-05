@@ -78,6 +78,18 @@ async function setupAndImportConverterManager(options: SetupOptions) {
     getAnswer: jest.fn(async () => ''),
     runtimeBaseDir,
     isPackagedRuntime: options.isPackagedRuntime,
+    findBinary: (name: string, subdirs: string[] = []) => {
+      const roots = [runtimeBaseDir, cwdDir];
+      for (const root of roots) {
+        const direct = join(root, name);
+        if (existsSyncMock(direct)) return direct;
+        for (const sub of subdirs) {
+          const candidate = join(root, sub, name);
+          if (existsSyncMock(candidate)) return candidate;
+        }
+      }
+      return null;
+    },
   }));
 
   const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(cwdDir);
@@ -105,21 +117,22 @@ beforeEach(() => {
 });
 
 describe('converterManager worker path resolution', () => {
-  it('dev + linux paths: prefers module dist worker', async () => {
+  it('dev + linux paths: prefers runtimeBaseDir/dist worker', async () => {
     const env = await setupAndImportConverterManager({
       pathStyle: 'posix',
       isPackagedRuntime: false,
     });
 
-    const expectedCandidates = [
-      env.join(env.moduleDir, '..', 'dist', 'converterWorker.js'),
-      env.join(env.moduleDir, 'converterWorker.js'),
-      env.join(env.cwdDir, 'dist', 'converterWorker.js'),
-    ];
-
-    env.existsSyncMock.mockImplementation(
-      (p: string) => p === expectedCandidates[0]
+    // findBinary('converterWorker.js', ['dist']) checks:
+    // runtimeBaseDir/converterWorker.js, runtimeBaseDir/dist/converterWorker.js,
+    // cwdDir/converterWorker.js, cwdDir/dist/converterWorker.js
+    const expectedPath = env.join(
+      env.runtimeBaseDir,
+      'dist',
+      'converterWorker.js'
     );
+
+    env.existsSyncMock.mockImplementation((p: string) => p === expectedPath);
 
     await env.convertFiles([
       {
@@ -129,10 +142,7 @@ describe('converterManager worker path resolution', () => {
       },
     ]);
 
-    expect(env.existsSyncMock.mock.calls.map((c) => c[0])).toEqual([
-      expectedCandidates[0],
-    ]);
-    expect(env.createdWorkerPaths[0]).toBe(expectedCandidates[0]);
+    expect(env.createdWorkerPaths[0]).toBe(expectedPath);
 
     env.cleanup();
   });
@@ -143,15 +153,9 @@ describe('converterManager worker path resolution', () => {
       isPackagedRuntime: false,
     });
 
-    const expectedCandidates = [
-      env.join(env.moduleDir, '..', 'dist', 'converterWorker.js'),
-      env.join(env.moduleDir, 'converterWorker.js'),
-      env.join(env.cwdDir, 'dist', 'converterWorker.js'),
-    ];
+    const expectedPath = env.join(env.cwdDir, 'dist', 'converterWorker.js');
 
-    env.existsSyncMock.mockImplementation(
-      (p: string) => p === expectedCandidates[2]
-    );
+    env.existsSyncMock.mockImplementation((p: string) => p === expectedPath);
 
     await env.convertFiles([
       {
@@ -161,10 +165,7 @@ describe('converterManager worker path resolution', () => {
       },
     ]);
 
-    expect(env.existsSyncMock.mock.calls.map((c) => c[0])).toEqual(
-      expectedCandidates
-    );
-    expect(env.createdWorkerPaths[0]).toBe(expectedCandidates[2]);
+    expect(env.createdWorkerPaths[0]).toBe(expectedPath);
 
     env.cleanup();
   });
@@ -175,16 +176,13 @@ describe('converterManager worker path resolution', () => {
       isPackagedRuntime: true,
     });
 
-    const expectedCandidates = [
-      env.join(env.runtimeBaseDir, 'dist', 'converterWorker.cjs'),
-      env.join(env.runtimeBaseDir, 'converterWorker.cjs'),
-      // converterManager also checks dirname(process.execPath)/dist
-      env.join(env.moduleDir, 'dist', 'converterWorker.cjs'),
-    ];
-
-    env.existsSyncMock.mockImplementation(
-      (p: string) => p === expectedCandidates[0]
+    const expectedPath = env.join(
+      env.runtimeBaseDir,
+      'dist',
+      'converterWorker.cjs'
     );
+
+    env.existsSyncMock.mockImplementation((p: string) => p === expectedPath);
 
     await env.convertFiles([
       {
@@ -194,10 +192,7 @@ describe('converterManager worker path resolution', () => {
       },
     ]);
 
-    expect(env.existsSyncMock.mock.calls.map((c) => c[0])).toEqual([
-      expectedCandidates[0],
-    ]);
-    expect(env.createdWorkerPaths[0]).toBe(expectedCandidates[0]);
+    expect(env.createdWorkerPaths[0]).toBe(expectedPath);
 
     env.cleanup();
   });
@@ -208,15 +203,13 @@ describe('converterManager worker path resolution', () => {
       isPackagedRuntime: true,
     });
 
-    const expectedCandidates = [
-      env.join(env.runtimeBaseDir, 'dist', 'converterWorker.cjs'),
-      env.join(env.runtimeBaseDir, 'converterWorker.cjs'),
-      env.join(env.moduleDir, 'dist', 'converterWorker.cjs'),
-    ];
-
-    env.existsSyncMock.mockImplementation(
-      (p: string) => p === expectedCandidates[0]
+    const expectedPath = env.join(
+      env.runtimeBaseDir,
+      'dist',
+      'converterWorker.cjs'
     );
+
+    env.existsSyncMock.mockImplementation((p: string) => p === expectedPath);
 
     await env.convertFiles([
       {
@@ -226,10 +219,7 @@ describe('converterManager worker path resolution', () => {
       },
     ]);
 
-    expect(env.existsSyncMock.mock.calls.map((c) => c[0])).toEqual([
-      expectedCandidates[0],
-    ]);
-    expect(env.createdWorkerPaths[0]).toBe(expectedCandidates[0]);
+    expect(env.createdWorkerPaths[0]).toBe(expectedPath);
 
     env.cleanup();
   });
@@ -255,7 +245,9 @@ describe('converterManager worker path resolution', () => {
     ).mock.calls
       .flat()
       .join(' ');
-    expect(allConsoleErrorText).toMatch(/Worker file not found\. Searched:/);
+    expect(allConsoleErrorText).toMatch(
+      /Worker file converterWorker\.cjs not found/
+    );
 
     env.cleanup();
   });

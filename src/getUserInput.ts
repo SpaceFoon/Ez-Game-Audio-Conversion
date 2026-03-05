@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, statSync } from 'fs';
 import chalk from 'chalk';
 import { getAnswer } from './utils.js';
 import path from 'path';
+import ExitProgramError from './exitProgramError.js';
 import type { Settings } from './types/settings.js';
 import type { AudioFormat } from './types/audio.js';
 
@@ -25,7 +26,7 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
         console.error(
           chalk.red(`Supported file types: ${inputTypes.join(', ')}`)
         );
-        process.exit(1);
+        throw new ExitProgramError('EXIT_PROGRAM:1');
       }
 
       settings.inputFilePath = path.dirname(filePath);

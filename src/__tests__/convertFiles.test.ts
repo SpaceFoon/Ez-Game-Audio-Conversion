@@ -7,6 +7,7 @@ import {
   beforeEach,
   afterEach,
 } from '@jest/globals';
+import type { ConversionItem } from '../types/audio.js';
 
 // ESM mocks must be declared BEFORE dynamic imports
 jest.unstable_mockModule('perf_hooks', () => ({
@@ -37,10 +38,13 @@ jest.unstable_mockModule('../utils.js', () => ({
   addToLog: jest.fn(),
   settings: { oggCodec: 'vorbis' },
   initializeFileNames: jest.fn(),
-  rl: { question: jest.fn((question, callback) => callback()) },
+  rl: {
+    question: jest.fn((_question: string, callback: () => void) => callback()),
+  },
   getAnswer: jest.fn(),
   runtimeBaseDir: '/mock/base',
   isPackagedRuntime: false,
+  findBinary: () => '/mock/base/converterWorker.js',
 }));
 
 jest.unstable_mockModule('os', () => ({
@@ -53,13 +57,26 @@ const os = await import('os');
 const { convertFiles } = await import('../converterManager.js');
 import events from 'events';
 
+type WorkerHandlers = {
+  message?: (message: unknown) => void;
+  error?: (error: unknown) => void;
+  exit?: (code: number) => void;
+};
+
+const workerMock = Worker as unknown as jest.MockedFunction<any>;
+const cpusMock = os.cpus as unknown as jest.MockedFunction<typeof os.cpus>;
+
 events.defaultMaxListeners = 20;
 
 // Add a timeout helper function
-const withTimeout = (promise, timeoutMs, errorMessage) => {
-  let timeoutId;
+const withTimeout = <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorMessage?: string
+): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-  const timeoutPromise = new Promise((_, reject) => {
+  const timeoutPromise: Promise<never> = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
       console.error(
         `TIMEOUT: ${errorMessage || 'Test took too long to complete'}`
@@ -73,7 +90,9 @@ const withTimeout = (promise, timeoutMs, errorMessage) => {
   });
 
   return Promise.race([promise, timeoutPromise]).finally(() => {
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   });
 };
 
@@ -104,8 +123,8 @@ describe('convertFiles', () => {
   });
 
   // Create a factory function for test files to make tests more maintainable
-  const createTestFiles = (count = 2) => {
-    const files = [];
+  const createTestFiles = (count = 2): ConversionItem[] => {
+    const files: ConversionItem[] = [];
     for (let i = 0; i < count; i++) {
       files.push({
         inputFile: `C:/Music/testfile${i}.mp3`,
@@ -125,12 +144,15 @@ describe('convertFiles', () => {
     delayCompletion = false,
   } = {}) {
     // Mock events object
-    const handlers = {};
+    const handlers: WorkerHandlers = {};
 
     // Create a worker with configurable behavior
     const worker = {
-      on: jest.fn((event, handler) => {
-        handlers[event] = handler;
+      on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+        if (event === 'message') handlers.message = handler;
+        if (event === 'error') handlers.error = handler;
+        if (event === 'exit')
+          handlers.exit = handler as unknown as (code: number) => void;
 
         // Don't auto-trigger events if we want to delay completion
         if (delayCompletion) {
@@ -169,7 +191,7 @@ describe('convertFiles', () => {
   it('should process files successfully', async () => {
     // Create a simple mock worker that auto-completes successfully
     console.log("Starting 'should process files successfully' test");
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
 
     const result = await withTimeout(
       convertFiles(createTestFiles(2)),
@@ -178,7 +200,7 @@ describe('convertFiles', () => {
     );
     console.log("Test 'should process files successfully' completed");
 
-    expect(Worker).toHaveBeenCalled();
+    expect(workerMock).toHaveBeenCalled();
     expect(result.failedFiles).toHaveLength(0);
     expect(result.successfulFiles.length).toBeGreaterThan(0);
   }, 30000);
@@ -186,7 +208,7 @@ describe('convertFiles', () => {
   it('should handle failed conversions (non-zero exit code)', async () => {
     // Create a worker that exits with non-zero code
     console.log("Starting 'should handle failed conversions' test");
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 1 }));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 1 }));
 
     const result = await withTimeout(
       convertFiles(createTestFiles(1)),
@@ -195,7 +217,7 @@ describe('convertFiles', () => {
     );
     console.log("Test 'should handle failed conversions' completed");
 
-    expect(Worker).toHaveBeenCalled();
+    expect(workerMock).toHaveBeenCalled();
     expect(result.successfulFiles).toHaveLength(0);
     expect(result.failedFiles.length).toBeGreaterThan(0);
     expect(console.error).toHaveBeenCalled();
@@ -205,12 +227,15 @@ describe('convertFiles', () => {
     // Mock a worker that triggers an error
     console.log("Starting 'should handle worker errors' test");
 
-    Worker.mockImplementation(() => {
+    workerMock.mockImplementation(() => {
       // Synchronously fire the error event when registered
-      const handlers = {};
+      const handlers: WorkerHandlers = {};
       const worker = {
-        on: jest.fn((event, handler) => {
-          handlers[event] = handler;
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          if (event === 'message') handlers.message = handler;
+          if (event === 'error') handlers.error = handler;
+          if (event === 'exit')
+            handlers.exit = handler as unknown as (code: number) => void;
           if (event === 'error') {
             handler(new Error('Worker thread error'));
           }
@@ -238,7 +263,7 @@ describe('convertFiles', () => {
     // Mock a worker that sends stderr messages
     console.log("Starting 'should handle stderr messages from workers' test");
 
-    Worker.mockImplementation(() =>
+    workerMock.mockImplementation(() =>
       createWorkerMock({
         triggerStderr: true,
       })
@@ -252,7 +277,7 @@ describe('convertFiles', () => {
     console.log("Test 'should handle stderr messages from workers' completed");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('ERROR MESSAGE FROM FFMPEG'),
+      expect.stringContaining('FFmpeg stderr'),
       expect.any(String),
       expect.any(String),
       expect.any(String)
@@ -263,7 +288,7 @@ describe('convertFiles', () => {
     // Mock a worker that sends a 'no space left' error
     console.log("Starting 'should detect disk space errors' test");
 
-    Worker.mockImplementation(() =>
+    workerMock.mockImplementation(() =>
       createWorkerMock({
         triggerStderr: true,
         noSpaceLeft: true,
@@ -272,7 +297,7 @@ describe('convertFiles', () => {
 
     // Mock process.exit
     const originalExit = process.exit;
-    process.exit = jest.fn();
+    process.exit = jest.fn() as unknown as typeof process.exit;
 
     await withTimeout(
       convertFiles(createTestFiles(1)),
@@ -296,7 +321,7 @@ describe('convertFiles', () => {
     );
 
     let callCount = 0;
-    Worker.mockImplementation(() => {
+    workerMock.mockImplementation(() => {
       callCount++;
       return createWorkerMock({
         exitCode: callCount % 2 === 0 ? 0 : 1,
@@ -312,7 +337,7 @@ describe('convertFiles', () => {
       "Test 'should handle multiple workers and files properly' completed"
     );
 
-    expect(Worker).toHaveBeenCalledTimes(4);
+    expect(workerMock).toHaveBeenCalledTimes(4);
     expect(result.successfulFiles.length).toBeGreaterThan(0);
     expect(result.failedFiles.length).toBeGreaterThan(0);
   }, 30000);
@@ -322,11 +347,11 @@ describe('convertFiles', () => {
     // Mock os.cpus to throw an error
     console.log("Starting 'should handle CPU detection failure' test");
 
-    os.cpus.mockImplementationOnce(() => {
+    cpusMock.mockImplementationOnce(() => {
       throw new Error('CPU detection failed');
     });
 
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
 
     const result = await withTimeout(
       convertFiles(createTestFiles(2)),
@@ -346,8 +371,8 @@ describe('convertFiles', () => {
     // Set up 10 CPUs but only 2 files
     console.log("Starting 'should limit concurrent workers' test");
 
-    os.cpus.mockReturnValueOnce(Array(10).fill({}));
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+    cpusMock.mockReturnValueOnce(Array(10).fill({}));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
 
     await withTimeout(
       convertFiles(createTestFiles(2)),
@@ -356,7 +381,7 @@ describe('convertFiles', () => {
     );
     console.log("Test 'should limit concurrent workers' completed");
 
-    expect(Worker).toHaveBeenCalledTimes(2); // Should create only 2 workers
+    expect(workerMock).toHaveBeenCalledTimes(2); // Should create only 2 workers
   }, 30000);
 
   it('should properly handle worker creation errors', async () => {
@@ -365,7 +390,7 @@ describe('convertFiles', () => {
       "Starting 'should properly handle worker creation errors' test"
     );
 
-    Worker.mockImplementationOnce(() => {
+    workerMock.mockImplementationOnce(() => {
       throw new Error('Failed to create worker');
     });
 
@@ -386,7 +411,7 @@ describe('convertFiles', () => {
   }, 30000);
 
   it('should handle an empty file list', async () => {
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
     const result = await withTimeout(
       convertFiles([]),
       5000,
@@ -397,10 +422,10 @@ describe('convertFiles', () => {
   });
 
   it('should handle file with missing properties gracefully', async () => {
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
     const files = [
       { inputFile: undefined, outputFile: undefined, outputFormat: undefined },
-    ];
+    ] as unknown as ConversionItem[];
     const result = await withTimeout(
       convertFiles(files),
       5000,
@@ -410,7 +435,7 @@ describe('convertFiles', () => {
   });
 
   it('should put all files in failedFiles if all workers fail', async () => {
-    Worker.mockImplementation(() => createWorkerMock({ exitCode: 1 }));
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 1 }));
     const files = createTestFiles(3);
     const result = await withTimeout(
       convertFiles(files),

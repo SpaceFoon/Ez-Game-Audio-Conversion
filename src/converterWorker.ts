@@ -2,7 +2,7 @@
 // Worker runs ffprobe to get metadata, then ffmpeg to convert one file.
 import { spawn } from 'child_process';
 import { workerData, parentPort } from 'worker_threads';
-import { join, dirname } from 'path';
+import { dirname, resolve } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import {
   getMetaData,
@@ -10,7 +10,7 @@ import {
   convertLoopPoints,
   formatLoopData,
 } from './metadataService.js';
-import { runtimeBaseDir, platformSlug, getErrorMessage } from './utils.js';
+import { platformSlug, getErrorMessage, findBinary } from './utils.js';
 import type { LoopDataMode } from './types/settings.js';
 
 type WorkerFileContext = {
@@ -59,19 +59,6 @@ const postError = (reason: unknown, fileCtx: WorkerFileContext = {}) => {
   }
 };
 
-// Helper function to properly escape file paths for command-line
-function ensureDirectoryExists(filePath: string): void {
-  const dir = dirname(filePath);
-  if (existsSync(dir)) return;
-
-  try {
-    mkdirSync(dir, { recursive: true });
-    console.log(`Created directory: ${dir}`);
-  } catch (err) {
-    console.error(`Failed to create directory: ${getErrorMessage(err)}`);
-  }
-}
-
 const converterWorker = async ({
   file: { inputFile, outputFile, outputFormat },
   settings: { oggCodec, loopDataMode = 'auto' },
@@ -82,32 +69,14 @@ const converterWorker = async ({
   // Basic validation to prevent crashes
   if (!inputFile) {
     failWorker('Missing input file');
-    return;
   }
 
   if (!outputFile) {
     failWorker('Missing output file');
-    return;
   }
 
   if (!outputFormat) {
-    // Try to extract format from outputFile extension if not provided
-    try {
-      const ext = outputFile.split('.').pop()?.toLowerCase();
-      if (ext && ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aiff'].includes(ext)) {
-        outputFormat = ext;
-      } else {
-        failWorker(
-          `Missing output format and couldn't determine from file extension: ${outputFile}`
-        );
-        return;
-      }
-    } catch (error) {
-      failWorker(
-        `Missing output format and error extracting extension: ${getErrorMessage(error)}`
-      );
-      return;
-    }
+    failWorker('Missing output format');
   }
 
   // Validate output file path
@@ -115,12 +84,10 @@ const converterWorker = async ({
     failWorker(
       `Output file path contains quotes which will cause problems: ${outputFile}`
     );
-    return;
   }
 
   if (outputFile.includes('\n') || outputFile.includes('\r')) {
     failWorker(`Output file path contains line breaks: ${outputFile}`);
-    return;
   }
 
   // Block Windows-invalid characters and control characters, but allow Unicode
@@ -135,13 +102,21 @@ const converterWorker = async ({
     failWorker(
       `Output file path contains invalid characters (control chars or <>:|?*): ${outputFile}`
     );
-    return;
   }
 
   // Output path too long check (Windows MAX_PATH limitation)
   if (outputFile.length > 250) {
     console.warn(
       `⚠️ Output path is very long (${outputFile.length} chars), might cause issues on Windows`
+    );
+  }
+
+  // Defense in depth: never allow ffmpeg -y to overwrite the source file.
+  // The upstream guard in createConversionList should prevent this, but if
+  // anything slips through, this hard stop protects the user's data.
+  if (resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()) {
+    failWorker(
+      `CRITICAL: output path resolves to input file — refusing to overwrite: ${inputFile}`
     );
   }
 
@@ -188,30 +163,18 @@ const converterWorker = async ({
     }
   }
 
-  // Find ffmpeg executable (use cross-platform path handling)
-  // Use platformSlug (from utils) instead of process.platform so tests can
-  // simulate Windows/Linux behavior deterministically.
+  // Find bundled ffmpeg executable
   const executableName = platformSlug === 'windows' ? 'ffmpeg.exe' : 'ffmpeg';
-  const ffmpegCandidates = [
-    join(runtimeBaseDir, executableName),
-    join(runtimeBaseDir, 'bin', executableName),
-    join(runtimeBaseDir, 'ffmpeg-bin', platformSlug, executableName),
-    join(process.cwd(), executableName),
-    join(process.cwd(), 'bin', executableName),
-    join(process.cwd(), 'ffmpeg-bin', platformSlug, executableName),
-  ];
-  const ffmpegPath = ffmpegCandidates.find((candidate) =>
-    existsSync(candidate)
-  );
+  const ffmpegPath = findBinary(executableName, [`ffmpeg-bin/${platformSlug}`]);
 
   if (!ffmpegPath) {
-    const notFoundMsg =
-      platformSlug === 'windows' ? 'ffmpeg.exe not found' : 'ffmpeg not found';
-    failWorker(`${notFoundMsg}. Searched:\n${ffmpegCandidates.join('\n')}`);
-    return; // unreachable but helps TypeScript
+    failWorker(
+      `${executableName} not found. Place it in ffmpeg-bin/${platformSlug}/`
+    );
+    return; // TypeScript needs this for null-narrowing despite failWorker(): never
   }
 
-  // Despite what you read online these are the best codecs. WAV and AIFF were chosen for compatibility.
+  // Despite what you read online these are the best codecs. WAV and AIFF codecs were chosen for common game engine compatibility.
   // https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
   // https://trac.ffmpeg.org/wiki/Encode/MP3
   // https://trac.ffmpeg.org/wiki/Encode/AAC page is wrong about aac being experimental.
@@ -231,9 +194,6 @@ const converterWorker = async ({
     mp3: { codec: 'libmp3lame', additionalOptions: ['-q:a', '4'] }, //-V 4	165average	140-188 range
     wav: {
       codec: 'pcm_s16le',
-      // For WAV files, we need to add special handling for loop points
-      // Loop points in WAV require custom chunks that ffmpeg doesn't support well through metadata
-      // We'll handle this in the formatLoopData function specifically for WAV
     },
     m4a: {
       codec: 'aac',
@@ -295,7 +255,7 @@ const converterWorker = async ({
   if (!preserveMetadata) {
     ffmpegArgs.push('-map_metadata', '-1');
   }
-
+  // '-c:a' means copy audio streams only.
   // Add codec
   ffmpegArgs.push('-c:a', codec);
 
@@ -318,7 +278,7 @@ const converterWorker = async ({
   }
 
   // Add loop data (numeric values only; safe to split)
-  if (loopData && typeof loopData === 'string' && loopData.trim()) {
+  if (loopData && loopData.trim()) {
     ffmpegArgs.push(...loopData.trim().split(/\s+/));
   }
 
@@ -337,13 +297,11 @@ const converterWorker = async ({
       if (!existsSync(outputFolder)) {
         mkdirSync(outputFolder, { recursive: true });
       }
-    } catch {
-      // Preserve legacy behavior: don't fail conversion on mkdir issues; report and continue
-      try {
-        parentPort?.postMessage({ type: 'code', data: 0 });
-      } catch {
-        // Ignore postMessage errors
-      }
+    } catch (error) {
+      postError(
+        `Failed to create output directory: ${outputFolder}. ${getErrorMessage(error)}`,
+        { inputFile, outputFile }
+      );
       return;
     }
   }
@@ -355,12 +313,10 @@ const runConversion = async (): Promise<void> => {
   // Detailed validation of worker data
   if (!workerData) {
     failWorker('Worker data is completely missing');
-    return;
   }
 
   if (!workerData.file) {
     failWorker('Worker data missing file object');
-    return;
   }
 
   const { inputFile, outputFile, outputFormat } = workerData.file;
@@ -368,38 +324,25 @@ const runConversion = async (): Promise<void> => {
   // Validate input file
   if (!inputFile) {
     failWorker('Missing input file path');
-    return;
   }
 
   if (!existsSync(inputFile)) {
     failWorker(`Input file does not exist: ${inputFile}`);
-    return;
   }
 
   // Validate output file
   if (!outputFile) {
     failWorker('Missing output file path');
-    return;
   }
 
   // Check for "Skipped" tag that might cause issues
   if (outputFile.includes('Skipped!')) {
     failWorker(`Output file appears to be marked as skipped: ${outputFile}`);
-    return;
   }
 
   // Validate output format
   if (!outputFormat) {
-    // Try to infer from output file extension
-    const ext = outputFile.split('.').pop()?.toLowerCase();
-    if (!ext || !['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aiff'].includes(ext)) {
-      failWorker(
-        `Missing output format and couldn't determine from extension: ${outputFile}`
-      );
-      return;
-    }
-    // Add the format to workerData for the worker
-    workerData.file.outputFormat = ext;
+    failWorker('Missing output format');
   }
 
   // Ensure codec is set for OGG
@@ -422,9 +365,6 @@ const runFFMPEG = (
 ): Promise<void> => {
   return new Promise((resolve, reject) => {
     try {
-      // Make sure the output directory exists
-      ensureDirectoryExists(outputFile);
-
       // Execute command
       // shell: false + no windowsVerbatimArguments = Node properly quotes args with spaces
       const ffmpegCommand = spawn(ffmpegPath, ffmpegArgs, {

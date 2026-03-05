@@ -1,4 +1,4 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
@@ -483,17 +483,9 @@ async function main() {
   return true;
 }
 
-// Run the main function
-main().catch((error) => {
-  console.error('Unhandled error:', error);
-  process.exit(1);
-});
-
-// Add a Jest test wrapper
-describe('Loop Point Handling', () => {
-  // Skip the test by default since it's a long-running test
-  it('tests loop point handling in various audio formats', () => {
-    // The test is considered successful if it gets to the end without crashing
-    expect(true).toBe(true);
+// Long-running integration test requiring ffmpeg — skipped in standard test runs
+describe.skip('Loop Point Handling Integration', () => {
+  it('converts loop points across formats without throwing', async () => {
+    await expect(main()).resolves.toBe(true);
   });
 });

@@ -17,7 +17,12 @@
       "Bash(npm test:*)",
       "Bash(xargs:*)",
       "Bash(grep:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/finalize.test.ts --runInBand 2>&1 | tail -30)",
+      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/selfOverwrite.test.ts --runInBand --verbose 2>&1 | grep -E '\\(✓|✕|PASS|FAIL|Tests:|✓|×|√|●|RUNS|✗|passed|failed|  \\)')",
+      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/selfOverwrite.test.ts --runInBand --verbose 2>&1 | grep -E '\\(PASS|FAIL|Tests:|✓|✕|✗|×|√\\)' | tail -5)",
+      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand 2>&1 | grep -E '\\(FAIL |● \\)' | head -20)",
+      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/metadataFormatting.integration.test.ts src/__tests__/converterWorker.paths.test.ts --runInBand 2>&1 | grep -B1 -A5 '●.*should escape\\\\|●.*uses runtime\\\\|●.*throws' | head -40)"
     ],
     "deny": [],
     "ask": []

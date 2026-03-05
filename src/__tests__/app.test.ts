@@ -85,8 +85,8 @@ describe('app.js', () => {
       successfulFiles: ['file2'],
       jobStartTime: 0,
     });
-    (finalize as unknown as Mock<() => Promise<void>>).mockResolvedValue(
-      undefined
+    (finalize as unknown as Mock<() => Promise<boolean>>).mockResolvedValue(
+      false
     );
 
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});

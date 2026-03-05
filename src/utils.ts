@@ -11,7 +11,7 @@ import moment from 'moment';
 import chalk from 'chalk';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+import ExitProgramError from './exitProgramError.js';
 import type { Settings, LogEntry, FileInfo } from './types/settings.js';
 
 // In the SEA build, the app is bundled to CJS and `import.meta.url` may be
@@ -65,6 +65,33 @@ export const platformSlug =
 export const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error || 'Unknown error');
 
+/**
+ * Locate a bundled binary (ffmpeg, ffprobe, or worker file) by searching
+ * the two directory roots that actually exist at runtime:
+ *   1. runtimeBaseDir  – next to the SEA exe, or project root in dev
+ *   2. process.cwd()   – for when the user runs from the release folder
+ *
+ * `subdirs` are the relative paths to check under each root, e.g.
+ * `['ffmpeg-bin/windows']` or `['dist']`.
+ */
+export const findBinary = (
+  name: string,
+  subdirs: string[] = []
+): string | null => {
+  const roots = [runtimeBaseDir, process.cwd()];
+  for (const root of roots) {
+    // Check directly under root
+    const direct = join(root, name);
+    if (existsSync(direct)) return direct;
+    // Check each sub-directory
+    for (const sub of subdirs) {
+      const candidate = join(root, sub, name);
+      if (existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+};
+
 export let settings: Settings = {
   inputFilePath: '',
   outputFilePath: '',
@@ -73,7 +100,6 @@ export let settings: Settings = {
   oggCodec: null,
   singleFileMode: false,
   singleFilePath: '',
-  userOS: null,
 };
 
 // Provide a Jest-friendly stub to avoid open handle (TTYWRAP) issues during tests
@@ -89,36 +115,11 @@ if (process.env.JEST_WORKER_ID) {
     question: (_q: string, cb: (answer: string) => void) => cb(''),
     close: () => {},
   };
-  // Attempt to fully release the TTY handle so Jest can exit cleanly.
+  // Fully release the TTY handle so Jest can exit cleanly.
   try {
-    const stdin = process.stdin as NodeJS.ReadStream & {
-      unref?: () => void;
-      pause?: () => void;
-      destroy?: () => void;
-    };
-    if (stdin) {
-      if (typeof stdin.unref === 'function') {
-        try {
-          stdin.unref();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-      if (typeof stdin.pause === 'function') {
-        try {
-          stdin.pause();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-      if (typeof stdin.destroy === 'function') {
-        try {
-          stdin.destroy();
-        } catch {
-          // Ignore cleanup errors
-        }
-      }
-    }
+    process.stdin.unref();
+    process.stdin.pause();
+    process.stdin.destroy();
   } catch {
     // Ignore stdin cleanup errors
   }
@@ -398,15 +399,8 @@ export const addToLog = async (
   }
 };
 
-export function handleExit(
-  code: number = 0,
-  { restart = false }: { restart?: boolean } = {}
-): void {
-  if (restart && code === 0 && process.argv[0]) {
-    console.log('Restarting the app...');
-    spawn(process.argv[0], process.argv.slice(1), { stdio: 'inherit' });
-  }
-  process.exit(code);
+export function handleExit(code: number = 0): void {
+  throw new ExitProgramError(`EXIT_PROGRAM:${code}`);
 }
 
 export function writeSummaryToLogs(

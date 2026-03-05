@@ -94,15 +94,13 @@ The conversion process (`src/converterManager.ts`) uses Node.js worker threads:
 - Each worker spawns ffmpeg processes for individual conversions
 - Parent thread collects results and aggregates success/failure counts
 
-**Critical Detail**: Worker uses ESM import.meta.url for path resolution:
+**Critical Detail**: Binary and worker path resolution is centralised in `src/utils.ts` via `findBinary()`. The ESM/CJS `__dirname` detection is computed once there, and all modules call:
 
 ```typescript
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { findBinary, isPackagedRuntime } from './utils.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const workerPath = join(__dirname, 'converterWorker.js');
+const workerExt = isPackagedRuntime ? 'cjs' : 'js';
+const workerPath = findBinary(`converterWorker.${workerExt}`, ['dist']);
 ```
 
 ### Key Architectural Components
@@ -111,13 +109,16 @@ const workerPath = join(__dirname, 'converterWorker.js');
 2. **getUserInput.ts** - Interactive CLI prompts for input/output paths and formats
 3. **searchFiles.ts** - Recursive file system search for audio files
 4. **createConversionList.ts** - Builds conversion jobs with conflict resolution (overwrite/rename/skip)
-5. **converterManager.ts** - Spawns and manages worker thread pool
+5. **converterManager.ts** - Spawns and manages worker thread pool, fatal ffmpeg error detection (disk space, etc.)
 6. **converterWorker.ts** - Worker thread that executes ffmpeg commands and extracts metadata
 7. **metadataService.ts** - Handles metadata extraction, loop point conversion, and formatting
-8. **utils.ts** - CSV logging, disk space checks, readline interface
-9. **finalize.ts** - Results display and auto-restart functionality
+8. **exitProgramError.ts** - Custom error class for silent program exit (caught by app.ts top-level handler)
+9. **utils.ts** - Runtime detection (`isPackagedRuntime`, `isSeaRuntime`, `platformSlug`, `runtimeBaseDir`), `findBinary()` for locating bundled executables/workers, `getErrorMessage()`, CSV logging, file-busy checks, readline interface
+10. **finalize.ts** - Results display, CSV summary output, and auto-restart functionality
 
 ### Global Environment Configuration
+
+Type definitions are in `src/types/`: `global.ts` (runtime env), `settings.ts` (Settings object), `audio.ts` (audio types), `metadata.ts` (AudioMetadata).
 
 The application uses `globalThis.env` for runtime configuration (type defined in `src/types/global.ts`):
 
@@ -234,7 +235,7 @@ Tests are located in `src/__tests__/`:
 
 All tests run sequentially (`--runInBand`) to prevent file system race conditions.
 
-**Test count:** 400+ tests across 25 test files.
+**Test count:** 440+ tests across 26 test files.
 
 ## TypeScript Configuration
 
@@ -258,7 +259,7 @@ Codecs are hardcoded in `src/converterWorker.ts`:
 - **OGG**: libopus at 64k bitrate, or libvorbis with VBR quality 1.2
 - **M4A**: AAC at 256k fixed bitrate
 - **WAV/AIFF**: pcm_s16le (16-bit uncompressed)
-- **FLAC**: Compression level 9 (minimal compression)
+- **FLAC**: Compression level 1 (minimal compression)
 
 To modify bitrates or codecs, edit the `formatConfig` object and `getFormatConfig()` function in `src/converterWorker.ts`.
 
@@ -289,7 +290,7 @@ The project uses GitHub Actions to automatically build releases for all platform
 Runs on every push/PR to `dev` or `main`:
 - Linting and formatting
 - TypeScript compilation
-- Tests with coverage (400+ tests)
+- Tests with coverage (440+ tests)
 - Build verification
 
 ### Creating a Release

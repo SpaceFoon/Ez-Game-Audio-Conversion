@@ -42,10 +42,15 @@ jest.unstable_mockModule('child_process', () => ({
   spawn: spawnMock,
 }));
 
-jest.unstable_mockModule('path', () => ({
-  join: (...parts: string[]) => parts.join(config.sep),
-  dirname: (p: string) => makeDirname(config.sep)(p),
-}));
+jest.unstable_mockModule('path', () => {
+  const { resolve: realResolve } =
+    jest.requireActual<typeof import('path')>('path');
+  return {
+    join: (...parts: string[]) => parts.join(config.sep),
+    dirname: (p: string) => makeDirname(config.sep)(p),
+    resolve: (...args: string[]) => realResolve(...args),
+  };
+});
 
 jest.unstable_mockModule('fs', () => ({
   existsSync: (p: string) => config.exists.has(p),
@@ -64,6 +69,32 @@ jest.unstable_mockModule('../utils.js', () => ({
   },
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
+  findBinary: (name: string, subdirs: string[] = []) => {
+    const sep = config.sep;
+    const roots = [config.runtimeBaseDir];
+    // Also check process.cwd() if it were relevant, but tests control via config.exists
+    for (const root of roots) {
+      const direct = [root, name].join(sep);
+      if (config.exists.has(direct)) return direct;
+      for (const sub of subdirs) {
+        const candidate = [root, sub, name].join(sep);
+        if (config.exists.has(candidate)) return candidate;
+      }
+    }
+    // Check cwd-based paths too
+    try {
+      const cwd = process.cwd();
+      const direct = [cwd, name].join(sep);
+      if (config.exists.has(direct)) return direct;
+      for (const sub of subdirs) {
+        const candidate = [cwd, sub, name].join(sep);
+        if (config.exists.has(candidate)) return candidate;
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  },
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
