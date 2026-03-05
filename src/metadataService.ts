@@ -3,6 +3,7 @@ import type { AudioMetadata } from './types/metadata.js';
 
 import { spawnSync } from 'child_process';
 import { platformSlug, findBinary } from './utils.js';
+import logger from './logger.js';
 
 const CANONICAL_FIELDS = [
   // Basic fields (ffmpeg canonical keys)
@@ -190,6 +191,7 @@ export const sanitizeMetaValueForArgs = (raw: string): string =>
   String(raw)
     .split('\u0000')
     .join('')
+    .replace(/\uFFFD/g, '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .trim();
@@ -206,6 +208,25 @@ const parseNumberAndTotal = (
     return { number: ofMatch[1], total: ofMatch[2] };
   }
   return null;
+};
+
+const replacementCharPattern = /\uFFFD/g;
+
+const replacementCharCount = (value: string): number =>
+  (value.match(replacementCharPattern) || []).length;
+
+const shouldPreferCandidateValue = (
+  currentValue: string,
+  candidateValue: string
+): boolean => {
+  const currentReplacementCount = replacementCharCount(currentValue);
+  const candidateReplacementCount = replacementCharCount(candidateValue);
+
+  if (candidateReplacementCount !== currentReplacementCount) {
+    return candidateReplacementCount < currentReplacementCount;
+  }
+
+  return false;
 };
 
 const collectNormalizedTags = (
@@ -246,6 +267,14 @@ const collectNormalizedTags = (
 
         if (!canonical.has(canonicalKey)) {
           canonical.set(canonicalKey, rawValue);
+        } else {
+          const existingValue = canonical.get(canonicalKey);
+          if (
+            typeof existingValue === 'string' &&
+            shouldPreferCandidateValue(existingValue, rawValue)
+          ) {
+            canonical.set(canonicalKey, rawValue);
+          }
         }
         continue;
       }
@@ -254,6 +283,14 @@ const collectNormalizedTags = (
       if (!seenNormalized.has(normalizedKey)) {
         seenNormalized.add(normalizedKey);
         passthrough.set(key, rawValue);
+      } else {
+        for (const [existingKey, existingValue] of passthrough.entries()) {
+          if (normalizeTagKey(existingKey) !== normalizedKey) continue;
+          if (!shouldPreferCandidateValue(existingValue, rawValue)) break;
+          passthrough.delete(existingKey);
+          passthrough.set(key, rawValue);
+          break;
+        }
       }
     }
   }
@@ -272,7 +309,7 @@ const getMetaData = async (
   ]);
 
   if (!ffprobePath) {
-    console.error(
+    logger.error(
       `${executableName} not found. Place it in ffmpeg-bin/${platformSlug}/`
     );
     return null;
@@ -306,7 +343,7 @@ const getMetaData = async (
     const metaData: AudioMetadata = JSON.parse(output.stdout);
     return metaData;
   } catch (error: unknown) {
-    console.error(
+    logger.error(
       `Error running ${executableName}:`,
       error instanceof Error ? error.message : String(error)
     );
@@ -320,7 +357,7 @@ export const formatMetaDataArgs = (
   inputFile?: string
 ): { metaDataArgs: string[]; channelsArgs: string[] } => {
   if (!metaData || !metaData.streams) {
-    if (inputFile) console.warn(`\n No metadata found in ${inputFile}`);
+    if (inputFile) logger.warn(`\n No metadata found in ${inputFile}`);
     return { metaDataArgs: [], channelsArgs: ['-ac', '2'] };
   }
 
@@ -336,14 +373,36 @@ export const formatMetaDataArgs = (
   for (const field of CANONICAL_FIELDS) {
     const raw = canonical.get(field);
     if (!raw && raw !== '0') continue;
-    const clean = sanitizeMetaValueForArgs(String(raw));
+    const rawString = String(raw);
+    const clean = sanitizeMetaValueForArgs(rawString);
+    if (rawString.includes('\uFFFD')) {
+      logger.error(
+        `Replacement character found in metadata tag "${field}"${inputFile ? ` for ${inputFile}` : ''}. Removed invalid character.`
+      );
+      if (!clean && clean !== '0') {
+        logger.error(
+          `Metadata tag "${field}" became empty after replacement-character cleanup and was skipped.`
+        );
+      }
+    }
     if (!clean && clean !== '0') continue;
     metaDataArgs.push('-metadata', `${field}=${clean}`);
   }
 
   for (const [key, value] of passthrough.entries()) {
     if (!isSafeMetaKey(key)) continue;
-    const clean = sanitizeMetaValueForArgs(String(value));
+    const rawString = String(value);
+    const clean = sanitizeMetaValueForArgs(rawString);
+    if (rawString.includes('\uFFFD')) {
+      logger.error(
+        `Replacement character found in metadata tag "${key}"${inputFile ? ` for ${inputFile}` : ''}. Removed invalid character.`
+      );
+      if (!clean && clean !== '0') {
+        logger.error(
+          `Metadata tag "${key}" became empty after replacement-character cleanup and was skipped.`
+        );
+      }
+    }
     if (!clean && clean !== '0') continue;
     metaDataArgs.push('-metadata', `${key}=${clean}`);
   }
@@ -474,13 +533,19 @@ export const convertLoopPoints = (
 
 // Format loop data for ffmpeg command
 export const formatLoopData = (loopStart: number, loopLength: number) => {
-  if (Number.isNaN(loopStart) || Number.isNaN(loopLength)) return '';
+  if (Number.isNaN(loopStart) || Number.isNaN(loopLength)) return [];
 
-  // Only include the standard variants that are most widely supported
-  return (
-    ` -metadata LOOPSTART=${loopStart} -metadata LOOPLENGTH=${loopLength} ` +
-    `-metadata loopstart=${loopStart} -metadata looplength=${loopLength}`
-  );
+  // Only include the standard variants that are most widely supported.
+  return [
+    '-metadata',
+    `LOOPSTART=${loopStart}`,
+    '-metadata',
+    `LOOPLENGTH=${loopLength}`,
+    '-metadata',
+    `loopstart=${loopStart}`,
+    '-metadata',
+    `looplength=${loopLength}`,
+  ];
 };
 
 export { getMetaData };

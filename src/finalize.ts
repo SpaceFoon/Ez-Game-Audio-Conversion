@@ -1,5 +1,6 @@
 import { settings, rl, writeSummaryToLogs } from './utils.js';
 import chalk from 'chalk';
+import logger from './logger.js';
 import type { ConversionResult } from './types/audio.js';
 
 const finalize = async (
@@ -15,7 +16,7 @@ const finalize = async (
   const average =
     successfulFiles.length > 0 ? totalTime / successfulFiles.length : 0;
 
-  console.log(
+  logger.log(
     `\n    Total job duration: ${totalTime.toFixed(
       2
     )} seconds\n    Average task duration ${average.toFixed(2)} seconds\n`
@@ -29,26 +30,26 @@ const finalize = async (
   writeSummaryToLogs(totalFiles, successCount, failCount, totalTime);
 
   if (successfulFiles && successfulFiles.length > 0) {
-    console.log(
+    logger.log(
       'Successes:',
       successfulFiles.length,
       successfulFiles.map((file) => file.outputFile)
     );
   } else {
-    console.log('NO SUCCESSFUL CONVERSIONS.');
+    logger.log('NO SUCCESSFUL CONVERSIONS.');
   }
 
   if (failedFiles && failedFiles.length > 0) {
-    console.log(
+    logger.log(
       'Failures:',
       failedFiles.length,
       failedFiles.map((file) => file.outputFile)
     );
   } else {
-    console.log('No conversions failed.');
+    logger.log('No conversions failed.');
   }
 
-  console.log(`Log files are in: ${settings.outputFilePath}.`);
+  logger.log(`Log files are in: ${settings.outputFilePath}.`);
 
   const promptToContinue = async (): Promise<boolean> =>
     new Promise((resolve) => {
@@ -65,13 +66,13 @@ const finalize = async (
             normalized === 'quit' ||
             normalized === 'exit'
           ) {
-            console.log('Exiting at user request.');
+            logger.log('Exiting at user request.');
             rl.close();
             resolve(false);
             return;
           }
 
-          console.log('Restarting conversion flow...');
+          logger.log('Restarting conversion flow...');
           resolve(true);
         }
       );

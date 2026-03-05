@@ -142,7 +142,7 @@ describe('converterWorker.js', () => {
       loopStart: NaN,
       loopLength: NaN,
     });
-    formatLoopDataMock.mockReturnValue('');
+    formatLoopDataMock.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -286,6 +286,25 @@ describe('converterWorker.js', () => {
       type: 'code',
       data: 0,
     });
+  }, 10000);
+
+  it('does not re-apply metadata args when preserving metadata for AIFF', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    await converterWorker({
+      file: {
+        inputFile: 'in.mp3',
+        outputFile: 'out.aiff',
+        outputFormat: 'aiff',
+      },
+      settings: { oggCodec: 'vorbis' },
+    });
+
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+
+    expect(args).toContain('-write_id3v2');
+    expect(args).toContain('1');
+    expect(args).not.toContain('title=Test');
   }, 10000);
 
   it('handles directory creation error gracefully', async () => {
@@ -485,16 +504,17 @@ describe('converterWorker.js', () => {
     consoleLogSpy.mockRestore();
   }, 10000);
 
-  it('blocks outputs marked as "Skipped!"', async () => {
+  it('blocks output files with embedded quotes', async () => {
     fs.existsSync.mockReturnValue(true);
     // Mutate live workerData binding
     workerThreads.workerData.file = {
       inputFile: 'in.wav',
-      outputFile: 'out Skipped!.mp3',
+      outputFile: 'out "Skipped!".mp3',
       outputFormat: 'mp3',
     };
+    workerThreads.workerData.settings = { oggCodec: 'vorbis' };
 
-    await expect(runConversion()).rejects.toThrow(/Skipped!/);
+    await expect(runConversion()).rejects.toThrow(/quotes/i);
   }, 10000);
 
   describe('self-overwrite defense in depth', () => {

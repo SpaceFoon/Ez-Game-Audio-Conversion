@@ -1,6 +1,7 @@
 import { readdirSync, statSync } from 'fs';
 import { join, extname } from 'path';
 import chalk from 'chalk';
+import logger from './logger.js';
 import type { Settings } from './types/settings.js';
 
 //Searches for files that meet criteria
@@ -17,11 +18,11 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   // If we're in single file mode, just return the single file
   if (settings.singleFileMode && settings.singleFilePath) {
     const fileExtension = extname(settings.singleFilePath).toLowerCase();
-    console.log('File extension:', fileExtension);
+    logger.log('File extension:', fileExtension);
 
     allFiles.push(settings.singleFilePath);
-    console.log(chalk.whiteBright.bold('\n🔍 Processing single file:\n'));
-    console.log(chalk.white(' 🎶 ', settings.singleFilePath));
+    logger.log(chalk.whiteBright.bold('\n🔍 Processing single file:\n'));
+    logger.log(chalk.white(' 🎶 ', settings.singleFilePath));
     return Promise.resolve(allFiles);
   }
 
@@ -46,7 +47,7 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   };
 
   walk(searchPath);
-  console.log(
+  logger.log(
     chalk.whiteBright.bold('\n🔍 Matched', allFiles.length, 'Input Files:\n')
   );
 
@@ -54,14 +55,14 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   const MAX_DISPLAY = 20;
   if (allFiles.length > 200) {
     allFiles.slice(0, MAX_DISPLAY).forEach((inputFile) => {
-      console.log(chalk.white(' 🎶 ', inputFile));
+      logger.log(chalk.white(' 🎶 ', inputFile));
     });
-    console.log(
+    logger.log(
       chalk.gray(`    ... and ${allFiles.length - MAX_DISPLAY} more files`)
     );
   } else {
     allFiles.forEach((inputFile) => {
-      console.log(chalk.white(' 🎶 ', inputFile));
+      logger.log(chalk.white(' 🎶 ', inputFile));
     });
   }
 

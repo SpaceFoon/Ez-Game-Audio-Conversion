@@ -36,8 +36,13 @@ jest.unstable_mockModule('child_process', () => ({
 // Dynamic imports after mock declarations
 const { existsSync } = await import('fs');
 const { spawnSync: _spawnSync } = await import('child_process');
-const { getMetaData, getLoopPoints, convertLoopPoints, formatLoopData } =
-  await import('../metadataService.js');
+const {
+  getMetaData,
+  getLoopPoints,
+  convertLoopPoints,
+  formatLoopData,
+  formatMetaDataArgs,
+} = await import('../metadataService.js');
 
 const existsSyncMock = existsSync as unknown as jest.MockedFunction<
   typeof existsSync
@@ -335,43 +340,97 @@ describe('metadataService', () => {
     it('should format loop data correctly', () => {
       const result = formatLoopData(1000, 5000);
 
-      // Check that result is a string containing the expected metadata tags
-      expect(result).toContain('-metadata LOOPSTART=1000');
-      expect(result).toContain('-metadata loopstart=1000');
-      expect(result).toContain('-metadata LOOPLENGTH=5000');
-      expect(result).toContain('-metadata looplength=5000');
+      // Check that result is an array containing the expected metadata args
+      expect(result).toEqual([
+        '-metadata',
+        'LOOPSTART=1000',
+        '-metadata',
+        'LOOPLENGTH=5000',
+        '-metadata',
+        'loopstart=1000',
+        '-metadata',
+        'looplength=5000',
+      ]);
 
       // Should not contain alternative/underscore formats we no longer use
-      expect(result).not.toContain('LOOP_START');
-      expect(result).not.toContain('LOOP_LENGTH');
+      expect(result.join(' ')).not.toContain('LOOP_START');
+      expect(result.join(' ')).not.toContain('LOOP_LENGTH');
 
       // Should not contain comment-based approaches
-      expect(result).not.toContain('COMMENT=');
-      expect(result).not.toContain('DESCRIPTION=');
+      expect(result.join(' ')).not.toContain('COMMENT=');
+      expect(result.join(' ')).not.toContain('DESCRIPTION=');
     });
 
     it('should format loop data for OGG correctly', () => {
       const result = formatLoopData(1000, 5000);
 
-      // Check that result is a string containing the expected metadata tags
-      expect(result).toContain('-metadata LOOPSTART=1000');
-      expect(result).toContain('-metadata loopstart=1000');
-      expect(result).toContain('-metadata LOOPLENGTH=5000');
-      expect(result).toContain('-metadata looplength=5000');
+      // Check that result is an array containing the expected metadata args
+      expect(result).toEqual([
+        '-metadata',
+        'LOOPSTART=1000',
+        '-metadata',
+        'LOOPLENGTH=5000',
+        '-metadata',
+        'loopstart=1000',
+        '-metadata',
+        'looplength=5000',
+      ]);
 
       // Should not contain alternative/underscore formats we no longer use
-      expect(result).not.toContain('LOOP_START');
-      expect(result).not.toContain('LOOP_LENGTH');
+      expect(result.join(' ')).not.toContain('LOOP_START');
+      expect(result.join(' ')).not.toContain('LOOP_LENGTH');
 
       // Should not contain comment-based approaches
-      expect(result).not.toContain('COMMENT=');
-      expect(result).not.toContain('DESCRIPTION=');
+      expect(result.join(' ')).not.toContain('COMMENT=');
+      expect(result.join(' ')).not.toContain('DESCRIPTION=');
     });
 
-    it('should return empty string for invalid loop points', () => {
-      expect(formatLoopData(NaN, 5000)).toBe('');
-      expect(formatLoopData(1000, NaN)).toBe('');
-      expect(formatLoopData(NaN, NaN)).toBe('');
+    it('should return empty array for invalid loop points', () => {
+      expect(formatLoopData(NaN, 5000)).toEqual([]);
+      expect(formatLoopData(1000, NaN)).toEqual([]);
+      expect(formatLoopData(NaN, NaN)).toEqual([]);
+    });
+  });
+
+  describe('formatMetaDataArgs replacement-character handling', () => {
+    it('removes replacement character glyphs and logs an error', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            channels: 2,
+            tags: {
+              performer: 'A�B',
+            },
+          },
+        ],
+      });
+
+      const result = formatMetaDataArgs(metadata, 'test.aiff');
+      expect(result.metaDataArgs).toContain('performer=AB');
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Replacement character found in metadata tag')
+      );
+    });
+
+    it('skips a metadata field if cleanup leaves it empty and logs', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            channels: 2,
+            tags: {
+              performer: '�',
+            },
+          },
+        ],
+      });
+
+      const result = formatMetaDataArgs(metadata, 'test.aiff');
+      expect(result.metaDataArgs.join(' ')).not.toContain('performer=');
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'became empty after replacement-character cleanup'
+        )
+      );
     });
   });
 });

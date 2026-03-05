@@ -10,6 +10,7 @@ import { convertFiles } from './converterManager.js';
 import { settings, isSeaRuntime } from './utils.js';
 import finalize from './finalize.js';
 import ExitProgramError from './exitProgramError.js';
+import logger from './logger.js';
 // Ensure global type augmentation is loaded for ts-node/tsc
 import './types/global.js';
 
@@ -37,12 +38,12 @@ const initializeGlobalEnv = (): void => {
 
 const logRuntimeMode = (): void => {
   if (globalThis.env.isDebug) {
-    console.log('debug mode');
-    console.log('stdin is TTY:', process.stdin.isTTY);
-    console.log('stdout is TTY:', process.stdout.isTTY);
+    logger.debug('debug mode');
+    logger.debug('stdin is TTY:', process.stdin.isTTY);
+    logger.debug('stdout is TTY:', process.stdout.isTTY);
   }
   if (globalThis.env.isDev) {
-    console.log('in dev mode');
+    logger.info('in dev mode');
   }
 };
 
@@ -55,13 +56,13 @@ const renderBanner = async (): Promise<void> => {
   // cfonts uses dynamic require for fonts which fails in SEA bundles
   if (isSeaRuntime) {
     // Fallback banner for SEA runtime where cfonts fonts aren't available
-    console.log(chalk.green.bold('\n  ╔═══════════════════════════════╗'));
-    console.log(
+    logger.log(chalk.green.bold('\n  ╔═══════════════════════════════╗'));
+    logger.log(
       chalk.green.bold('  ║') +
         chalk.yellow.bold('     EZ Game Audio Converter    ') +
         chalk.green.bold('║')
     );
-    console.log(chalk.green.bold('  ╚═══════════════════════════════╝\n'));
+    logger.log(chalk.green.bold('  ╚═══════════════════════════════╝\n'));
     return;
   }
 
@@ -79,7 +80,7 @@ const renderBanner = async (): Promise<void> => {
     });
   } catch {
     // Graceful fallback if cfonts import fails in unusual runtimes
-    console.log(chalk.green.bold('\nEZ Game Audio Converter\n'));
+    logger.log(chalk.green.bold('\nEZ Game Audio Converter\n'));
   }
 };
 
@@ -111,7 +112,7 @@ async function runApp(): Promise<void> {
       if (error instanceof ExitProgramError) {
         continue;
       }
-      console.error('Fatal Error', error);
+      logger.error('Fatal Error', error);
       return;
     }
   }
@@ -137,7 +138,7 @@ const isMainModule = (() => {
 
 if (isMainModule) {
   void runApp().catch((error: unknown) => {
-    console.error('Fatal startup error', error);
+    logger.error('Fatal startup error', error);
   });
 }
 

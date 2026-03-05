@@ -16,28 +16,14 @@
 </p>
 
 <!-- Pre-Headline -->
-<p style="font-size: 16px; color: yellow; text-align: center;">Boost your productivity and streamline your workflow today!</p>
+<p style="font-size: 16px; color: yellow; text-align: center;">Easiest, fastest and most reliable way to convert audio files available</p>
 
-## Why I built Ez Game Audio Converter
 
-I started this project after wasting many hours finding, organizing and converting assets for my game project. When you are using mostly free assets from different sources with different formats, bitrates and naming conventions, it can be a real time sink. If you spend all day learning how audio files work, you just spent all day not working on your project. You shouldn't have to be a audio engineer or terminal wizard just to have audio files in the right format/codec/bitrate.
-
-The Problem: Game devs and anyone else who needs to convert audio files for whatever reason, need to know a lot about digital audio before they can even get started. This is a huge barrier to entry for new game devs and a time sink for experienced ones.
-
-The Solution: A simple, easy to use tool that does all the heavy lifting for you. You don't need to know anything about audio files to use this tool. Just point it at your files and let it do the work. It will automatically select the best codec and bitrate for you. It will even handle loop tags for you. It's the easiest, fastest and most reliable solution available. And it's FREE!
-
-Please leave feedback on Itch.io or Github.
 
 <!--
 ## Introduction
 
 EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags! -->
-
-<!-- ## Not just for game devs anymore.
-
-  Now with FULL support for Apple iTunes metadata even when converting to and from non-M4A formats. This means you can convert your iTunes library to OGG or FLAC and keep all your metadata. This includes loop tags. Not many tools that do it all, also do this.
-
-  A big feature request has been to add CD ripping support. That this feature is now available! You can now rip your CDs to any format you like. Just select the CD drive as your source and the destination folder as your output. You can even rip multiple CDs at once. This feature is still in beta so please report any issues you find. -->
 
 ## Features
 
@@ -51,7 +37,7 @@ EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailo
 - 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extensions. Selects the best input file format.
 - 📝 **Meta Data Support:** All meta data, including iTunes data and Apple music will be transferred to the new file. Will transfer all basic meta data to and from all formats that support it.
 - 🔁 **Loop Tag Support:** All loop meta data will be transferred to new OGG or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
-- 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis when you have to.
+- 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis for compatibility.
 
 ## Installation
 

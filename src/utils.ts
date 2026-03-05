@@ -12,6 +12,7 @@ import chalk from 'chalk';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import ExitProgramError from './exitProgramError.js';
+import logger from './logger.js';
 import type { Settings, LogEntry, FileInfo } from './types/settings.js';
 
 // In the SEA build, the app is bundled to CJS and `import.meta.url` may be
@@ -138,36 +139,11 @@ export const getAnswer = (question: string | string[]): Promise<string> =>
       ? question.join(' ')
       : question;
     // Always echo the question so Windows PowerShell/cmd users see it even if ANSI is suppressed
-    console.log(formattedQuestion);
+    logger.log(formattedQuestion);
     rl.question('', (answer: string) => {
       resolve(answer);
     });
   });
-
-// Override console.error with a custom function
-const originalConsoleError = console.error;
-console.error = function (...args) {
-  const coloredArgs = args.map((arg) => {
-    if (arg instanceof Error) {
-      const txt = arg.stack || arg.message || String(arg);
-      return chalk.red.bold(txt);
-    }
-    return typeof arg === 'string' ? chalk.red.bold(arg) : arg;
-  });
-  originalConsoleError.apply(console, coloredArgs);
-};
-// Save the original console.warn function
-const originalConsoleWarn = console.warn;
-console.warn = function (...args) {
-  const coloredArgs = args.map((arg) => {
-    if (arg instanceof Error) {
-      const txt = arg.stack || arg.message || String(arg);
-      return chalk.yellow.bold(txt);
-    }
-    return typeof arg === 'string' ? chalk.yellow.bold(arg) : arg;
-  });
-  originalConsoleWarn.apply(console, coloredArgs);
-};
 
 // If a file fails to read or write, check if it is busy.
 export const isFileBusy = async (file: string): Promise<boolean> => {
@@ -186,10 +162,10 @@ export const isFileBusy = async (file: string): Promise<boolean> => {
       );
       return false;
     } else if (err?.code === 'ENOENT') {
-      console.error('ENOENT while checking file status:', String(error));
+      logger.error('ENOENT while checking file status:', String(error));
       return false;
     } else {
-      console.error(
+      logger.error(
         `\n🚨🚨⛔ Error checking status of Log file: ${err?.message ?? String(error)} ⛔🚨🚨`
       );
       throw error;
@@ -227,7 +203,7 @@ export const initializeFileNames = () => {
         mkdirSync(basePath, { recursive: true });
       }
     } catch (err) {
-      console.error('Error ensuring log directory exists:', err);
+      logger.error('Error ensuring log directory exists:', err);
     }
   }
   fileNameL = initFileName(basePath, 'logs');
@@ -266,6 +242,49 @@ export function escapeCsvField(value: string): string {
   return value;
 }
 
+const normalizeCsvValue = (value: string): string =>
+  value.replace(/[\r\n]+/g, ' ');
+
+const buildCsvRow = (values: string[]): string =>
+  values.map((value) => escapeCsvField(value)).join(',') + '\n';
+
+const ensureCsvHeader = async (
+  filePath: string | null,
+  header: string,
+  onError: (error: unknown) => void
+): Promise<boolean> => {
+  if (!filePath) return false;
+  if (existsSync(filePath)) return true;
+
+  try {
+    await isFileBusy(filePath);
+    writeFileSync(filePath, '\uFEFF' + header + '\n', {
+      encoding: 'utf8',
+    });
+    return true;
+  } catch (error) {
+    onError(error);
+    return false;
+  }
+};
+
+const appendCsvRow = async (
+  filePath: string | null,
+  row: string,
+  onError: (error: unknown) => void
+): Promise<boolean> => {
+  if (!filePath) return false;
+
+  try {
+    await isFileBusy(filePath);
+    appendFileSync(filePath, row);
+    return true;
+  } catch (error) {
+    onError(error);
+    return false;
+  }
+};
+
 export const addToLog = async (
   log: LogEntry,
   file?: FileInfo
@@ -282,7 +301,7 @@ export const addToLog = async (
   const outputFile = file?.outputFile || 'Unknown Output File';
   const isErr = log.type === 'stderr' || log.type === 'error';
   if (isErr && data === 'Unknown Error') {
-    console.error('Unknown Error log, details:', log, file);
+    logger.error('Unknown Error log, details:', log, file);
   }
   // const logPath = settings.outputFilePath;
 
@@ -298,103 +317,78 @@ export const addToLog = async (
 
   // Determine if the log is an error or not.
   if (isErr) {
-    if (fileNameE) await isFileBusy(fileNameE);
-
-    // Create error log file and header if none exists.
-    if (fileNameE && !existsSync(fileNameE)) {
-      try {
-        writeFileSync(
-          fileNameE,
-          '\uFEFF' + 'Timestamp,"Exit Code",Error,"Input File","Output File"\n',
-          {
-            encoding: 'utf8',
-          }
-        );
-        // Header created; continue to write the current log line below
-      } catch (error) {
-        console.error('Error creating Error CSV file: ', error);
-        return false; // bail out safely
+    const hasErrorHeader = await ensureCsvHeader(
+      fileNameE,
+      'Timestamp,"Exit Code",Error,"Input File","Output File"',
+      (error) => {
+        logger.error('Error creating Error CSV file: ', error);
       }
-    }
-
-    // Write error line
-    try {
-      if (fileNameE) await isFileBusy(fileNameE);
-      const csvRow =
-        [
-          escapeCsvField(time),
-          escapeCsvField(exitCode),
-          escapeCsvField(data.replace(/[\r\n]+/g, ' ')),
-          escapeCsvField(inputFile),
-          escapeCsvField(outputFile),
-        ].join(',') + '\n';
-      if (fileNameE) appendFileSync(fileNameE, csvRow);
-    } catch (error) {
-      console.error(`🚨🚨⛔ Error writing to ${fileNameE}: ${error} ⛔🚨🚨`);
+    );
+    if (!hasErrorHeader) {
       return false;
     }
 
-    // Also log errors to logs.csv
-    try {
-      if (fileNameL && !existsSync(fileNameL)) {
-        await isFileBusy(fileNameL);
-        writeFileSync(
-          fileNameL,
-          '\uFEFF' + 'Timestamp,"Exit Code",Input,Output\n',
-          {
-            encoding: 'utf8',
-          }
+    const errorRow = buildCsvRow([
+      time,
+      exitCode,
+      normalizeCsvValue(data),
+      inputFile,
+      outputFile,
+    ]);
+    const wroteErrorRow = await appendCsvRow(fileNameE, errorRow, (error) => {
+      logger.error(`🚨🚨⛔ Error writing to ${fileNameE}: ${error} ⛔🚨🚨`);
+    });
+    if (!wroteErrorRow) {
+      return false;
+    }
+
+    const hasLogHeader = await ensureCsvHeader(
+      fileNameL,
+      'Timestamp,"Exit Code",Input,Output',
+      (error) => {
+        logger.error(
+          `🚨🚨⛔ Error creating file or making header to ${fileNameL}: ${error} ⛔🚨🚨`
         );
       }
-      if (fileNameL) await isFileBusy(fileNameL);
-      const logCsvRow =
-        [
-          escapeCsvField(time),
-          escapeCsvField(exitCode),
-          escapeCsvField(inputFile),
-          escapeCsvField(outputFile),
-        ].join(',') + '\n';
-      if (fileNameL) appendFileSync(fileNameL, logCsvRow);
-    } catch (error) {
-      console.error(`🚨🚨⛔ Error writing to ${fileNameL}: ${error} ⛔🚨🚨`);
+    );
+    if (!hasLogHeader) {
+      return false;
+    }
+
+    const logCsvRow = buildCsvRow([time, exitCode, inputFile, outputFile]);
+    const wroteLogRow = await appendCsvRow(fileNameL, logCsvRow, (error) => {
+      logger.error(`🚨🚨⛔ Error writing to ${fileNameL}: ${error} ⛔🚨🚨`);
+    });
+    if (!wroteLogRow) {
       return false;
     }
 
     return;
   }
 
-  // Create log file and header if none exists.
-  if (fileNameL && !existsSync(fileNameL)) {
-    await isFileBusy(fileNameL);
-    try {
-      // Create log file with BOM for UTF-8. Hopefully avoids software not detecting this is CSV.
-      writeFileSync(
-        fileNameL,
-        '\uFEFF' + 'Timestamp,"Exit Code",Input,Output\n',
-        {
-          encoding: 'utf8',
-        }
-      );
-    } catch (error) {
-      console.error(
+  const hasLogHeader = await ensureCsvHeader(
+    fileNameL,
+    'Timestamp,"Exit Code",Input,Output',
+    (error) => {
+      logger.error(
         `🚨🚨⛔ Error creating file or making header to ${fileNameL}: ${error} ⛔🚨🚨`
       );
-      return false;
     }
+  );
+  if (!hasLogHeader) {
+    return false;
   }
-  // Write log line
-  try {
-    if (fileNameL) await isFileBusy(fileNameL);
-    const csvRow =
-      [
-        escapeCsvField(time),
-        escapeCsvField(data.replace(/[\r\n]+/g, ' ')),
-        escapeCsvField(inputFile),
-        escapeCsvField(outputFile),
-      ].join(',') + '\n';
-    if (fileNameL) appendFileSync(fileNameL, csvRow);
-  } catch (error) {
-    console.error(`🚨🚨⛔ Error writing log to ${fileNameL}: ${error} ⛔🚨🚨`);
+
+  const csvRow = buildCsvRow([
+    time,
+    normalizeCsvValue(data),
+    inputFile,
+    outputFile,
+  ]);
+  const wroteLogRow = await appendCsvRow(fileNameL, csvRow, (error) => {
+    logger.error(`🚨🚨⛔ Error writing log to ${fileNameL}: ${error} ⛔🚨🚨`);
+  });
+  if (!wroteLogRow) {
     return false;
   }
 };
@@ -421,7 +415,7 @@ export function writeSummaryToLogs(
       appendFileSync(fileNameL, logRow);
     }
   } catch (error) {
-    console.error(`Error writing summary to logs: ${error}`);
+    logger.error(`Error writing summary to logs: ${error}`);
   }
 
   // Write to error.csv
@@ -434,7 +428,7 @@ export function writeSummaryToLogs(
       appendFileSync(fileNameE, errorRow);
     }
   } catch (error) {
-    console.error(`Error writing summary to errors: ${error}`);
+    logger.error(`Error writing summary to errors: ${error}`);
   }
 }
 

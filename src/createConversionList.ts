@@ -1,8 +1,22 @@
 import { existsSync, mkdirSync } from 'fs';
-import { join, basename, extname, dirname, relative, resolve } from 'path';
+import {
+  join,
+  basename,
+  extname,
+  dirname,
+  relative,
+  resolve,
+  isAbsolute,
+} from 'path';
 import chalk from 'chalk';
 import { getAnswer, settings, handleExit, getErrorMessage } from './utils.js';
-import type { AudioFormat, ConversionItem, OggCodec } from './types/audio.js';
+import logger from './logger.js';
+import type {
+  AudioFormat,
+  ConversionCandidate,
+  ConversionItem,
+  OggCodec,
+} from './types/audio.js';
 
 // Get a unique output file name
 const getOutputFileCopy = async (
@@ -50,14 +64,35 @@ const askOggCodec = async (): Promise<OggCodec> => {
 
   if (input === '') return 'vorbis';
   if (input !== 'vorbis' && input !== 'opus') {
-    console.warn('\n⚠️ Did not enter Vorbis or Opus! 😧😓😯');
+    logger.warn('\n⚠️ Did not enter Vorbis or Opus! 😧😓😯');
     return await askOggCodec(); // Keep asking until a valid input is provided
   }
 
   // Save the selection to settings and return
   settings.oggCodec = input;
-  console.log(chalk.green.italic(`\n ✨ Ogg Codec 🔌 Selected: ${input} ✅`));
+  logger.log(chalk.green.italic(`\n ✨ Ogg Codec 🔌 Selected: ${input} ✅`));
   return input;
+};
+
+const getRelativeOutputDir = (inputRoot: string, inputFile: string): string => {
+  const normalizedRoot = resolve(inputRoot);
+  const normalizedFile = resolve(inputFile);
+  const relFilePath = relative(normalizedRoot, normalizedFile);
+  const relDir = dirname(relFilePath);
+
+  if (relDir === '.' || relDir === '') {
+    return '';
+  }
+
+  // Guard against writing outside output root if paths are inconsistent.
+  if (relDir.startsWith('..') || isAbsolute(relDir)) {
+    logger.warn(
+      `Could not preserve folder structure for ${inputFile}; falling back to output root.`
+    );
+    return '';
+  }
+
+  return relDir;
 };
 
 //Create final list of output files to convert
@@ -74,7 +109,7 @@ const createConversionList = async (
   let outputFolder: string | null = null;
 
   let convertSelf: string | null = null;
-  const conversionList: ConversionItem[] = [];
+  const conversionList: ConversionCandidate[] = [];
   let response: string | null = null;
   let relativePath: string | null = null;
 
@@ -84,20 +119,18 @@ const createConversionList = async (
   }
 
   // Batch summary information
-  console.log(chalk.blueBright('\n📝 Conversion parameters:'));
-  console.log(chalk.blueBright(`  Files to process: ${files.length}`));
-  console.log(
+  logger.log(chalk.blueBright('\n📝 Conversion parameters:'));
+  logger.log(chalk.blueBright(`  Files to process: ${files.length}`));
+  logger.log(
     chalk.blueBright(`  Single file mode: ${singleFileMode ? 'Yes' : 'No'}`)
   );
-  console.log(chalk.blueBright(`  Input path: ${inputFilePath}`));
-  console.log(chalk.blueBright(`  Output path: ${outputFilePath}`));
-  console.log(
-    chalk.blueBright(`  Output formats: ${outputFormats.join(', ')}`)
-  );
+  logger.log(chalk.blueBright(`  Input path: ${inputFilePath}`));
+  logger.log(chalk.blueBright(`  Output path: ${outputFilePath}`));
+  logger.log(chalk.blueBright(`  Output formats: ${outputFormats.join(', ')}`));
 
   // Validate we have files to process
   if (!files.length) {
-    console.error(
+    logger.error(
       chalk.redBright('\n❌ Error: No input files found to process.')
     );
     handleExit(1);
@@ -106,30 +139,30 @@ const createConversionList = async (
   // Pre-calculate and create all unique output directories ONCE
   // This avoids 180k+ existsSync calls (30k files × 6 formats)
   if (inputFilePath !== outputFilePath) {
-    console.log(chalk.cyan('\n📁 Preparing output directories...'));
+    logger.log(chalk.cyan('\n📁 Preparing output directories...'));
     const outputDirs = new Set<string>();
     for (const inputFile of files) {
       try {
-        const relPath = dirname(relative(inputFilePath, inputFile));
+        const relPath = getRelativeOutputDir(inputFilePath, inputFile);
         outputDirs.add(join(outputFilePath, relPath));
       } catch {
         // Path issues are handled later in the main loop
       }
     }
-    console.log(chalk.cyan(`   Creating ${outputDirs.size} directories...`));
+    logger.log(chalk.cyan(`   Creating ${outputDirs.size} directories...`));
     for (const dir of outputDirs) {
       if (!existsSync(dir)) {
         try {
           mkdirSync(dir, { recursive: true });
         } catch (error) {
-          console.error(
+          logger.error(
             chalk.redBright.bold("Couldn't create directory:", dir),
             error
           );
         }
       }
     }
-    console.log(chalk.green('   ✅ Directories ready'));
+    logger.log(chalk.green('   ✅ Directories ready'));
   }
 
   // Track progress for large batches
@@ -140,14 +173,15 @@ const createConversionList = async (
 
   for (const inputFile of files) {
     if (showDetailedLogs) {
-      console.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
+      logger.log(chalk.cyan(`\n🔍 Processing input file: ${inputFile}`));
     }
 
     for (const outputFormat of outputFormats) {
       if (showDetailedLogs) {
-        console.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
+        logger.log(chalk.cyan(`  🔄 Output format: ${outputFormat}`));
       }
 
+      let action: ConversionCandidate['action'] = 'convert';
       let outputFile: string;
       if (outputFormats.includes('ogg') && !oggCodec) {
         oggCodec = await askOggCodec();
@@ -160,9 +194,9 @@ const createConversionList = async (
 
       // Calculate relative path if needed
       try {
-        relativePath = dirname(relative(inputFilePath, inputFile));
+        relativePath = getRelativeOutputDir(inputFilePath, inputFile);
       } catch (error) {
-        console.error(
+        logger.error(
           chalk.redBright(
             `❌ Error calculating relative path: ${getErrorMessage(error)}`
           )
@@ -190,8 +224,8 @@ const createConversionList = async (
       }
 
       if (showDetailedLogs) {
-        console.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
-        console.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
+        logger.log(chalk.cyan(`  📁 Output folder: ${outputFolder}`));
+        logger.log(chalk.cyan(`  📄 Output file: ${outputFile}`));
       }
 
       // Stops from overwriting input file.
@@ -199,7 +233,7 @@ const createConversionList = async (
       if (
         resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()
       ) {
-        console.log(
+        logger.log(
           chalk.yellow(
             `  ⚠️ Input file and output file are the same: ${inputFile}`
           )
@@ -210,14 +244,14 @@ const createConversionList = async (
             convertSelf === '' ||
             (convertSelf && /^no$/i.test(convertSelf))
           ) {
-            console.log('\n 🚫 Not converting files to own type! 🚫 \n');
+            logger.log('\n 🚫 Not converting files to own type! 🚫 \n');
             convertSelf = 'no';
-            outputFile = `${outputFile} "Skipped! ⏭️!"`;
+            action = 'skip';
             break;
           }
           if (convertSelf && /^yes$/i.test(convertSelf)) {
             convertSelf = 'yes';
-            console.log('\n 🔀 Converting files to own type! ✔');
+            logger.log('\n 🔀 Converting files to own type! ✔');
             //Rename. Never overwrite input file.
             outputFile = await getOutputFileCopy(
               inputFile,
@@ -236,14 +270,14 @@ const createConversionList = async (
             convertSelf !== 'yes' &&
             convertSelf !== 'no'
           ) {
-            console.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
+            logger.warn('⚠️  Invalid input, please type "yes" or "no" ⚠️');
           }
         }
       }
 
-      const responseActions: { [key: string]: () => Promise<void | null> } = {
+      const responseActions: { [key: string]: () => Promise<void> } = {
         o: async () => {
-          return (response = null);
+          response = null;
         },
         oa: async () => {
           if (!existsSync(outputFile)) return;
@@ -256,7 +290,8 @@ const createConversionList = async (
             outputFormat,
             outputFolder || dirname(inputFile)
           );
-          return (response = null);
+          action = 'convert';
+          response = null;
         },
         ra: async () => {
           if (!existsSync(outputFile)) return;
@@ -265,21 +300,22 @@ const createConversionList = async (
             outputFormat,
             outputFolder || dirname(outputFile)
           );
+          action = 'convert';
         },
         s: async () => {
-          outputFile = `${outputFile} "Skipped! ⏭️"`;
-          return (response = null);
+          action = 'skip';
+          response = null;
         },
         sa: async () => {
           if (!existsSync(outputFile)) return;
-          outputFile = `${outputFile} "Skipped! ⏭️"`;
+          action = 'skip';
         },
       };
 
       // Handle file exists responses
       switch (response) {
         case '':
-          console.error('response was empty:', response);
+          logger.error('response was empty:', response);
           break;
         case 'ra':
           await responseActions['ra']?.();
@@ -288,7 +324,7 @@ const createConversionList = async (
           await responseActions['sa']?.();
           break;
         case 'oa':
-          console.log(
+          logger.log(
             chalk.red('🔺🚩OVERWRITE FILE🚩'),
             chalk.yellow(outputFile, ' 🔺')
           );
@@ -297,7 +333,7 @@ const createConversionList = async (
           while (true) {
             if (!response) {
               if (existsSync(outputFile)) {
-                console.log(
+                logger.log(
                   chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
                 );
 
@@ -313,7 +349,7 @@ const createConversionList = async (
                   break;
                 } else {
                   response = null;
-                  console.warn('\n⚠️ Invalid selection! Try again ⚠️');
+                  logger.warn('\n⚠️ Invalid selection! Try again ⚠️');
                 }
               } else {
                 break;
@@ -327,10 +363,11 @@ const createConversionList = async (
         inputFile,
         outputFile,
         outputFormat,
+        action,
       });
 
       if (showDetailedLogs) {
-        console.log(
+        logger.log(
           chalk.green(
             `  ✅ Added to conversion list: ${inputFile} -> ${outputFile}`
           )
@@ -349,20 +386,27 @@ const createConversionList = async (
   // Process the conversion list
   while (true) {
     // Function to remove duplicates based on outputFile
-    const removeDuplicates = (list: ConversionItem[]): ConversionItem[] => {
+    const removeDuplicates = (
+      list: ConversionCandidate[]
+    ): ConversionCandidate[] => {
       const seen = new Set<string>();
-      return list.filter((conversion: ConversionItem) => {
+      return list.filter((conversion: ConversionCandidate) => {
         const duplicate = seen.has(conversion.outputFile);
         seen.add(conversion.outputFile);
         return !duplicate;
       });
     };
 
-    const uniqueConversionList = removeDuplicates(conversionList);
+    const uniqueConversionList = removeDuplicates(
+      conversionList.filter((x: ConversionCandidate) => x.action === 'convert')
+    );
 
-    // Filter out skipped files
-    const filesToConvert = uniqueConversionList.filter(
-      (x: ConversionItem) => !/Skipped!.*⏭️/g.test(x.outputFile)
+    const filesToConvert: ConversionItem[] = uniqueConversionList.map(
+      ({ inputFile, outputFile, outputFormat }: ConversionCandidate) => ({
+        inputFile,
+        outputFile,
+        outputFormat,
+      })
     );
 
     // Display conversion list - only build numbered array for what we show
@@ -374,7 +418,7 @@ const createConversionList = async (
       const preview = filesToConvert
         .slice(0, MAX_DISPLAY)
         .map((x: ConversionItem, i: number) => `🔊 ${i + 1} ${x.outputFile}`);
-      console.log(
+      logger.log(
         chalk.cyanBright(
           '\n🔄 Pending Conversion 🔄',
           fileCount,
@@ -387,7 +431,7 @@ const createConversionList = async (
       const numbered = filesToConvert.map(
         (x: ConversionItem, index: number) => `🔊 ${index + 1} ${x.outputFile}`
       );
-      console.log(
+      logger.log(
         chalk.cyanBright(
           '\n🔄 Pending Conversion 🔄',
           fileCount,
@@ -399,7 +443,7 @@ const createConversionList = async (
 
     // No files to convert
     if (fileCount === 0) {
-      console.log(
+      logger.log(
         chalk.yellow('\n⚠️ No files to convert after filtering! Exiting.')
       );
       handleExit(0);
@@ -413,10 +457,10 @@ const createConversionList = async (
     );
 
     if (/^no$/i.test(accept_answer)) {
-      console.log('\n🚫 Conversion cancelled. Restarting program 🚫');
+      logger.log('\n🚫 Conversion cancelled. Restarting program 🚫');
       handleExit(0);
     } else if (!/^yes$/i.test(accept_answer)) {
-      console.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');
+      logger.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');
       continue;
     }
 

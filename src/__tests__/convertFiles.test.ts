@@ -253,9 +253,7 @@ describe('convertFiles', () => {
     console.log("Test 'should handle worker errors' completed");
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Worker had an error'),
-      expect.any(String),
-      expect.any(String)
+      expect.stringContaining('Worker had an error')
     );
   }, 30000);
 
@@ -405,8 +403,7 @@ describe('convertFiles', () => {
     );
 
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Error creating worker'),
-      expect.any(Object)
+      expect.stringContaining('Error creating worker')
     );
   }, 30000);
 

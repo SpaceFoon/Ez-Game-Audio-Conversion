@@ -99,7 +99,7 @@ describe('converterWorker.js', () => {
       loopStart: null,
       loopLength: null,
     });
-    metadataService.formatLoopData.mockReturnValue('');
+    metadataService.formatLoopData.mockReturnValue([]);
   });
 
   afterEach(() => {
@@ -321,9 +321,16 @@ describe('converterWorker.js', () => {
       loopStart: 123,
       loopLength: 456,
     });
-    metadataService.formatLoopData.mockReturnValue(
-      ' -metadata LOOPSTART=123 -metadata loopstart=123 -metadata LOOPLENGTH=456 -metadata looplength=456'
-    );
+    metadataService.formatLoopData.mockReturnValue([
+      '-metadata',
+      'LOOPSTART=123',
+      '-metadata',
+      'loopstart=123',
+      '-metadata',
+      'LOOPLENGTH=456',
+      '-metadata',
+      'looplength=456',
+    ]);
 
     await converterWorker({
       file: {

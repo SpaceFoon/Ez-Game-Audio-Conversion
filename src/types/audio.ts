@@ -19,6 +19,12 @@ export interface ConversionItem {
   outputFormat: AudioFormat;
 }
 
+export type ConversionAction = 'convert' | 'skip';
+
+export interface ConversionCandidate extends ConversionItem {
+  action: ConversionAction;
+}
+
 export interface ConversionResult {
   success: boolean;
   inputFile: string;

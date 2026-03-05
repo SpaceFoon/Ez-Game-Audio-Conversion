@@ -11,6 +11,7 @@ import {
   formatLoopData,
 } from './metadataService.js';
 import { platformSlug, getErrorMessage, findBinary } from './utils.js';
+import logger from './logger.js';
 import type { LoopDataMode } from './types/settings.js';
 
 type WorkerFileContext = {
@@ -106,7 +107,7 @@ const converterWorker = async ({
 
   // Output path too long check (Windows MAX_PATH limitation)
   if (outputFile.length > 250) {
-    console.warn(
+    logger.warn(
       `⚠️ Output path is very long (${outputFile.length} chars), might cause issues on Windows`
     );
   }
@@ -140,10 +141,10 @@ const converterWorker = async ({
   const sampleRateArgs = newSampleRate ? ['-ar', String(newSampleRate)] : [];
 
   // Format loop data for ffmpeg command
-  let loopData = '';
+  let loopDataArgs: string[] = [];
   if (loopDataMode === 'skip') {
     // User explicitly disabled loop point handling
-    loopData = '';
+    loopDataArgs = [];
   } else if (
     loopStart !== null &&
     loopLength !== null &&
@@ -154,12 +155,12 @@ const converterWorker = async ({
     // Skip loop points for unsupported formats (WAV and M4A)
     const fmt = outputFormat.toLowerCase();
     if (fmt === 'm4a' || fmt === 'wav') {
-      console.log(
+      logger.log(
         `Loop points are not supported for ${fmt.toUpperCase()} format`
       );
-      loopData = '';
+      loopDataArgs = [];
     } else {
-      loopData = formatLoopData(loopStart, loopLength);
+      loopDataArgs = formatLoopData(loopStart, loopLength);
     }
   }
 
@@ -167,12 +168,12 @@ const converterWorker = async ({
   const executableName = platformSlug === 'windows' ? 'ffmpeg.exe' : 'ffmpeg';
   const ffmpegPath = findBinary(executableName, [`ffmpeg-bin/${platformSlug}`]);
 
-  if (!ffmpegPath) {
+  if (ffmpegPath === null) {
     failWorker(
       `${executableName} not found. Place it in ffmpeg-bin/${platformSlug}/`
     );
-    return; // TypeScript needs this for null-narrowing despite failWorker(): never
   }
+  const resolvedFfmpegPath = ffmpegPath!;
 
   // Despite what you read online these are the best codecs. WAV and AIFF codecs were chosen for common game engine compatibility.
   // https://trac.ffmpeg.org/wiki/TheoraVorbisEncodingGuide
@@ -272,14 +273,16 @@ const converterWorker = async ({
   // Add basic options
   ffmpegArgs.push('-vn', '-y');
 
-  // Add metadata args
-  if (metaDataArgs && metaDataArgs.length) {
+  // Add metadata args only when metadata is being rebuilt.
+  // For preserveMetadata formats (AIFF), ffmpeg keeps source metadata;
+  // re-applying all tags can create duplicate/conflicting entries.
+  if (!preserveMetadata && metaDataArgs && metaDataArgs.length) {
     ffmpegArgs.push(...metaDataArgs);
   }
 
-  // Add loop data (numeric values only; safe to split)
-  if (loopData && loopData.trim()) {
-    ffmpegArgs.push(...loopData.trim().split(/\s+/));
+  // Add loop metadata args
+  if (loopDataArgs.length) {
+    ffmpegArgs.push(...loopDataArgs);
   }
 
   // Add channels args
@@ -306,7 +309,7 @@ const converterWorker = async ({
     }
   }
 
-  await runFFMPEG(ffmpegPath, ffmpegArgs, outputFile, inputFile);
+  await runFFMPEG(resolvedFfmpegPath, ffmpegArgs, outputFile, inputFile);
 };
 
 const runConversion = async (): Promise<void> => {
@@ -333,11 +336,6 @@ const runConversion = async (): Promise<void> => {
   // Validate output file
   if (!outputFile) {
     failWorker('Missing output file path');
-  }
-
-  // Check for "Skipped" tag that might cause issues
-  if (outputFile.includes('Skipped!')) {
-    failWorker(`Output file appears to be marked as skipped: ${outputFile}`);
   }
 
   // Validate output format

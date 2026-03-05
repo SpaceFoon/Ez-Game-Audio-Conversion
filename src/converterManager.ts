@@ -10,6 +10,7 @@ import { Worker } from 'worker_threads';
 import { performance } from 'perf_hooks';
 import { cpus } from 'os';
 import chalk from 'chalk';
+import logger from './logger.js';
 import {
   initializeFileNames,
   addToLog,
@@ -67,7 +68,7 @@ const convertFiles = async (
     cpuNumber = cpus().length;
   } catch {
     cpuNumber = 8;
-    console.warn(
+    logger.warn(
       '🚨🚨⛔ Could not detect amount of CPU cores!!! Setting to 8 ⛔🚨🚨'
     );
   }
@@ -87,8 +88,8 @@ const convertFiles = async (
       });
     }
   };
-  console.info('\n   Detected 🕵️‍♂️', cpuNumber, 'CPU Cores 🖥');
-  console.log('   Using', maxConcurrentWorkers, 'concurrent 🧵 threads');
+  logger.info('\n   Detected 🕵️‍♂️', cpuNumber, 'CPU Cores 🖥');
+  logger.log('   Using', maxConcurrentWorkers, 'concurrent 🧵 threads');
 
   const processFile = async (
     file: ConversionItem,
@@ -97,13 +98,44 @@ const convertFiles = async (
     tasksLeft: number
   ): Promise<void> => {
     const workerStartTime = performance.now();
-    console.log(
+    logger.log(
       chalk.cyanBright(
         `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left. Output file:\n   ${file.outputFile}📤`
       )
     );
 
     return new Promise((resolve) => {
+      let settled = false;
+      let errorLogged = false;
+      let fatalExitRequested = false;
+      let stderrOutput = '';
+
+      const resolveOnce = () => {
+        if (settled) return;
+        settled = true;
+        resolve();
+      };
+
+      const recordFailureWithLog = (
+        logData: string,
+        displayMessage: string
+      ) => {
+        if (errorLogged) return;
+        errorLogged = true;
+        addToLog(
+          {
+            type: 'error' as const,
+            data: logData,
+          },
+          file
+        );
+        logger.error(
+          chalk.red(`\n❌ Error: ${file.outputFile}\n   ${displayMessage}`)
+        );
+        recordFailure(file);
+        resolveOnce();
+      };
+
       try {
         const workerData = {
           file: {
@@ -131,18 +163,6 @@ const convertFiles = async (
           workerData,
         });
 
-        let settled = false;
-        const resolveOnce = () => {
-          if (settled) return;
-          settled = true;
-          resolve();
-        };
-
-        // Accumulate stderr for final error log
-        let stderrOutput = '';
-        let errorLogged = false;
-        let fatalExitRequested = false;
-
         worker.on('message', (message: unknown) => {
           if (!isRecord(message) || typeof message.type !== 'string') return;
           const typedMessage = message as WorkerManagerMessage;
@@ -151,7 +171,7 @@ const convertFiles = async (
           if (typedMessage.type === 'stderr') {
             const stderrMessage = String(typedMessage.data ?? '');
             stderrOutput += stderrMessage + ' ';
-            console.error(
+            logger.error(
               'FFmpeg stderr:',
               stderrMessage,
               file.inputFile,
@@ -162,14 +182,26 @@ const convertFiles = async (
             if (fatalKind && !fatalExitRequested) {
               fatalExitRequested = true;
               abortRequested = true;
-              files.length = 0;
+              errorLogged = true;
+
+              const fatalMessage =
+                fatalKind === 'disk-space'
+                  ? 'Fatal ffmpeg error: insufficient disk space.'
+                  : 'Fatal ffmpeg error: permission/access denied.';
+              addToLog(
+                {
+                  type: 'error' as const,
+                  data: `${fatalMessage} ${stderrOutput.trim()}`,
+                },
+                file
+              );
 
               if (fatalKind === 'disk-space') {
-                console.error(
+                logger.error(
                   '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
                 );
               } else {
-                console.error(
+                logger.error(
                   '\n 🚨⛔🚨 Stopping due to file permission/access error! 🚨🔐🚨'
                 );
               }
@@ -187,23 +219,8 @@ const convertFiles = async (
 
           // Handle error type messages - log immediately and mark as logged
           if (typedMessage.type === 'error') {
-            if (!errorLogged) {
-              errorLogged = true;
-              const errorMessage = {
-                type: 'error' as const,
-                data: String(typedMessage.data ?? ''),
-              };
-              addToLog(errorMessage, file);
-              // Show error with details
-              console.error(
-                chalk.red(
-                  `\n❌ Error: ${file.outputFile}\n   ${String(typedMessage.data ?? '')}`
-                )
-              );
-
-              recordFailure(file);
-              resolveOnce();
-            }
+            const workerErrorMessage = String(typedMessage.data ?? '');
+            recordFailureWithLog(workerErrorMessage, workerErrorMessage);
             return;
           }
 
@@ -225,7 +242,7 @@ const convertFiles = async (
                 inputFile: file.inputFile,
                 outputFile: file.outputFile,
               });
-              console.log(
+              logger.log(
                 chalk.greenBright(
                   `\n🛠️👷‍♂️ Worker`,
                   workerCounter,
@@ -238,23 +255,11 @@ const convertFiles = async (
               );
               resolveOnce();
               // File Failure code - only log if not already logged via error message
-            } else if (exitCode !== 0 && !errorLogged) {
-              errorLogged = true;
-              // Log the error once with accumulated stderr
-              const errorMessage = {
-                type: 'error' as const,
-                data: `ffmpeg exited with code ${exitCode}. ${stderrOutput.trim()}`,
-              };
-              addToLog(errorMessage, file);
-              // Show error with details
-              console.error(
-                chalk.red(
-                  `\n❌ Error: ${file.outputFile}\n   ffmpeg exit code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
-                )
+            } else if (exitCode !== 0) {
+              recordFailureWithLog(
+                `ffmpeg exited with code ${exitCode}. ${stderrOutput.trim()}`,
+                `ffmpeg exit code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
               );
-
-              recordFailure(file);
-              resolveOnce();
             }
           }
         });
@@ -263,16 +268,10 @@ const convertFiles = async (
           const message = `Worker had an error: ${String(
             error instanceof Error ? error.message : error
           )}`;
-          console.error(message, file.inputFile, file.outputFile);
-          addToLog(
-            {
-              type: 'error' as const,
-              data: message,
-            },
-            file
+          recordFailureWithLog(
+            message,
+            `${message}\n   Input: ${file.inputFile}\n   Output: ${file.outputFile}`
           );
-          recordFailure(file);
-          resolveOnce();
         });
 
         worker.on('exit', (exitCode: number) => {
@@ -292,26 +291,25 @@ const convertFiles = async (
             return;
           }
 
-          const exitMessage = `Worker exited with code ${exitCode}. ${stderrOutput.trim()}`;
-          addToLog(
-            {
-              type: 'error' as const,
-              data: exitMessage,
-            },
-            file
+          recordFailureWithLog(
+            `Worker exited with code ${exitCode}. ${stderrOutput.trim()}`,
+            `Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
           );
-          console.error(
-            chalk.red(
-              `\n ❌ Error: ${file.outputFile}\n   Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
-            )
-          );
-          recordFailure(file);
-          resolveOnce();
         });
       } catch (error) {
-        console.error('Error creating worker:', error);
+        const message = `Error creating worker: ${String(
+          error instanceof Error ? error.message : error
+        )}`;
+        logger.error(message);
+        addToLog(
+          {
+            type: 'error' as const,
+            data: message,
+          },
+          file
+        );
         recordFailure(file);
-        resolve();
+        resolveOnce();
       }
     });
   };
@@ -333,7 +331,7 @@ const convertFiles = async (
             if (workerCounter > maxConcurrentWorkers) workerCounter = 1;
             if (file) await processFile(file, workerCounter, task, tasksLeft);
           } catch (error) {
-            console.error(error);
+            logger.error(error);
           }
         }
       })()

@@ -166,8 +166,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // Backslashes should be escaped
-      expect(result.metaDataArgs).toContain('title=Path\\\\To\\\\File');
+      // With spawn args array (shell: false), backslashes are preserved as-is
+      expect(result.metaDataArgs).toContain('title=Path\\To\\File');
     });
 
     it('should escape double quotes', () => {
@@ -195,7 +195,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('title=Song \\"With\\" Quotes');
+      // With spawn args array (shell: false), quotes are preserved as-is
+      expect(result.metaDataArgs).toContain('title=Song "With" Quotes');
     });
 
     it('should convert Windows newlines to escaped \\n', () => {
@@ -223,7 +224,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('comment=Line 1\\nLine 2\\nLine 3');
+      // With spawn args array (shell: false), newlines are normalized to \n and preserved
+      expect(result.metaDataArgs).toContain('comment=Line 1\nLine 2\nLine 3');
     });
 
     it('should convert Unix newlines to escaped \\n', () => {
@@ -251,9 +253,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain(
-        'lyrics=Verse 1\\nChorus\\nVerse 2'
-      );
+      // With spawn args array (shell: false), newlines are preserved as-is
+      expect(result.metaDataArgs).toContain('lyrics=Verse 1\nChorus\nVerse 2');
     });
 
     it('should convert old Mac newlines (CR only) to escaped \\n', () => {
@@ -281,7 +282,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('comment=Old\\nMac\\nStyle');
+      // With spawn args array (shell: false), CR is normalized to LF
+      expect(result.metaDataArgs).toContain('comment=Old\nMac\nStyle');
     });
 
     it('should remove null bytes', () => {
@@ -337,9 +339,9 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // Should escape backslashes, quotes, and newlines
+      // With spawn args array (shell: false), chars are preserved; newlines normalized
       expect(result.metaDataArgs).toContain(
-        'comment=Path: C:\\\\Music\\\\\\"Best\\" Songs\\nLine 2'
+        'comment=Path: C:\\Music\\"Best" Songs\nLine 2'
       );
     });
   });
@@ -1021,53 +1023,103 @@ describe('convertLoopPoints - Real Output Tests', () => {
 });
 
 describe('formatLoopData - Real Output Tests', () => {
-  it('should format loop data for ffmpeg', () => {
+  it('should format loop data for ffmpeg as args array', () => {
     const result = formatLoopData(12345, 67890);
 
-    expect(result).toContain('-metadata LOOPSTART=12345');
-    expect(result).toContain('-metadata LOOPLENGTH=67890');
-    expect(result).toContain('-metadata loopstart=12345');
-    expect(result).toContain('-metadata looplength=67890');
+    expect(result).toEqual([
+      '-metadata',
+      'LOOPSTART=12345',
+      '-metadata',
+      'LOOPLENGTH=67890',
+      '-metadata',
+      'loopstart=12345',
+      '-metadata',
+      'looplength=67890',
+    ]);
   });
 
-  it('should return empty string for NaN loop start', () => {
+  it('should return empty array for NaN loop start', () => {
     const result = formatLoopData(NaN, 67890);
 
-    expect(result).toBe('');
+    expect(result).toEqual([]);
   });
 
-  it('should return empty string for NaN loop length', () => {
+  it('should return empty array for NaN loop length', () => {
     const result = formatLoopData(12345, NaN);
 
-    expect(result).toBe('');
+    expect(result).toEqual([]);
   });
 
-  it('should return empty string for both NaN', () => {
+  it('should return empty array for both NaN', () => {
     const result = formatLoopData(NaN, NaN);
 
-    expect(result).toBe('');
+    expect(result).toEqual([]);
   });
 
   it('should handle zero values (valid loop points)', () => {
     const result = formatLoopData(0, 100000);
 
-    expect(result).toContain('-metadata LOOPSTART=0');
-    expect(result).toContain('-metadata LOOPLENGTH=100000');
+    expect(result).toEqual([
+      '-metadata',
+      'LOOPSTART=0',
+      '-metadata',
+      'LOOPLENGTH=100000',
+      '-metadata',
+      'loopstart=0',
+      '-metadata',
+      'looplength=100000',
+    ]);
   });
 
-  it('should produce valid ffmpeg argument string', () => {
+  it('should produce valid ffmpeg argument array', () => {
     const result = formatLoopData(48000, 96000);
 
-    // Should be usable directly in ffmpeg command
-    // Format: " -metadata LOOPSTART=X -metadata LOOPLENGTH=Y -metadata loopstart=X -metadata looplength=Y"
-    expect(result).toMatch(
-      /^\s*-metadata LOOPSTART=\d+ -metadata LOOPLENGTH=\d+ -metadata loopstart=\d+ -metadata looplength=\d+$/
+    // Should be usable directly spread into ffmpeg args
+    expect(result).toEqual(
+      expect.arrayContaining(['-metadata', 'LOOPSTART=48000'])
     );
+    expect(result).toEqual(
+      expect.arrayContaining(['-metadata', 'LOOPLENGTH=96000'])
+    );
+    expect(result.length).toBe(8);
   });
 });
 
 // Additional preservation-focused scenarios requested post-review
 describe('formatMetaDataArgs - Preservation scenarios', () => {
+  it('should prefer non-replacement-character performer value when duplicates conflict', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'aiff',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '44100',
+          tags: {
+            Performer: '�B',
+          },
+        },
+      ],
+      format: {
+        filename: 'performer.aiff',
+        format_name: 'aiff',
+        duration: '180',
+        size: '1234',
+        bit_rate: '256000',
+        tags: {
+          PERFORMER: 'µB',
+        },
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('performer=µB');
+    expect(joined).not.toContain('performer=�B');
+  });
+
   it('should round-trip extra/unknown tags unchanged', () => {
     const metadata: AudioMetadata = {
       streams: [

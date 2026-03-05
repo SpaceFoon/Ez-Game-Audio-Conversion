@@ -1,4 +1,5 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { resolve } from 'path';
 
 // ESM mocks must be declared BEFORE dynamic imports
 jest.unstable_mockModule('fs', () => ({
@@ -52,8 +53,8 @@ describe('getUserInput', () => {
 
     const result = await getUserInput(settings);
 
-    expect(result.inputFilePath).toBe('/input/path');
-    expect(result.outputFilePath).toBe('/output/path');
+    expect(result.inputFilePath).toBe(resolve('/input/path'));
+    expect(result.outputFilePath).toBe(resolve('/output/path'));
     expect(result.inputFormats).toEqual(['mp3', 'wav']);
     expect(result.outputFormats).toEqual(['ogg']);
   });
