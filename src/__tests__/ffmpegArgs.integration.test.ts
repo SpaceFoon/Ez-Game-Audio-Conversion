@@ -208,7 +208,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
       expect(args).toContain('-c:a');
       expect(args).toContain('flac');
       expect(args).toContain('-compression_level');
-      expect(args).toContain('9');
+      expect(args).toContain('1');
     });
 
     it('should build correct args for AIFF conversion', async () => {

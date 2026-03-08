@@ -208,7 +208,7 @@ const converterWorker = async ({
       additionalOptions: ['-write_id3v2', '1'],
       preserveMetadata: true, // Flag to avoid using -map_metadata -1 for AIFF
     },
-    flac: { codec: 'flac', additionalOptions: ['-compression_level', '9'] }, //Minimal compression but 30% smaller than without.
+    flac: { codec: 'flac', additionalOptions: ['-compression_level', '1'] }, //Minimal compression but 30% smaller than without.
   };
 
   type FormatConfig = {

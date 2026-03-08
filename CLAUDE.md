@@ -235,7 +235,7 @@ Tests are located in `src/__tests__/`:
 
 All tests run sequentially (`--runInBand`) to prevent file system race conditions.
 
-**Test count:** 440+ tests across 26 test files.
+**Test count:** 468 tests across 26 test files.
 
 ## TypeScript Configuration
 
@@ -290,7 +290,7 @@ The project uses GitHub Actions to automatically build releases for all platform
 Runs on every push/PR to `dev` or `main`:
 - Linting and formatting
 - TypeScript compilation
-- Tests with coverage (440+ tests)
+- Tests with coverage (468 tests)
 - Build verification
 
 ### Creating a Release
