@@ -1,16 +1,15 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { EventEmitter } from 'events';
+import {
+  createFindBinaryMock,
+  joinWithSeparator,
+} from './test-utils/pathResolutionMocks.js';
 
 type PathStyle = 'posix' | 'win32';
 
 type SetupOptions = {
   pathStyle: PathStyle;
   isPackagedRuntime: boolean;
-};
-
-const makeJoin = (style: PathStyle) => {
-  const sep = style === 'win32' ? '\\' : '/';
-  return (...parts: string[]) => parts.join(sep);
 };
 
 async function setupAndImportConverterManager(options: SetupOptions) {
@@ -22,7 +21,8 @@ async function setupAndImportConverterManager(options: SetupOptions) {
   console.warn = jest.fn();
   console.error = jest.fn();
 
-  const join = makeJoin(options.pathStyle);
+  const sep = options.pathStyle === 'win32' ? '\\' : '/';
+  const join = joinWithSeparator(sep);
   const moduleDir = options.pathStyle === 'win32' ? 'C:\\MODDIR' : '/MODDIR';
   const cwdDir = options.pathStyle === 'win32' ? 'C:\\CWD' : '/CWD';
   const runtimeBaseDir =
@@ -78,18 +78,12 @@ async function setupAndImportConverterManager(options: SetupOptions) {
     getAnswer: jest.fn(async () => ''),
     runtimeBaseDir,
     isPackagedRuntime: options.isPackagedRuntime,
-    findBinary: (name: string, subdirs: string[] = []) => {
-      const roots = [runtimeBaseDir, cwdDir];
-      for (const root of roots) {
-        const direct = join(root, name);
-        if (existsSyncMock(direct)) return direct;
-        for (const sub of subdirs) {
-          const candidate = join(root, sub, name);
-          if (existsSyncMock(candidate)) return candidate;
-        }
-      }
-      return null;
-    },
+    findBinary: createFindBinaryMock({
+      sep,
+      runtimeBaseDir,
+      pathExists: (path: string) => existsSyncMock(path),
+      includeCwd: true,
+    }),
   }));
 
   const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(cwdDir);

@@ -1,4 +1,5 @@
 import { jest, describe, it, expect, afterEach } from '@jest/globals';
+import { createFindBinaryMock } from './test-utils/pathResolutionMocks.js';
 
 type Config = {
   sep: '/' | '\\';
@@ -40,30 +41,12 @@ jest.unstable_mockModule('../utils.js', () => ({
   get platformSlug() {
     return config.platformSlug;
   },
-  findBinary: (name: string, subdirs: string[] = []) => {
-    const sep = config.sep;
-    const roots = [config.runtimeBaseDir];
-    for (const root of roots) {
-      const direct = [root, name].join(sep);
-      if (config.exists.has(direct)) return direct;
-      for (const sub of subdirs) {
-        const candidate = [root, sub, name].join(sep);
-        if (config.exists.has(candidate)) return candidate;
-      }
-    }
-    try {
-      const cwd = process.cwd();
-      const direct = [cwd, name].join(sep);
-      if (config.exists.has(direct)) return direct;
-      for (const sub of subdirs) {
-        const candidate = [cwd, sub, name].join(sep);
-        if (config.exists.has(candidate)) return candidate;
-      }
-    } catch {
-      /* ignore */
-    }
-    return null;
-  },
+  findBinary: createFindBinaryMock({
+    sep: config.sep,
+    runtimeBaseDir: config.runtimeBaseDir,
+    pathExists: (path: string) => config.exists.has(path),
+    includeCwd: true,
+  }),
   addToLog: jest.fn(async () => true),
 }));
 
