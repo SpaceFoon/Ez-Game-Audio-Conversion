@@ -1,6 +1,6 @@
 <!-- # <span style="color:red">EZ Game Audio Conversion </span> -->
 
-![Title Image](media/title3.webp)
+![Title Image](media/Title.png)
 
 <p align="center">
   <img src="https://img.shields.io/github/downloads/SpaceFoon/Ez-Game-Audio-Conversion/total" alt="GitHub Downloads (all assets, all releases)">
@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/">
-    <img src="https://img.shields.io/badge/Download_for_Windows-0099FF?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows">
+    <img src="https://img.shields.io/badge/Download_Releases-181717?style=for-the-badge&logo=github&logoColor=white" alt="Download Releases">
   </a>
 </p>
 
@@ -19,48 +19,26 @@
 <p style="font-size: 16px; color: yellow; text-align: center;">Easiest, fastest and most reliable way to convert audio files available</p>
 
 
-
-<!--
 ## Introduction
 
-EZ-Game-Audio-Converter streamlines the process of batch audio conversion. Tailored specifically for game developers, this tool ensures great audio quality and small file sizes without the need for extensive knowledge. With almost no setup and multi-threaded conversion, it's the easiest, fastest and most reliable solution available. Plus, now with support for loop tags! -->
+EZ-Game-Audio-Converter is a fast batch audio converter built for game developers and anyone managing large audio libraries. It focuses on doing the job with minimal setup and minimal friction: point it at your files, choose an output format, and let it run without babysitting.
 
 ## Features
 
-- 💻 **User-Friendly Interface:** Designed with simplicity as the main goal, eliminating any learning curve.
-- 🔄 **Unattended Batch Jobs:** With recursive file searching and unattended conflict resolution, set it and forget it.
-- 🚀 **Multi-threading:** No job too big or small when all your CPU cores are fully utilized.
-- 🎵 **Automatic Bitrate and Codec Selection:** Automatically selects the best codec and Variable Bitrate (VBR) at 160kbs(mp3) or near equivalent. Balanced between great sound quality and small file size.
-- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A AAC formats. WMA to come.
-- 🔒 **Privacy and Reliability:** Operates offline, ensuring data privacy and reliability.
-- 🎶 **High-Quality Output:** Employs FFMPEG for superior sound quality, codec support, and speed.
-- 🤖 **Intelligent File Handling:** Automatically resolves duplicate file names with different file extensions. Selects the best input file format.
-- 📝 **Meta Data Support:** All meta data, including iTunes data and Apple music will be transferred to the new file. Will transfer all basic meta data to and from all formats that support it.
-- 🔁 **Loop Tag Support:** All loop meta data will be transferred to new OGG or FLAC files. When changing sample rate, loop timings will be adjusted automatically. Cannot write loop tags TO M4A, only FROM.
-- 🎼 **Opus AND Vorbis Support for Ogg:** Use Opus when you can and Vorbis for compatibility.
+- 💻 **User-Friendly Interface:** Designed with simplicity as the main goal.
+- 🔄 **Unattended Batch Jobs:** Recursively scans folders and handles filename conflicts automatically with overwrite, rename, or skip behavior.
+- 🚀 **Multi-threading:** Uses up to all available CPU cores.
+- 🎵 **Automatic Bitrate and Codec Selection:** Chooses the output codec and a sensible variable bit rate target automatically, aiming for a strong balance between sound quality and file size.
+- 🤖 **Smart File Handling:** Prevents the same output filename from being queued more than once.
+- 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A AAC.
+- 📝 **Metadata Support:** Preserves standard tags automatically, including title, artist, album, track and disc data, ReplayGain, many iTunes and podcast fields, and other safe metadata when supported by the target format.
+- 🔁 **Loop Tag Support:** Reads loop points from supported input files and writes them to OGG, FLAC, MP3, and AIFF outputs. If the sample rate changes during conversion, loop timings are adjusted automatically. Loop points can be read from M4A and WAV, but cannot be written to those formats.
+- 🎼 **Opus and Vorbis Support for OGG:** Supports both Ogg Opus for efficiency and Ogg Vorbis for compatibility.
+- 🔒 **Fully Local Processing:** Runs entirely on your machine with no cloud uploads, no telemetry, no tracking, and no internet requirement.
+- 🎶 **High-Quality Output:** Uses FFmpeg for conversion quality, codec support, and speed.
 
-## Installation
 
-1. **Download** [Latest Release](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases)
-2. **Extract** Folder "EZ-Game-Audio-Converter"
-3. **Run** File "EZ-Game-Audio.exe"
 
-## Checksums (SHA-256)
-
-Release archives include a matching `.sha256` file for integrity verification. You can verify the download before running it.
-
-**Windows (PowerShell):**
-Get-FileHash .\EZ-Game-Audio-Conversion.zip -Algorithm SHA256
-
-**macOS/Linux:**
-shasum -a 256 EZ-Game-Audio-Conversion.zip
-
-Compare the output hash to the contents of the `.sha256` file.
-
-## Prerequisites
-
-- Windows PC
-- Not required: Windows Terminal from the Windows Store for enhanced visual experience (emoji support 😎 ).
 
 ## Usage
 
@@ -68,7 +46,7 @@ Compare the output hash to the contents of the `.sha256` file.
 
 2. **File Selection:** The application will search for matching files based on the provided criteria and display the list of input files to be converted.
 
-3. **Duplicate Handling:** Duplicate file names with different extensions will be automatically resolved, retaining the best or lossless format.
+3. **Duplicate Handling:** If multiple inputs would produce the same output path, only one output file is queued. Existing output-file conflicts are handled by the overwrite, rename, or skip options below.
 
 4. **Conflict Resolution:** Resolve conflicts for conflicting output files:
 
@@ -79,7 +57,7 @@ Compare the output hash to the contents of the `.sha256` file.
 
 5. **Confirmation:** Review the list of files to be converted and confirm by typing "yes" or "no" when prompted.
 
-6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, logs.csv will be available at the specified file path. Any errors will be logged separately to errors.csv. Some files may produce errors but still convert correctly.
+6. **Conversion:** Monitor progress and any errors during the conversion process. Upon completion, `logs.csv` will be available at the specified output path. Any errors will be logged separately to `error.csv`. Some files may produce errors but still convert correctly.
 
 ## Source
 
@@ -87,19 +65,21 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 
 1. Clone the repository or download.
 
-2. In the project folder, run `npm i` then `npm run build` to build the executable.
-   OR
-3. Run `npm i` then `npm run start` to run from your terminal.
+2. Install dependencies with `npm install`.
 
-4. Remember to have `ffmpeg.exe` and `ffprobe.exe` located alongside wherever you run the application from.
-   [FFMPEG Essentials Build Download](https://www.gyan.dev/ffmpeg/builds/#release-builds)
+3. Choose the workflow you want:
+   - `npm run dev` builds TypeScript and runs the app from `dist/`
+   - `npm run build` compiles TypeScript to `dist/`
+   - `npm run build:sea` builds the single executable application
+   - `npm run package` builds the SEA release package, docs, checksums, and archives
 
-To change things like bitrate and codec, look in `converterWorker.js`.
+4. Download FFmpeg and FFprobe for your platform and place them in `ffmpeg-bin/windows/`, `ffmpeg-bin/linux/`, or `ffmpeg-bin/macos/` before building packages.
+   See [ffmpeg-bin/README.md](ffmpeg-bin/README.md) for download links and setup instructions.
+
+To change codec or bitrate defaults, look in `src/converterWorker.ts`.
 
 [On Github](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
 
-<!-- TODO
-add other links -->
 
 ### Additional Notes
 
@@ -110,6 +90,7 @@ add other links -->
   - **Read**: Can read loop points from any format (WAV, MP3, OGG, FLAC, AIFF, M4A)
   - **Write**: Can only write loop points to certain formats (OGG, FLAC, MP3, AIFF)
   - **Recommended**: For best loop point compatibility, use OGG or FLAC formats
+- FLAC is minimaly compressed. Saves a lot of space while still being nearly lossless.
 
 ### Loop Point Support in This App
 
@@ -198,10 +179,6 @@ Source: [Ren'Py Documentation](https://www.renpy.org/doc/html/audio.html)
 [Itch.io](https://spacefoon.itch.io/ez-game-audio-format-conversion)
 [Source on GitHub](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion)
 [RPG Maker Forums](https://forums.rpgmakerweb.com/index.php?threads/v1-3-tool-ez-batch-game-audio-converter-for-windows.163150/)
-[GameJolt](https://gamejolt.com/@Fooney)
-[](https://ko-fi.com/fooney58825)
-[](https://app.gumroad.com/dashboard)
-[](https://www.gamedev.net/fooney/)
 [Download mirror: ascensiongamedev.com](https://www.ascensiongamedev.com/files/file/183-ez-game-audio-conversion/)
 
 ## License
@@ -215,7 +192,39 @@ If you would like to use this software for commercial purposes, please contact m
 - [Icon Source](https://icon-icons.com/icon/audio-x-generic/36263)
 - [Guy on forum who helped me a lot](https://forums.rpgmakerweb.com/index.php?members/att_turan.41930/)
 
-## Development
+
+
+## Installation
+
+1. **Download** [Latest Release](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases)
+2. **Choose** the archive for your platform:
+  - Windows: `EZ-Game-Audio-Windows.zip` or `.7z`
+  - Linux: `EZ-Game-Audio-Linux.zip` (You build)
+  - macOS: `EZ-Game-Audio-macOS.zip` (You build)
+3. **Extract** the archive
+4. **Run** the packaged executable:
+  - Windows: `EZ-Game-Audio.exe`
+  - Linux/macOS: `EZ-Game-Audio`
+
+## Checksums (SHA-256)
+
+Release archives include a matching `.sha256` file for integrity verification. You can verify the download before running it.
+Replace `<archive-name>.zip` with the actual archive you downloaded.
+
+**Windows (PowerShell):**
+Get-FileHash .\<archive-name>.zip -Algorithm SHA256
+
+**macOS/Linux:**
+shasum -a 256 <archive-name>.zip
+
+Compare the output hash to the contents of the `.sha256` file.
+
+## Prerequisites
+
+- Building from source: Windows, Linux, and macOS are supported
+- Node.js 24
+- FFmpeg and FFprobe binaries for target OS at `ffmpeg-bin/<platform>/`
+- Optional on Windows: Windows Terminal from the Windows Store for enhanced visual experience (emoji support 😎 ).
 
 ### Testing
 
