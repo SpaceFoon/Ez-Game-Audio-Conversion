@@ -64,6 +64,7 @@ jest.unstable_mockModule('../utils.js', () => ({
     }
     return null;
   },
+  addToLog: jest.fn(async () => true),
 }));
 
 const importSubject = async () => {

@@ -3,7 +3,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { join, dirname, basename, extname } from 'path';
 
 // Simplified version of deleteDuplicateFiles for test purposes only
-const handleDuplicateFiles = (files) => {
+const handleDuplicateFiles = (files: string[]) => {
   const priorityList = [
     '.midi',
     '.mid',
@@ -14,13 +14,13 @@ const handleDuplicateFiles = (files) => {
     '.flac',
     '.aiff',
   ];
-  const fileobjs = files.map((file) => [
+  const fileobjs = files.map((file: string) => [
     join(dirname(file), basename(file, extname(file))),
     extname(file),
   ]);
 
-  const uniq = new Map();
-  const droppedFiles = [];
+  const uniq = new Map<string, string>();
+  const droppedFiles: string[] = [];
 
   for (const [name, ext] of fileobjs) {
     if (!uniq.has(name)) {
@@ -29,7 +29,7 @@ const handleDuplicateFiles = (files) => {
     }
 
     const current = uniq.get(name);
-    if (priorityList.indexOf(ext) > priorityList.indexOf(current)) {
+    if (priorityList.indexOf(ext) > priorityList.indexOf(current!)) {
       droppedFiles.push(`${name}${current}`);
       uniq.set(name, ext);
     } else {
@@ -37,7 +37,7 @@ const handleDuplicateFiles = (files) => {
     }
   }
 
-  const uniqueFiles = Array.from(uniq.entries()).reduce(
+  const uniqueFiles = Array.from(uniq.entries()).reduce<string[]>(
     (p, c) => [...p, `${c[0]}${c[1]}`],
     []
   );

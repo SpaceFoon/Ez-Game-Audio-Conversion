@@ -8,7 +8,7 @@
  */
 
 import { execSync } from 'child_process';
-import { copyFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
 import { platform } from 'os';
 
@@ -20,6 +20,30 @@ const SEA_CONFIG_PATH = 'sea-config.json';
 const SEA_BLOB_PATH = join(RELEASE_DIR, 'sea-prep.blob');
 const OUTPUT_EXE = join(RELEASE_DIR, isWindows ? `${APP_NAME}.exe` : APP_NAME);
 
+function tryApplyWindowsIcon() {
+  if (!isWindows) return;
+  if (process.env.POST_SEA_SKIP_ICON === '1') {
+    console.log('[SEA] Skipping icon injection (POST_SEA_SKIP_ICON=1)');
+    return;
+  }
+
+  const iconScript = join('src', 'ico', 'icon.js');
+  if (!existsSync(iconScript)) {
+    console.warn('[SEA] Icon script not found; skipping icon injection');
+    return;
+  }
+
+  console.log('[SEA] Applying Windows icon + version metadata...');
+  try {
+    execSync(`node "${iconScript}" "${OUTPUT_EXE}"`, { stdio: 'inherit' });
+  } catch (error) {
+    console.warn(
+      '[SEA] Warning: icon injection failed (continuing):',
+      error.message
+    );
+  }
+}
+
 console.log('[SEA] Building Single Executable Application...\n');
 
 // Step 1: Ensure release directory exists
@@ -29,10 +53,18 @@ mkdirSync(RELEASE_DIR, { recursive: true });
 // Step 1.5: Bundle ESM to CJS for SEA compatibility
 // The code handles import.meta being empty by falling back to CJS __filename
 // Exclude cfonts entirely - it uses dynamic require for fonts that can't work in SEA
+console.log('[SEA] Injecting banner snapshot...');
+try {
+  execSync('node scripts/gen-banner.js', { stdio: 'inherit' });
+} catch (error) {
+  console.error('[SEA] Failed to generate banner snapshot:', error.message);
+  process.exit(1);
+}
+
 console.log('[SEA] Bundling application with esbuild...');
 try {
   execSync(
-    `npx esbuild dist/app.js --bundle --platform=node --format=cjs --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --log-override:empty-import-meta=silent`,
+    `npx esbuild dist/app.js --bundle --platform=node --format=cjs --minify --tree-shaking=true --legal-comments=none --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --define:__SEA_BUILD__=true --log-override:empty-import-meta=silent`,
     {
       stdio: 'inherit',
     }
@@ -61,7 +93,7 @@ const WORKER_BUNDLE = join(RELEASE_DIR, 'dist', 'converterWorker.cjs');
 mkdirSync(join(RELEASE_DIR, 'dist'), { recursive: true });
 try {
   execSync(
-    `npx esbuild dist/converterWorker.js --bundle --platform=node --format=cjs --outfile=${WORKER_BUNDLE} --log-override:empty-import-meta=silent`,
+    `npx esbuild dist/converterWorker.js --bundle --platform=node --format=cjs --minify --tree-shaking=true --legal-comments=none --outfile=${WORKER_BUNDLE} --log-override:empty-import-meta=silent`,
     {
       stdio: 'inherit',
     }
@@ -85,7 +117,12 @@ try {
 // Step 4: Copy Node.js executable
 console.log('[SEA] Copying Node.js executable...');
 try {
-  copyFileSync(process.execPath, OUTPUT_EXE);
+  // Use system copy command instead of Node API to avoid file lock issues
+  // when npm itself holds the Node.exe lock during package builds
+  const copyCmd = isWindows
+    ? `cmd /c copy /Y "${process.execPath}" "${OUTPUT_EXE}"`
+    : `cp "${process.execPath}" "${OUTPUT_EXE}"`;
+  execSync(copyCmd, { stdio: 'inherit' });
 } catch (error) {
   console.error('[SEA] Failed to copy Node.js executable:', error.message);
   process.exit(1);
@@ -115,6 +152,9 @@ try {
   );
   process.exit(1);
 }
+
+// Step 5.5: Inject custom icon/version info (best-effort)
+tryApplyWindowsIcon();
 
 // Step 6: Cleanup temporary files
 console.log('[SEA] Cleaning up temporary files...');

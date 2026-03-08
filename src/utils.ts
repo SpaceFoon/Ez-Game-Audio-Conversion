@@ -44,10 +44,11 @@ const moduleDirname = (() => {
   return process.cwd();
 })();
 
-const seaFuseKey = Object.keys(process.env).find((key) =>
-  key.startsWith('NODE_SEA_FUSE_')
-);
-export const isSeaRuntime = Boolean(seaFuseKey);
+// Replaced at compile time by esbuild --define in build-sea.js.
+// In dev (unbundled ESM) the global doesn't exist, so falls back to false.
+declare const __SEA_BUILD__: boolean | undefined;
+export const isSeaRuntime =
+  typeof __SEA_BUILD__ !== 'undefined' && __SEA_BUILD__;
 export const isPackagedRuntime =
   isSeaRuntime ||
   Boolean((process as NodeJS.Process & { pkg?: unknown }).pkg) ||

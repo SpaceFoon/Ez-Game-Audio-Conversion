@@ -47,8 +47,8 @@ npm run clean            # Remove dist/ and release/ folders
 
 **Icon/Metadata (Optional):**
 - Icon exists at `media/ico/icon.ico`
-- Manual icon application script at `src/ico/icon.js` (Windows only, requires `resedit` package)
-- Not currently integrated into automated build process
+- Icon + version metadata is applied automatically for Windows builds during `npm run package` via `src/ico/icon.js` (uses `resedit`)
+- To skip icon injection: set `POST_SEA_SKIP_ICON=1`
 
 ### Testing
 

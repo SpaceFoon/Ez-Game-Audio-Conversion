@@ -195,6 +195,34 @@ function ensureFile(filePath, message) {
   }
 }
 
+function tryApplyWindowsIcon({ exePath }) {
+  // Best-effort: icon injection should never fail a release build.
+  if (!isTargetWindows) return;
+  if (process.env.POST_SEA_SKIP_ICON === '1') {
+    console.log('[post-sea] Skipping icon injection (POST_SEA_SKIP_ICON=1)');
+    return;
+  }
+
+  const iconScript = join(rootDir, 'src', 'ico', 'icon.js');
+  if (!existsSync(iconScript)) {
+    console.warn('[post-sea] Icon script missing; skipping:', iconScript);
+    return;
+  }
+
+  console.log('[post-sea] Applying Windows icon + version info...');
+  try {
+    execSync(`node "${iconScript}" "${exePath}"`, {
+      cwd: rootDir,
+      stdio: 'inherit',
+    });
+  } catch (error) {
+    console.warn(
+      '[post-sea] Icon injection failed (continuing):',
+      error instanceof Error ? error.message : String(error)
+    );
+  }
+}
+
 function cleanupIntermediateArtifacts() {
   console.log('[post-sea] Cleaning up intermediate files...');
   // Remove staging/temp artifacts.
@@ -329,6 +357,9 @@ const manifestArtifactPaths = [];
 let releaseReady = false;
 
 try {
+  // Apply Windows icon/version metadata before copying into stage.
+  tryApplyWindowsIcon({ exePath: builtExePath });
+
   // Stage directory structure
   console.log('[post-sea] Staging files...');
   emptyDir(stageDir);
@@ -426,9 +457,33 @@ try {
   }
 
   // Ensure README assets are available for both ZIP and PDF rendering.
+  // Only copy the media files that README.md actually references — not the entire media/ folder.
   const repoMediaDir = join(rootDir, 'media');
   if (existsSync(repoMediaDir)) {
-    copyDir(repoMediaDir, join(readmesDir, 'media'));
+    const readmeSrc = join(rootDir, 'README.md');
+    const referencedMediaFiles = [];
+    if (existsSync(readmeSrc)) {
+      const readmeText = readFileSync(readmeSrc, 'utf8');
+      // Match Markdown image/link syntax and HTML src/href attributes pointing into media/
+      const mdRe = /\]\((media\/[^)\s"]+)\)/g;
+      const htmlRe = /(?:src|href)="(media\/[^"]+)"/g;
+      for (const re of [mdRe, htmlRe]) {
+        let m;
+        while ((m = re.exec(readmeText)) !== null) {
+          referencedMediaFiles.push(m[1]);
+        }
+      }
+    }
+    for (const relPath of [...new Set(referencedMediaFiles)]) {
+      const srcFile = join(rootDir, relPath);
+      if (!existsSync(srcFile)) {
+        console.warn(`[post-sea] Referenced media file not found: ${srcFile}`);
+        continue;
+      }
+      const destFile = join(readmesDir, relPath);
+      mkdirSync(dirname(destFile), { recursive: true });
+      copyFileSync(srcFile, destFile);
+    }
   }
 
   // Copy existing docs/readmes if present
@@ -440,10 +495,11 @@ try {
     for (const entry of entries) {
       if (!entry.isFile()) continue;
       if (/^README\.(html|pdf)$/i.test(entry.name)) continue;
-      copyFileSync(
-        join(legacyDocsDir, entry.name),
-        join(readmesDir, entry.name)
-      );
+      // Place How-to-start.txt at the archive root for easy first-run discovery.
+      const dest = /^how-to-start\.txt$/i.test(entry.name)
+        ? join(stageDir, entry.name)
+        : join(readmesDir, entry.name);
+      copyFileSync(join(legacyDocsDir, entry.name), dest);
     }
   }
 

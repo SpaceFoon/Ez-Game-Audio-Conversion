@@ -85,6 +85,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
   findBinary: () => '/app/ffmpeg.exe',
+  addToLog: jest.fn(),
 }));
 
 // Import converterWorker (metadataService is NOT mocked - uses real functions)

@@ -26,6 +26,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   platformSlug: 'windows',
   findBinary: () => '/mock/base/ffprobe.exe',
+  addToLog: jest.fn(async () => true),
 }));
 
 jest.unstable_mockModule('child_process', () => ({
@@ -36,6 +37,7 @@ jest.unstable_mockModule('child_process', () => ({
 // Dynamic imports after mock declarations
 const { existsSync } = await import('fs');
 const { spawnSync: _spawnSync } = await import('child_process');
+const { addToLog: _addToLog } = await import('../utils.js');
 const {
   getMetaData,
   getLoopPoints,
@@ -48,6 +50,7 @@ const existsSyncMock = existsSync as unknown as jest.MockedFunction<
   typeof existsSync
 >;
 const spawnSyncMock = _spawnSync as unknown as jest.Mock;
+const addToLogMock = _addToLog as unknown as jest.Mock;
 const asMeta = (value: unknown): AudioMetadata => value as AudioMetadata;
 
 describe('metadataService', () => {
@@ -409,6 +412,13 @@ describe('metadataService', () => {
       expect(result.metaDataArgs).toContain('performer=AB');
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining('Replacement character found in metadata tag')
+      );
+      expect(addToLogMock).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'error' }),
+        expect.objectContaining({
+          inputFile: 'test.aiff',
+          outputFile: '[metadata-cleanup]',
+        })
       );
     });
 

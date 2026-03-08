@@ -11,10 +11,14 @@ import { settings, isSeaRuntime } from './utils.js';
 import finalize from './finalize.js';
 import ExitProgramError from './exitProgramError.js';
 import logger from './logger.js';
+import { renderSeaBanner } from './banner.js';
 // Ensure global type augmentation is loaded for ts-node/tsc
 import './types/global.js';
 
-config();
+// Skip dotenv in SEA — there is no .env file and v17 prints noisy banners.
+if (!isSeaRuntime) {
+  config();
+}
 
 const initializeGlobalEnv = (): void => {
   if (typeof globalThis.env === 'undefined') {
@@ -52,22 +56,22 @@ const setTerminalTitle = (): void => {
   process.stdout.write('\x1b]2;EZ Game Audio\x1b\x5c');
 };
 
+const resizeTerminal = (): void => {
+  // Only resize when launched as a standalone exe — dev terminal is already sized.
+  if (!isSeaRuntime) return;
+  // xterm-compatible resize escape: rows=40, cols=120
+  process.stdout.write('\x1b[8;40;120t');
+};
+
 const renderBanner = async (): Promise<void> => {
-  // cfonts uses dynamic require for fonts which fails in SEA bundles
   if (isSeaRuntime) {
-    // Fallback banner for SEA runtime where cfonts fonts aren't available
-    logger.log(chalk.green.bold('\n  ╔═══════════════════════════════╗'));
-    logger.log(
-      chalk.green.bold('  ║') +
-        chalk.yellow.bold('     EZ Game Audio Converter    ') +
-        chalk.green.bold('║')
-    );
-    logger.log(chalk.green.bold('  ╚═══════════════════════════════╝\n'));
+    // cfonts uses dynamic require for font JSON files which can't resolve
+    // inside a SEA bundle. Use pre-rendered banner art with chalk gradient.
+    logger.log(renderSeaBanner());
     return;
   }
 
   try {
-    // Dynamic import to avoid loading cfonts in SEA (it errors even at import time)
     const cfonts = await import('cfonts');
     cfonts.default.say('|||EZ Game|Audio', {
       font: 'huge',
@@ -99,6 +103,7 @@ async function runApp(): Promise<void> {
   // Worker is loaded dynamically by converterManager when needed
   logRuntimeMode();
   setTerminalTitle();
+  resizeTerminal();
 
   await renderBanner();
 

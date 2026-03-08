@@ -64,8 +64,10 @@
     "markdown-to-html-cli": "^5.0.3",
     "md-to-pdf": "^5.2.4",
     "nodemon": "^3.1.10",
+    "pe-library": "^2.0.1",
     "postject": "^1.0.0-alpha.6",
     "prettier": "^3.6.2",
+    "resedit": "^3.0.2",
     "rimraf": "^6.0.1",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
@@ -87,15 +89,32 @@
       "<rootDir>/build/",
       "<rootDir>/release/"
     ],
-    "extensionsToTreatAsEsm": [".ts"],
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "transform": {
-      "^.+\\.ts$": ["ts-jest", { "useESM": true }]
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
     },
-    "moduleFileExtensions": ["ts", "js", "cjs", "jsx", "json", "node"],
-    "testMatch": ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.js"],
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "cjs",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.js"
+    ],
     "verbose": false,
     "forceExit": true,
     "testTimeout": 30000

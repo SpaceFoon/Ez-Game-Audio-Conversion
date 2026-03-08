@@ -2,7 +2,7 @@
 import type { AudioMetadata } from './types/metadata.js';
 
 import { spawnSync } from 'child_process';
-import { platformSlug, findBinary } from './utils.js';
+import { platformSlug, findBinary, addToLog } from './utils.js';
 import logger from './logger.js';
 
 const CANONICAL_FIELDS = [
@@ -212,6 +212,22 @@ const parseNumberAndTotal = (
 
 const replacementCharPattern = /\uFFFD/g;
 
+const logMetadataCleanupWarning = (
+  message: string,
+  inputFile?: string
+): void => {
+  logger.error(message);
+  void addToLog(
+    { type: 'error', data: message },
+    inputFile ? { inputFile, outputFile: '[metadata-cleanup]' } : undefined
+  ).catch((error: unknown) => {
+    logger.error(
+      'Failed to write metadata cleanup warning to CSV logs:',
+      error instanceof Error ? error.message : String(error)
+    );
+  });
+};
+
 const replacementCharCount = (value: string): number =>
   (value.match(replacementCharPattern) || []).length;
 
@@ -376,12 +392,14 @@ export const formatMetaDataArgs = (
     const rawString = String(raw);
     const clean = sanitizeMetaValueForArgs(rawString);
     if (rawString.includes('\uFFFD')) {
-      logger.error(
-        `Replacement character found in metadata tag "${field}"${inputFile ? ` for ${inputFile}` : ''}. Removed invalid character.`
+      logMetadataCleanupWarning(
+        `Replacement character found in metadata tag "${field}"${inputFile ? ` for ${inputFile}` : ''}. Removed invalid character.`,
+        inputFile
       );
       if (!clean && clean !== '0') {
-        logger.error(
-          `Metadata tag "${field}" became empty after replacement-character cleanup and was skipped.`
+        logMetadataCleanupWarning(
+          `Metadata tag "${field}" became empty after replacement-character cleanup and was skipped.`,
+          inputFile
         );
       }
     }
@@ -394,12 +412,14 @@ export const formatMetaDataArgs = (
     const rawString = String(value);
     const clean = sanitizeMetaValueForArgs(rawString);
     if (rawString.includes('\uFFFD')) {
-      logger.error(
-        `Replacement character found in metadata tag "${key}"${inputFile ? ` for ${inputFile}` : ''}. Removed invalid character.`
+      logMetadataCleanupWarning(
+        `Replacement character found in metadata tag "${key}"${inputFile ? ` for ${inputFile}` : ''}. Removed invalid character.`,
+        inputFile
       );
       if (!clean && clean !== '0') {
-        logger.error(
-          `Metadata tag "${key}" became empty after replacement-character cleanup and was skipped.`
+        logMetadataCleanupWarning(
+          `Metadata tag "${key}" became empty after replacement-character cleanup and was skipped.`,
+          inputFile
         );
       }
     }
@@ -479,10 +499,10 @@ export const convertLoopPoints = (
   const sampleRate = metaData.streams[0].sample_rate;
   const { loopStart, loopLength } = getLoopPoints(metaData);
 
-  const sampleRateNumber = sampleRate
+  const inputSampleRate = sampleRate
     ? Number.parseInt(String(sampleRate), 10)
     : NaN;
-  if (!Number.isFinite(sampleRateNumber) || sampleRateNumber <= 0) {
+  if (!Number.isFinite(inputSampleRate) || inputSampleRate <= 0) {
     return {
       newSampleRate: null,
       loopStart,
@@ -490,13 +510,8 @@ export const convertLoopPoints = (
     };
   }
 
-  // If not converting to opus or no valid loop points, return original values
-  if (
-    outputFormat !== 'ogg' ||
-    oggCodec !== 'opus' ||
-    isNaN(loopStart) ||
-    isNaN(loopLength)
-  ) {
+  // If no valid loop points, return early
+  if (isNaN(loopStart) || isNaN(loopLength)) {
     return {
       newSampleRate: null,
       loopStart,
@@ -504,28 +519,39 @@ export const convertLoopPoints = (
     };
   }
 
-  // Convert sample rate for opus
-  let newSampleRate = null;
+  // Determine output sample rate based on format requirements
+  let outputSampleRate = inputSampleRate; // Default: preserve input rate
+  let isOpusConversion = false;
 
-  if (sampleRateNumber >= 32000) {
-    newSampleRate = 48000;
-  } else if (sampleRateNumber > 16000) {
-    newSampleRate = 24000;
-  } else if (sampleRateNumber > 12000) {
-    newSampleRate = 16000;
-  } else if (sampleRateNumber > 8000) {
-    newSampleRate = 12000;
-  } else if (sampleRateNumber <= 8000) {
-    newSampleRate = 8000;
+  // Opus requires specific sample rates, so we must convert
+  if (outputFormat === 'ogg' && oggCodec === 'opus') {
+    isOpusConversion = true;
+    if (inputSampleRate >= 32000) {
+      outputSampleRate = 48000;
+    } else if (inputSampleRate > 16000) {
+      outputSampleRate = 24000;
+    } else if (inputSampleRate > 12000) {
+      outputSampleRate = 16000;
+    } else if (inputSampleRate > 8000) {
+      outputSampleRate = 12000;
+    } else {
+      outputSampleRate = 8000;
+    }
   }
+  // Other formats: add explicit sample rate handling here if needed in future
 
-  // Convert loop points based on sample rate change
-  const ratio = (newSampleRate || sampleRateNumber) / sampleRateNumber;
+  // Calculate ratio and adjust loop points if sample rate differs
+  const ratio = outputSampleRate / inputSampleRate;
   const convertedLoopStart = Math.round(loopStart * ratio);
   const convertedLoopLength = Math.round(loopLength * ratio);
 
+  // For Opus, always return the sample rate (ffmpeg needs explicit -ar flag)
+  // For other formats, only return it if it actually changed
+  const shouldReturnSampleRate =
+    isOpusConversion || outputSampleRate !== inputSampleRate;
+
   return {
-    newSampleRate,
+    newSampleRate: shouldReturnSampleRate ? outputSampleRate : null,
     loopStart: convertedLoopStart,
     loopLength: convertedLoopLength,
   };

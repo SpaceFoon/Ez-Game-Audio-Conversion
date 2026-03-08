@@ -22,7 +22,16 @@
       "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/selfOverwrite.test.ts --runInBand --verbose 2>&1 | grep -E '\\(✓|✕|PASS|FAIL|Tests:|✓|×|√|●|RUNS|✗|passed|failed|  \\)')",
       "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/selfOverwrite.test.ts --runInBand --verbose 2>&1 | grep -E '\\(PASS|FAIL|Tests:|✓|✕|✗|×|√\\)' | tail -5)",
       "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand 2>&1 | grep -E '\\(FAIL |● \\)' | head -20)",
-      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/metadataFormatting.integration.test.ts src/__tests__/converterWorker.paths.test.ts --runInBand 2>&1 | grep -B1 -A5 '●.*should escape\\\\|●.*uses runtime\\\\|●.*throws' | head -40)"
+      "Bash(node --experimental-vm-modules node_modules/jest/bin/jest.js src/__tests__/metadataFormatting.integration.test.ts src/__tests__/converterWorker.paths.test.ts --runInBand 2>&1 | grep -B1 -A5 '●.*should escape\\\\|●.*uses runtime\\\\|●.*throws' | head -40)",
+      "Bash(node -e \"const {version} = require\\('dotenv/package.json'\\); console.log\\(version\\)\" 2>/dev/null || grep '\"dotenv\"' package.json)",
+      "Bash(node -e \"const dotenv = require\\('dotenv'\\); console.log\\(Object.keys\\(dotenv\\)\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\({ quiet: true }\\)\" 2>&1)",
+      "Bash(node -e \"const dotenv = require\\('dotenv'\\); const r = dotenv.config.__proto__; console.log\\(dotenv.config.toString\\(\\).slice\\(0, 500\\)\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).configDotenv\\(\\)\" 2>&1)",
+      "Bash(DOTENV_LOG_LEVEL=error node -e \"require\\('dotenv'\\).config\\(\\)\" 2>&1)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\({ debug: false, silent: true, logLevel: 'error' }\\)\" 2>&1)",
+      "Bash(npm run build 2>&1 | tail -5)",
+      "Bash(wc -l /mnt/c/Users/Darren/Ez-Game-Audio-Conversion/node_modules/cfonts/fonts/*.json)"
     ],
     "deny": [],
     "ask": []

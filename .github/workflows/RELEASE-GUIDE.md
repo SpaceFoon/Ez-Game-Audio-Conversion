@@ -67,6 +67,8 @@ Each platform creates a separate release archive:
 - `add_context_menu.bat` - Windows context menu integration
 - `remove_context_menu.bat` - Uninstall context menu
 
+Note: For Windows builds, the packaged `.exe` icon + version metadata is applied automatically during `npm run package`. To disable this (rare), set `POST_SEA_SKIP_ICON=1`.
+
 ### Linux (`EZ-Game-Audio-Linux.zip`)
 - `ez-game-audio` - Single executable application
 - `ffmpeg` - Audio conversion binary
