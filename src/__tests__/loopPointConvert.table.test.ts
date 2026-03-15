@@ -111,9 +111,36 @@ describe('convertLoopPoints table cases', () => {
     }
   );
 
+  it.each([
+    [8000, 8000],
+    [12000, 12000],
+    [16000, 16000],
+    [32000, 48000],
+  ])(
+    'handles opus boundary sample rate %d -> %d explicitly',
+    (sampleRate, expectedRate) => {
+      const meta = makeMeta(sampleRate, baseLoopStart, baseLoopLength);
+      const ratio = expectedRate / sampleRate;
+      const res = (convertLoopPoints as any)(meta, 'ogg', 'opus');
+
+      expect(res.newSampleRate).toBe(expectedRate);
+      expect(res.loopStart).toBe(Math.round(baseLoopStart * ratio));
+      expect(res.loopLength).toBe(Math.round(baseLoopLength * ratio));
+    }
+  );
+
   it('returns original loop points for non-opus', () => {
     const meta = makeMeta(44100, baseLoopStart, baseLoopLength);
     const res = (convertLoopPoints as any)(meta, 'mp3', 'vorbis');
+    expect(res.newSampleRate).toBeNull();
+    expect(res.loopStart).toBe(baseLoopStart);
+    expect(res.loopLength).toBe(baseLoopLength);
+  });
+
+  it('returns original loop points for ogg when codec is not opus', () => {
+    const meta = makeMeta(44100, baseLoopStart, baseLoopLength);
+    const res = (convertLoopPoints as any)(meta, 'ogg', 'vorbis');
+
     expect(res.newSampleRate).toBeNull();
     expect(res.loopStart).toBe(baseLoopStart);
     expect(res.loopLength).toBe(baseLoopLength);

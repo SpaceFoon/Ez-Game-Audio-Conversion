@@ -108,6 +108,26 @@ describe('finalize', () => {
     expect(rl.close).toHaveBeenCalled();
   });
 
+  it.each(['quit', 'exit'])(
+    'returns false for %s as an exit command',
+    async (answer) => {
+      (rl.question as Mock<(...args: unknown[]) => unknown>).mockImplementation(
+        (_msg: unknown, cb: unknown) => (cb as (value: string) => void)(answer)
+      );
+      (rl.close as Mock).mockImplementation(() => {});
+
+      await expect(
+        finalize(
+          [],
+          [{ success: true, inputFile: 'in.wav', outputFile: 'ok.mp3' }],
+          0
+        )
+      ).resolves.toBe(false);
+
+      expect(rl.close).toHaveBeenCalled();
+    }
+  );
+
   it('handles undefined arguments gracefully', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     await expect(
@@ -151,5 +171,29 @@ describe('finalize', () => {
       0, // fail count
       expect.any(Number) // duration
     );
+  });
+
+  it('logs formatted total and average durations', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(5000);
+
+    await finalize(
+      [],
+      [
+        { success: true, inputFile: 'in1.wav', outputFile: 'ok1.mp3' },
+        { success: true, inputFile: 'in2.wav', outputFile: 'ok2.mp3' },
+      ],
+      1000
+    );
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Total job duration: 4.00 seconds')
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Average task duration 2.00 seconds')
+    );
+
+    dateNowSpy.mockRestore();
+    logSpy.mockRestore();
   });
 });

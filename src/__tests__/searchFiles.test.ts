@@ -12,11 +12,13 @@ jest.unstable_mockModule('chalk', () => ({
       bold: jest.fn((text) => text),
     },
     white: jest.fn((text) => text),
+    gray: jest.fn((text) => text),
   },
   whiteBright: {
     bold: jest.fn((text) => text),
   },
   white: jest.fn((text) => text),
+  gray: jest.fn((text) => text),
 }));
 
 // Dynamic imports after mock declarations
@@ -114,5 +116,121 @@ describe('searchFiles', () => {
 
     // Should not find any files
     expect(result).toHaveLength(0);
+  });
+
+  it('returns an empty array for an empty directory', async () => {
+    _readdirSync.mockReturnValueOnce([]);
+
+    const settings = {
+      inputFilePath: '/test/empty',
+      inputFormats: ['mp3', 'wav'],
+    };
+
+    const result = await searchFiles(settings);
+
+    expect(result).toEqual([]);
+    expect(_readdirSync).toHaveBeenCalledWith('/test/empty');
+  });
+
+  it('recursively finds matching files in deeply nested folders', async () => {
+    _readdirSync
+      .mockReturnValueOnce(['level1', 'root.wav'])
+      .mockReturnValueOnce(['level2', 'ignore.txt'])
+      .mockReturnValueOnce(['level3', 'deep.mp3'])
+      .mockReturnValueOnce(['final.flac']);
+
+    _statSync.mockImplementation((targetPath) => ({
+      isDirectory: () =>
+        String(targetPath).endsWith('level1') ||
+        String(targetPath).endsWith('level2') ||
+        String(targetPath).endsWith('level3'),
+    }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/root',
+      inputFormats: ['wav', 'mp3', 'flac'],
+    });
+
+    expect(result).toEqual([
+      join('/test/root', 'level1', 'level2', 'level3', 'final.flac'),
+      join('/test/root', 'level1', 'level2', 'deep.mp3'),
+      join('/test/root', 'root.wav'),
+    ]);
+  });
+
+  it('matches mixed-case file extensions', async () => {
+    _readdirSync.mockReturnValueOnce(['Song.WAV', 'theme.Mp3', 'notes.txt']);
+    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/case',
+      inputFormats: ['wav', 'mp3'],
+    });
+
+    expect(result).toEqual([
+      join('/test/case', 'Song.WAV'),
+      join('/test/case', 'theme.Mp3'),
+    ]);
+  });
+
+  it('matches files based on the final extension when names contain multiple dots', async () => {
+    _readdirSync.mockReturnValueOnce([
+      'track.backup.wav',
+      'voice.temp.mp3',
+      'archive.wav.zip',
+    ]);
+    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/double-ext',
+      inputFormats: ['wav', 'mp3'],
+    });
+
+    expect(result).toEqual([
+      join('/test/double-ext', 'track.backup.wav'),
+      join('/test/double-ext', 'voice.temp.mp3'),
+    ]);
+  });
+
+  it('skips files without an extension', async () => {
+    _readdirSync.mockReturnValueOnce(['README', 'LICENSE', 'theme.ogg']);
+    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/no-ext',
+      inputFormats: ['ogg'],
+    });
+
+    expect(result).toEqual([join('/test/no-ext', 'theme.ogg')]);
+  });
+
+  it('handles large flat directories without truncating the result set', async () => {
+    const files = Array.from(
+      { length: 250 },
+      (_, index) => `track-${index}.mp3`
+    );
+    _readdirSync.mockReturnValueOnce(files);
+    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/large',
+      inputFormats: ['mp3'],
+    });
+
+    expect(result).toHaveLength(250);
+    expect(result[0]).toBe(join('/test/large', 'track-0.mp3'));
+    expect(result[249]).toBe(join('/test/large', 'track-249.mp3'));
+  });
+
+  it('returns the configured single file immediately in single-file mode', async () => {
+    const result = await searchFiles({
+      inputFilePath: '/ignored',
+      inputFormats: ['wav'],
+      singleFileMode: true,
+      singleFilePath: '/music/special track.wav',
+    });
+
+    expect(result).toEqual(['/music/special track.wav']);
+    expect(_readdirSync).not.toHaveBeenCalled();
   });
 });

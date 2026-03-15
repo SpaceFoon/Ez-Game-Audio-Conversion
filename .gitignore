@@ -152,7 +152,6 @@ sea-config.json
 **/**/*.aiff
 **/**/*.wav
 **/**/*.flac
-MIGRATION-GUIDE.md
-MIGRATION-COMPLETE.md
-
 .jest_run*
+log**
+error**

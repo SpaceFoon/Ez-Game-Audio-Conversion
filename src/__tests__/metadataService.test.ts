@@ -44,6 +44,7 @@ const {
   convertLoopPoints,
   formatLoopData,
   formatMetaDataArgs,
+  sanitizeMetaValueForArgs,
 } = await import('../metadataService.js');
 
 const existsSyncMock = existsSync as unknown as jest.MockedFunction<
@@ -167,6 +168,33 @@ describe('metadataService', () => {
         expect.any(String)
       );
     });
+
+    it('should return null when ffprobe succeeds but returns no output', async () => {
+      spawnSyncMock.mockReturnValue({
+        stdout: '',
+        stderr: '',
+        status: 0,
+        error: undefined,
+      });
+
+      const result = await getMetaData('test.mp3');
+
+      expect(result).toBeNull();
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error running ffprobe.exe'),
+        expect.stringContaining('ffprobe returned no output')
+      );
+    });
+  });
+
+  describe('sanitizeMetaValueForArgs', () => {
+    it('removes null bytes and replacement chars, normalizes line endings, and trims whitespace', () => {
+      const result = sanitizeMetaValueForArgs(
+        '  A\u0000B\uFFFDC\r\nD\rE\u0000  '
+      );
+
+      expect(result).toBe('ABC\nD\nE');
+    });
   });
 
   describe('getLoopPoints', () => {
@@ -242,6 +270,28 @@ describe('metadataService', () => {
       });
 
       const { loopStart, loopLength } = getLoopPoints(metadata);
+      expect(loopStart).toBeNaN();
+      expect(loopLength).toBeNaN();
+    });
+
+    it('should return NaN for non-numeric loop point values', () => {
+      const metadata = asMeta({
+        format: {
+          tags: {
+            LOOPSTART: 'not-a-number',
+            LOOPLENGTH: 'also-not-a-number',
+          },
+        },
+      });
+
+      const { loopStart, loopLength } = getLoopPoints(metadata);
+      expect(loopStart).toBeNaN();
+      expect(loopLength).toBeNaN();
+    });
+
+    it('should return NaN for undefined metadata', () => {
+      const { loopStart, loopLength } = getLoopPoints(undefined);
+
       expect(loopStart).toBeNaN();
       expect(loopLength).toBeNaN();
     });
@@ -337,6 +387,46 @@ describe('metadataService', () => {
         expect(result.newSampleRate).toBe(expected);
       });
     });
+
+    it('should return original loop points when sample rate is not numeric', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            sample_rate: 'not-a-number',
+            tags: {
+              LOOPSTART: '1000',
+              LOOPLENGTH: '5000',
+            },
+          },
+        ],
+      });
+
+      const result = convertLoopPoints(metadata, 'ogg', 'opus');
+
+      expect(result.newSampleRate).toBeNull();
+      expect(result.loopStart).toBe(1000);
+      expect(result.loopLength).toBe(5000);
+    });
+
+    it('should return original loop points when sample rate is zero', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            sample_rate: '0',
+            tags: {
+              LOOPSTART: '1000',
+              LOOPLENGTH: '5000',
+            },
+          },
+        ],
+      });
+
+      const result = convertLoopPoints(metadata, 'ogg', 'opus');
+
+      expect(result.newSampleRate).toBeNull();
+      expect(result.loopStart).toBe(1000);
+      expect(result.loopLength).toBe(5000);
+    });
   });
 
   describe('formatLoopData', () => {
@@ -396,6 +486,22 @@ describe('metadataService', () => {
   });
 
   describe('formatMetaDataArgs replacement-character handling', () => {
+    it('returns empty metadata args when a file has no metadata tags', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            channels: 1,
+          },
+        ],
+        format: {},
+      });
+
+      const result = formatMetaDataArgs(metadata);
+
+      expect(result.metaDataArgs).toEqual([]);
+      expect(result.channelsArgs).toEqual(['-ac', '1']);
+    });
+
     it('removes replacement character glyphs and logs an error', () => {
       const metadata = asMeta({
         streams: [
@@ -441,6 +547,40 @@ describe('metadataService', () => {
           'became empty after replacement-character cleanup'
         )
       );
+    });
+
+    it('defaults channels args to stereo when channels are missing', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            tags: {
+              title: 'Test Song',
+            },
+          },
+        ],
+      });
+
+      const result = formatMetaDataArgs(metadata);
+
+      expect(result.channelsArgs).toEqual(['-ac', '2']);
+    });
+
+    it('maps tracknumber to track metadata', () => {
+      const metadata = asMeta({
+        streams: [
+          {
+            channels: 2,
+            tags: {
+              tracknumber: '5',
+            },
+          },
+        ],
+      });
+
+      const result = formatMetaDataArgs(metadata);
+
+      expect(result.metaDataArgs).toContain('track=5');
+      expect(result.metaDataArgs).not.toContain('tracknumber=5');
     });
   });
 });

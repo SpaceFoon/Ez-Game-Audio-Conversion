@@ -54,6 +54,7 @@ jest.unstable_mockModule('os', () => ({
 // Dynamic imports after mock declarations
 const { Worker } = await import('worker_threads');
 const os = await import('os');
+const { getAnswer, addToLog } = await import('../utils.js');
 const { convertFiles } = await import('../converterManager.js');
 import events from 'events';
 
@@ -65,6 +66,12 @@ type WorkerHandlers = {
 
 const workerMock = Worker as unknown as jest.MockedFunction<any>;
 const cpusMock = os.cpus as unknown as jest.MockedFunction<typeof os.cpus>;
+const getAnswerMock = getAnswer as unknown as jest.MockedFunction<
+  typeof getAnswer
+>;
+const addToLogMock = addToLog as unknown as jest.MockedFunction<
+  typeof addToLog
+>;
 
 events.defaultMaxListeners = 20;
 
@@ -107,6 +114,7 @@ describe('convertFiles', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    getAnswerMock.mockResolvedValue('');
     // Re-enable mocking console output since our tests check for these calls
     console.log = jest.fn();
     console.error = jest.fn();
@@ -203,6 +211,20 @@ describe('convertFiles', () => {
     expect(workerMock).toHaveBeenCalled();
     expect(result.failedFiles).toHaveLength(0);
     expect(result.successfulFiles.length).toBeGreaterThan(0);
+  }, 30000);
+
+  it('should use a single worker for a single file batch', async () => {
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(1)),
+      5000,
+      "Test 'should use a single worker for a single file batch' timed out"
+    );
+
+    expect(workerMock).toHaveBeenCalledTimes(1);
+    expect(result.successfulFiles).toHaveLength(1);
+    expect(result.failedFiles).toHaveLength(0);
   }, 30000);
 
   it('should handle failed conversions (non-zero exit code)', async () => {
@@ -312,6 +334,114 @@ describe('convertFiles', () => {
     process.exit = originalExit;
   }, 30000);
 
+  it('should detect permission errors and stop the batch', async () => {
+    workerMock.mockImplementation(() => {
+      const handlers: WorkerHandlers = {};
+      const worker = {
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          if (event === 'message') handlers.message = handler;
+          if (event === 'error') handlers.error = handler;
+          if (event === 'exit') {
+            handlers.exit = handler as unknown as (code: number) => void;
+          }
+
+          if (event === 'message' && handlers.message) {
+            handlers.message({
+              type: 'stderr',
+              data: 'Permission denied while opening output file',
+            });
+          }
+
+          if (event === 'exit' && handlers.exit) {
+            handlers.exit(1);
+          }
+
+          return worker;
+        }),
+      };
+      return worker;
+    });
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(1)),
+      5000,
+      "Test 'should detect permission errors and stop the batch' timed out"
+    );
+
+    expect(result.failedFiles).toHaveLength(1);
+    expect(result.successfulFiles).toHaveLength(0);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Stopping due to file permission/access error')
+    );
+  }, 30000);
+
+  it('should prompt multiple times when concurrent workers hit fatal errors together', async () => {
+    cpusMock.mockReturnValueOnce([{}, {}]);
+
+    const queuedWorkers: Array<{
+      emitFatal: () => void;
+      emitExit: () => void;
+    }> = [];
+    let released = false;
+
+    workerMock.mockImplementation(() => {
+      const handlers: WorkerHandlers = {};
+      const queuedWorker = {
+        emitFatal: () => {
+          handlers.message?.({
+            type: 'stderr',
+            data: 'no space left on device',
+          });
+        },
+        emitExit: () => {
+          handlers.exit?.(1);
+        },
+      };
+      queuedWorkers.push(queuedWorker);
+
+      const worker = {
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          if (event === 'message') handlers.message = handler;
+          if (event === 'error') handlers.error = handler;
+          if (event === 'exit') {
+            handlers.exit = handler as unknown as (code: number) => void;
+          }
+
+          if (!released && queuedWorkers.length === 2) {
+            released = true;
+            Promise.resolve().then(() => {
+              for (const activeWorker of queuedWorkers) {
+                activeWorker.emitFatal();
+                activeWorker.emitExit();
+              }
+            });
+          }
+
+          return worker;
+        }),
+      };
+
+      return worker;
+    });
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(2)),
+      5000,
+      "Test 'should prompt multiple times when concurrent workers hit fatal errors together' timed out"
+    );
+
+    expect(getAnswerMock).toHaveBeenCalledTimes(2);
+    expect(getAnswerMock).toHaveBeenNthCalledWith(
+      1,
+      'Press ENTER to return to the main menu...'
+    );
+    expect(getAnswerMock).toHaveBeenNthCalledWith(
+      2,
+      'Press ENTER to return to the main menu...'
+    );
+    expect(result.failedFiles).toHaveLength(2);
+  }, 30000);
+
   it('should handle multiple workers and files properly', async () => {
     // Create a mix of successful and failing workers
     console.log(
@@ -338,6 +468,45 @@ describe('convertFiles', () => {
     expect(workerMock).toHaveBeenCalledTimes(4);
     expect(result.successfulFiles.length).toBeGreaterThan(0);
     expect(result.failedFiles.length).toBeGreaterThan(0);
+  }, 30000);
+
+  it('should return exact success and failure counts for a mixed batch', async () => {
+    const exitCodes = [0, 1, 0];
+    workerMock.mockImplementation(() =>
+      createWorkerMock({ exitCode: exitCodes.shift() ?? 0 })
+    );
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(3)),
+      5000,
+      "Test 'should return exact success and failure counts' timed out"
+    );
+
+    expect(result.successfulFiles).toHaveLength(2);
+    expect(result.failedFiles).toHaveLength(1);
+  }, 30000);
+
+  it('should call addToLog for both successful and failed conversions', async () => {
+    const exitCodes = [0, 1];
+    workerMock.mockImplementation(() =>
+      createWorkerMock({ exitCode: exitCodes.shift() ?? 0 })
+    );
+
+    await withTimeout(
+      convertFiles(createTestFiles(2)),
+      5000,
+      "Test 'should call addToLog for both successful and failed conversions' timed out"
+    );
+
+    expect(addToLogMock).toHaveBeenCalledTimes(2);
+    expect(addToLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'code', data: 0 }),
+      expect.objectContaining({ outputFile: expect.stringContaining('.ogg') })
+    );
+    expect(addToLogMock).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' }),
+      expect.objectContaining({ outputFile: expect.stringContaining('.ogg') })
+    );
   }, 30000);
 
   // Test for CPU count fallback
@@ -440,6 +609,96 @@ describe('convertFiles', () => {
       "Test 'should put all files in failedFiles' timed out"
     );
     expect(result.failedFiles.length).toBe(3);
+    expect(result.successfulFiles).toHaveLength(0);
+  });
+
+  it('should return all files as successful when every worker exits cleanly', async () => {
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(3)),
+      5000,
+      "Test 'should return all files as successful when every worker exits cleanly' timed out"
+    );
+
+    expect(result.successfulFiles).toHaveLength(3);
+    expect(result.failedFiles).toHaveLength(0);
+  });
+
+  it('should not treat harmless stderr containing the word space as fatal disk-space error', async () => {
+    workerMock.mockImplementation(() => {
+      const handlers: WorkerHandlers = {};
+      const worker = {
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          if (event === 'message') handlers.message = handler;
+          if (event === 'error') handlers.error = handler;
+          if (event === 'exit') {
+            handlers.exit = handler as unknown as (code: number) => void;
+          }
+
+          if (event === 'message' && handlers.message) {
+            handlers.message({
+              type: 'stderr',
+              data: 'Using color space conversion matrix',
+            });
+            handlers.message({ type: 'code', data: 0 });
+          }
+
+          if (event === 'exit' && handlers.exit) {
+            handlers.exit(0);
+          }
+
+          return worker;
+        }),
+      };
+      return worker;
+    });
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(1)),
+      5000,
+      "Test 'should not treat harmless stderr as fatal' timed out"
+    );
+
+    expect(result.successfulFiles).toHaveLength(1);
+    expect(result.failedFiles).toHaveLength(0);
+    expect(console.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Stopping due to insufficient disk space')
+    );
+  });
+
+  it('should not record the same failed file twice when error and exit both fire', async () => {
+    workerMock.mockImplementation(() => {
+      const handlers: WorkerHandlers = {};
+      const worker = {
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          if (event === 'message') handlers.message = handler;
+          if (event === 'error') handlers.error = handler;
+          if (event === 'exit') {
+            handlers.exit = handler as unknown as (code: number) => void;
+          }
+
+          if (event === 'error' && handlers.error) {
+            handlers.error(new Error('Worker thread error'));
+          }
+
+          if (event === 'exit' && handlers.exit) {
+            handlers.exit(1);
+          }
+
+          return worker;
+        }),
+      };
+      return worker;
+    });
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(1)),
+      5000,
+      "Test 'should deduplicate failed file recording' timed out"
+    );
+
+    expect(result.failedFiles).toHaveLength(1);
     expect(result.successfulFiles).toHaveLength(0);
   });
 });

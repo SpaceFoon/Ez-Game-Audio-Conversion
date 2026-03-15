@@ -334,6 +334,21 @@ const verifyFileIntegrity = (
   }
 };
 
+// Classifies test failures by phase so triage is immediate:
+// [GENERATION] → ffmpeg couldn't create the input WAV
+// [CONVERSION]  → ffmpeg failed converting to the target format
+// [INTEGRITY]   → output file is corrupt or zero-duration
+// [METADATA]    → tag values didn't survive the conversion
+const checkPhase = (
+  phase: 'GENERATION' | 'CONVERSION' | 'INTEGRITY' | 'METADATA',
+  condition: boolean,
+  detail: string
+): void => {
+  if (!condition) {
+    throw new Error(`[${phase}] ${detail}`);
+  }
+};
+
 describe('Metadata Preservation E2E Tests', () => {
   const ffmpegAvailable = checkFfmpeg();
 
@@ -390,42 +405,83 @@ describe('Metadata Preservation E2E Tests', () => {
             const inputPath = join(INPUT_DIR, `${testCase.name}.wav`);
             const outputPath = join(OUTPUT_DIR, `${testCase.name}.${format}`);
 
-            // Ensure input exists
+            // Phase 1 — Generation: ensure the source WAV exists
             if (!existsSync(inputPath)) {
-              generateTestFile(inputPath, testCase.metadata);
+              const generated = generateTestFile(inputPath, testCase.metadata);
+              checkPhase(
+                'GENERATION',
+                generated,
+                `Failed to create ${testCase.name}.wav`
+              );
             }
 
-            // Convert
+            // Phase 2 — Conversion: ffmpeg must succeed and produce the file
             const convertSuccess = convertFile(inputPath, outputPath, format);
-            expect(convertSuccess).toBe(true);
+            checkPhase(
+              'CONVERSION',
+              convertSuccess,
+              `ffmpeg failed converting ${testCase.name}.wav → ${format}`
+            );
+            checkPhase(
+              'CONVERSION',
+              existsSync(outputPath),
+              `Output file not created: ${testCase.name}.${format}`
+            );
 
-            // Verify output exists
-            expect(existsSync(outputPath)).toBe(true);
-
-            // Verify file integrity
+            // Phase 3 — Integrity: file must be non-corrupt and have audio
             const integrity = verifyFileIntegrity(outputPath);
-            expect(integrity.valid).toBe(true);
-            expect(integrity.duration).toBeGreaterThan(0);
+            checkPhase(
+              'INTEGRITY',
+              integrity.valid,
+              `Output file corrupt: ${testCase.name}.${format}${integrity.error ? ` — ${integrity.error}` : ''}`
+            );
+            checkPhase(
+              'INTEGRITY',
+              (integrity.duration ?? 0) > 0,
+              `Zero-duration output: ${testCase.name}.${format}`
+            );
 
-            // Verify metadata preserved
+            // Phase 4 — Metadata: tags must survive the conversion
             const outputMetadata = getMetadata(outputPath);
-            expect(outputMetadata).not.toBeNull();
+            checkPhase(
+              'METADATA',
+              outputMetadata !== null,
+              `Cannot read metadata from ${testCase.name}.${format}`
+            );
 
             const outputTitle = getTag(outputMetadata, 'title');
             const outputArtist = getTag(outputMetadata, 'artist');
-            const outputAlbum = getTag(outputMetadata, 'album');
 
-            // Note: Some formats may slightly modify metadata encoding
-            // We check that it's at least present and similar
-            expect(outputTitle).not.toBeNull();
-            expect(outputArtist).not.toBeNull();
+            checkPhase(
+              'METADATA',
+              outputTitle !== null,
+              `Missing title tag in ${testCase.name}.${format}`
+            );
+            checkPhase(
+              'METADATA',
+              outputArtist !== null,
+              `Missing artist tag in ${testCase.name}.${format}`
+            );
 
-            // For formats that fully support Unicode metadata
+            // FLAC and OGG preserve Unicode tags verbatim
             if (format === 'flac' || format === 'ogg') {
-              expect(outputTitle).toBe(testCase.metadata.title);
-              expect(outputArtist).toBe(testCase.metadata.artist);
-              if (outputAlbum) {
-                expect(outputAlbum).toBe(testCase.metadata.album);
+              checkPhase(
+                'METADATA',
+                outputTitle === testCase.metadata.title,
+                `Title mismatch in ${testCase.name}.${format}: expected "${testCase.metadata.title}" got "${outputTitle}"`
+              );
+              checkPhase(
+                'METADATA',
+                outputArtist === testCase.metadata.artist,
+                `Artist mismatch in ${testCase.name}.${format}: expected "${testCase.metadata.artist}" got "${outputArtist}"`
+              );
+              const outputAlbum = getTag(outputMetadata, 'album');
+              if (outputAlbum !== null) {
+                checkPhase(
+                  'METADATA',
+                  outputAlbum === testCase.metadata.album,
+                  `Album mismatch in ${testCase.name}.${format}: expected "${testCase.metadata.album}" got "${outputAlbum}"`
+                );
               }
             }
           }

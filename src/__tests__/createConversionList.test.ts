@@ -25,7 +25,12 @@ jest.unstable_mockModule('chalk', () => {
       green: makeFn(),
       cyanBright: jest.fn((...a) => a.join(' ')),
       cyan: jest.fn((...a) => a.join(' ')),
-      redBright: jest.fn((a) => a),
+      redBright: Object.assign(
+        jest.fn((a) => a),
+        {
+          bold: jest.fn((...a) => a.join(' ')),
+        }
+      ),
       red: Object.assign(
         jest.fn((a) => a),
         { bold: jest.fn((a) => a) }
@@ -37,7 +42,12 @@ jest.unstable_mockModule('chalk', () => {
     green: makeFn(),
     cyanBright: jest.fn((...a) => a.join(' ')),
     cyan: jest.fn((...a) => a.join(' ')),
-    redBright: jest.fn((a) => a),
+    redBright: Object.assign(
+      jest.fn((a) => a),
+      {
+        bold: jest.fn((...a) => a.join(' ')),
+      }
+    ),
     red: Object.assign(
       jest.fn((a) => a),
       { bold: jest.fn((a) => a) }
@@ -130,6 +140,24 @@ describe('createConversionList', () => {
   });
 
   describe('file conflict handling', () => {
+    it('applies overwrite-all (oa) to subsequent conflicts', async () => {
+      existsSyncMock.mockImplementation(
+        (path) =>
+          String(path) === join(settings.outputFilePath, 'a.mp3') ||
+          String(path) === join(settings.outputFilePath, 'b.mp3')
+      );
+      getAnswerMock.mockResolvedValueOnce('oa').mockResolvedValue('yes');
+
+      const files = ['a.wav', 'b.wav'].map((name) =>
+        join(settings.inputFilePath, name)
+      );
+      const result = await createConversionList(files);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].outputFile).toBe(join(settings.outputFilePath, 'a.mp3'));
+      expect(result[1].outputFile).toBe(join(settings.outputFilePath, 'b.mp3'));
+    });
+
     it('renames output when user selects [r]ename for existing file', async () => {
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3') // Only the original exists
@@ -157,6 +185,60 @@ describe('createConversionList', () => {
 
       // All files skipped = exit with 0
       expect(handleExitMock).toHaveBeenCalledWith(0);
+    });
+
+    it('re-prompts on repeated invalid conflict responses before valid selection', async () => {
+      existsSyncMock.mockImplementation(
+        (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
+      );
+      getAnswerMock
+        .mockResolvedValueOnce('x') // invalid
+        .mockResolvedValueOnce('nope') // invalid
+        .mockResolvedValueOnce('r') // valid: rename
+        .mockResolvedValue('yes'); // confirm
+
+      const files = [join(settings.inputFilePath, 'song.wav')];
+      const result = await createConversionList(files);
+
+      expect(result[0].outputFile).toContain('-copy(1)');
+      // 3 conflict prompts + 1 final confirm = 4 total
+      expect(getAnswerMock).toHaveBeenCalledTimes(4);
+    });
+
+    it('re-prompts when the user submits an empty conflict response', async () => {
+      existsSyncMock.mockImplementation(
+        (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
+      );
+      getAnswerMock
+        .mockResolvedValueOnce('')
+        .mockResolvedValueOnce('r')
+        .mockResolvedValue('yes');
+
+      const result = await createConversionList([
+        join(settings.inputFilePath, 'song.wav'),
+      ]);
+
+      expect(result[0].outputFile).toContain('-copy(1)');
+      expect(getAnswerMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('increments -copy number when -copy(1) already exists (rename depth)', async () => {
+      existsSyncMock.mockImplementation((path) => {
+        const p = String(path);
+        // Original output and copy(1) both exist; copy(2) does not
+        return (
+          p === join(settings.outputFilePath, 'song.mp3') ||
+          p === join(settings.outputFilePath, 'song-copy(1).mp3')
+        );
+      });
+      getAnswerMock
+        .mockResolvedValueOnce('r') // rename
+        .mockResolvedValue('yes'); // confirm
+
+      const files = [join(settings.inputFilePath, 'song.wav')];
+      const result = await createConversionList(files);
+
+      expect(result[0].outputFile).toContain('-copy(2)');
     });
 
     it('applies rename-all (ra) to subsequent conflicts', async () => {
@@ -314,6 +396,80 @@ describe('createConversionList', () => {
       await createConversionList(files);
 
       expect(handleExitMock).toHaveBeenCalledWith(1);
+    });
+
+    it('continues when preparing one output directory fails', async () => {
+      settings.inputFilePath = '/input';
+      settings.outputFilePath = '/output';
+      mkdirSyncMock.mockImplementation((dir) => {
+        if (String(dir).includes('bad')) {
+          throw new Error('mkdir failed');
+        }
+      });
+      getAnswerMock.mockResolvedValue('yes');
+
+      const files = [
+        join(settings.inputFilePath, 'good', 'song.wav'),
+        join(settings.inputFilePath, 'bad', 'song.wav'),
+      ];
+      const result = await createConversionList(files);
+
+      expect(result).toHaveLength(2);
+      expect(mkdirSyncMock).toHaveBeenCalled();
+    });
+
+    it('deduplicates duplicate output targets before returning the final list', async () => {
+      getAnswerMock.mockResolvedValue('yes');
+
+      const duplicateFile = join(settings.inputFilePath, 'song.wav');
+      const result = await createConversionList([duplicateFile, duplicateFile]);
+
+      expect(result).toEqual([
+        {
+          inputFile: duplicateFile,
+          outputFile: join(settings.outputFilePath, 'song.mp3'),
+          outputFormat: 'mp3',
+        },
+      ]);
+    });
+
+    it('writes progress output for large batches', async () => {
+      const writeSpy = jest
+        .spyOn(process.stdout, 'write')
+        .mockImplementation(() => true);
+      getAnswerMock.mockResolvedValue('yes');
+
+      const files = Array.from({ length: 101 }, (_, index) =>
+        join(settings.inputFilePath, `track-${index}.wav`)
+      );
+
+      const result = await createConversionList(files);
+
+      expect(result).toHaveLength(101);
+      expect(writeSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Building list: 101/101 items... Done!')
+      );
+      writeSpy.mockRestore();
+    });
+
+    it('keeps existing and non-conflicting outputs together in mixed-format batches', async () => {
+      settings.outputFormats = ['mp3', 'ogg'];
+      existsSyncMock.mockImplementation(
+        (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
+      );
+      getAnswerMock.mockResolvedValueOnce('r').mockResolvedValueOnce('yes');
+
+      const result = await createConversionList([
+        join(settings.inputFilePath, 'song.wav'),
+      ]);
+
+      expect(result).toHaveLength(2);
+      expect(
+        result.some((file) => file.outputFile.endsWith('song-copy(1).mp3'))
+      ).toBe(true);
+      expect(result.some((file) => file.outputFile.endsWith('song.ogg'))).toBe(
+        true
+      );
     });
 
     // Note: Directory creation failure is difficult to test with ESM mocks

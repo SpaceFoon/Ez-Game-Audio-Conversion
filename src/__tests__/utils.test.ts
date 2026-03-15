@@ -1,4 +1,5 @@
 // src/__tests__/utils.test.js
+import { join } from 'path';
 import {
   jest,
   describe,
@@ -7,6 +8,7 @@ import {
   beforeEach,
   afterEach,
 } from '@jest/globals';
+import type { Mock } from 'jest-mock';
 
 // Mock fs module BEFORE importing utils (ESM requirement)
 jest.unstable_mockModule('fs', () => ({
@@ -41,11 +43,28 @@ const {
   appendFileSync: _appendFileSync,
 } = await import('fs');
 
+const existsSyncMock = _existsSync as unknown as Mock<
+  (path: string) => boolean
+>;
+const openSyncMock = _openSync as unknown as Mock<
+  (path: string, flags: string) => number
+>;
+const closeSyncMock = _closeSync as unknown as Mock<(fd: number) => void>;
+const writeFileSyncMock = _writeFileSync as unknown as Mock<
+  (file: string, data: string, options?: unknown) => void
+>;
+const appendFileSyncMock = _appendFileSync as unknown as Mock<
+  (file: string, data: string, options?: unknown) => void
+>;
+
 const {
   rl,
   settings,
   initializeFileNames,
   getAnswer,
+  getErrorMessage,
+  findBinary,
+  runtimeBaseDir,
   isFileBusy,
   addToLog,
   __setLogFileStateForTests,
@@ -67,6 +86,11 @@ describe('utils module', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    existsSyncMock.mockReset().mockReturnValue(false);
+    openSyncMock.mockReset();
+    closeSyncMock.mockReset();
+    writeFileSyncMock.mockReset();
+    appendFileSyncMock.mockReset();
 
     // Mock console methods
     console.log = jest.fn();
@@ -74,7 +98,10 @@ describe('utils module', () => {
     console.warn = jest.fn();
 
     // Mock readline question
-    rl.question = jest.fn((_, callback) => callback('test-answer'));
+    rl.question = jest.fn(
+      (_question: string, callback: (answer: string) => void) =>
+        callback('test-answer')
+    );
 
     // Setup internal log files
     __setLogFileStateForTests(
@@ -99,6 +126,43 @@ describe('utils module', () => {
     expect(settings).toHaveProperty('oggCodec');
   });
 
+  describe('getErrorMessage function', () => {
+    it('should unwrap Error instances', () => {
+      expect(getErrorMessage(new Error('boom'))).toBe('boom');
+    });
+
+    it('should handle non-Error values defensively', () => {
+      expect(getErrorMessage('plain failure')).toBe('plain failure');
+      expect(getErrorMessage(null)).toBe('Unknown error');
+    });
+  });
+
+  describe('findBinary function', () => {
+    it('should return a binary found directly under runtimeBaseDir', () => {
+      const expectedPath = join(runtimeBaseDir, 'ffmpeg.exe');
+      existsSyncMock.mockImplementation(
+        (path: string) => path === expectedPath
+      );
+
+      const result = findBinary('ffmpeg.exe');
+
+      expect(result).toBe(expectedPath);
+    });
+
+    it('should fall back to process.cwd subdirectories when runtimeBaseDir misses', () => {
+      const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue('/workspace');
+      const expectedPath = join('/workspace', 'dist', 'converterWorker.js');
+      existsSyncMock.mockImplementation(
+        (path: string) => path === expectedPath
+      );
+
+      const result = findBinary('converterWorker.js', ['dist']);
+
+      expect(result).toBe(expectedPath);
+      cwdSpy.mockRestore();
+    });
+  });
+
   describe('getAnswer function', () => {
     it('should return a promise that resolves with user input', async () => {
       const answer = await getAnswer('Test question');
@@ -119,25 +183,25 @@ describe('utils module', () => {
 
   describe('isFileBusy function', () => {
     it('should return false if file does not exist', async () => {
-      _existsSync.mockReturnValueOnce(false);
+      existsSyncMock.mockReturnValueOnce(false);
       const result = await isFileBusy('/test/file.txt');
       expect(result).toBe(false);
     });
 
     it('should return false if file is not busy', async () => {
-      _existsSync.mockReturnValueOnce(true);
-      _openSync.mockReturnValueOnce(123);
+      existsSyncMock.mockReturnValueOnce(true);
+      openSyncMock.mockReturnValueOnce(123);
       const result = await isFileBusy('/test/file.txt');
       expect(result).toBe(false);
-      expect(_openSync).toHaveBeenCalledWith('/test/file.txt', 'r+');
-      expect(_closeSync).toHaveBeenCalledWith(123);
+      expect(openSyncMock).toHaveBeenCalledWith('/test/file.txt', 'r+');
+      expect(closeSyncMock).toHaveBeenCalledWith(123);
     });
 
     it('should handle EBUSY error', async () => {
-      _existsSync.mockReturnValueOnce(true);
-      const error = new Error('File is busy');
+      existsSyncMock.mockReturnValueOnce(true);
+      const error = new Error('File is busy') as Error & { code?: string };
       error.code = 'EBUSY';
-      _openSync.mockImplementationOnce(() => {
+      openSyncMock.mockImplementationOnce(() => {
         throw error;
       });
 
@@ -157,8 +221,8 @@ describe('utils module', () => {
       settings.outputFilePath = '/test/output';
       initializeFileNames();
       // Verify calls to existsSync
-      expect(_existsSync).toHaveBeenCalledWith('/test/output/logs.csv');
-      expect(_existsSync).toHaveBeenCalledWith('/test/output/error.csv');
+      expect(existsSyncMock).toHaveBeenCalledWith('/test/output/logs.csv');
+      expect(existsSyncMock).toHaveBeenCalledWith('/test/output/error.csv');
     });
   });
 
@@ -174,41 +238,38 @@ describe('utils module', () => {
 
     it("should create a new log file when it doesn't exist", async () => {
       // First check if file exists (no)
-      _existsSync.mockReturnValueOnce(false);
+      existsSyncMock.mockReturnValueOnce(false);
 
       await addToLog(
         { type: 'code', data: '0' },
-        { inputFile: 'input.wav', outputFile: 'output.mp3' },
-        0
+        { inputFile: 'input.wav', outputFile: 'output.mp3' }
       );
 
-      expect(_writeFileSync).toHaveBeenCalled();
+      expect(writeFileSyncMock).toHaveBeenCalled();
     });
 
     it('should append to existing log file', async () => {
       // First check if file exists (yes)
-      _existsSync.mockReturnValueOnce(true);
+      existsSyncMock.mockReturnValueOnce(true);
 
       await addToLog(
         { type: 'code', data: '0' },
-        { inputFile: 'input.wav', outputFile: 'output.mp3' },
-        0
+        { inputFile: 'input.wav', outputFile: 'output.mp3' }
       );
 
-      expect(_appendFileSync).toHaveBeenCalled();
+      expect(appendFileSyncMock).toHaveBeenCalled();
     });
 
     it("should create a new error log file when it doesn't exist", async () => {
       // First check if file exists (no)
-      _existsSync.mockReturnValueOnce(false);
+      existsSyncMock.mockReturnValueOnce(false);
 
       await addToLog(
         { type: 'stderr', data: 'Test error' },
-        { inputFile: 'input.wav', outputFile: 'output.mp3' },
-        0
+        { inputFile: 'input.wav', outputFile: 'output.mp3' }
       );
 
-      expect(_writeFileSync).toHaveBeenCalled();
+      expect(writeFileSyncMock).toHaveBeenCalled();
     });
 
     it('should append to existing error log file', async () => {
@@ -216,19 +277,54 @@ describe('utils module', () => {
       __setLogFileStateForTests(undefined, '/test/output/error.csv');
 
       // First check if file exists (yes)
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       // Ensure appendFileSync is called properly
-      _appendFileSync.mockImplementation(() => true);
+      appendFileSyncMock.mockImplementation(() => undefined);
 
       await addToLog(
         { type: 'stderr', data: 'Test error' },
-        { inputFile: 'input.wav', outputFile: 'output.mp3' },
-        0
+        { inputFile: 'input.wav', outputFile: 'output.mp3' }
       );
 
       // Now appendFileSync should have been called
-      expect(_appendFileSync).toHaveBeenCalled();
+      expect(appendFileSyncMock).toHaveBeenCalled();
+    });
+
+    it('should return false without throwing when creating the log header fails', async () => {
+      existsSyncMock.mockReturnValueOnce(false);
+      writeFileSyncMock.mockImplementationOnce(() => {
+        throw new Error('header failed');
+      });
+
+      await expect(
+        addToLog(
+          { type: 'code', data: '0' },
+          { inputFile: 'input.wav', outputFile: 'output.mp3' }
+        )
+      ).resolves.toBe(false);
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error creating file or making header')
+      );
+    });
+
+    it('should return false without throwing when appending the log row fails', async () => {
+      existsSyncMock.mockReturnValueOnce(true);
+      appendFileSyncMock.mockImplementationOnce(() => {
+        throw new Error('append failed');
+      });
+
+      await expect(
+        addToLog(
+          { type: 'code', data: '0' },
+          { inputFile: 'input.wav', outputFile: 'output.mp3' }
+        )
+      ).resolves.toBe(false);
+
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error writing log')
+      );
     });
   });
 
@@ -243,65 +339,65 @@ describe('utils module', () => {
     });
 
     it('should write summary to logs.csv when it exists', () => {
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       writeSummaryToLogs(100, 95, 5, 123.45);
 
-      expect(_appendFileSync).toHaveBeenCalledWith(
+      expect(appendFileSyncMock).toHaveBeenCalledWith(
         '/test/output/logs.csv',
         expect.stringContaining('SUMMARY:')
       );
     });
 
     it('should write summary to error.csv when it exists', () => {
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       writeSummaryToLogs(100, 95, 5, 123.45);
 
-      expect(_appendFileSync).toHaveBeenCalledWith(
+      expect(appendFileSyncMock).toHaveBeenCalledWith(
         '/test/output/error.csv',
         expect.stringContaining('SUMMARY:')
       );
     });
 
     it('should include total, passed, failed counts in summary', () => {
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       writeSummaryToLogs(100, 95, 5, 123.45);
 
-      const logCall = _appendFileSync.mock.calls.find(
-        (call) => call[0] === '/test/output/logs.csv'
+      const logCall = appendFileSyncMock.mock.calls.find(
+        (call: unknown[]) => call[0] === '/test/output/logs.csv'
       );
       expect(logCall).toBeDefined();
-      const csvRow = logCall[1];
+      const csvRow = logCall![1] as string;
       expect(csvRow).toContain('Total=100');
       expect(csvRow).toContain('Passed=95');
       expect(csvRow).toContain('Failed=5');
     });
 
     it('should include duration in summary with 2 decimal places', () => {
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       writeSummaryToLogs(50, 50, 0, 45.6789);
 
-      const logCall = _appendFileSync.mock.calls.find(
-        (call) => call[0] === '/test/output/logs.csv'
+      const logCall = appendFileSyncMock.mock.calls.find(
+        (call: unknown[]) => call[0] === '/test/output/logs.csv'
       );
       expect(logCall).toBeDefined();
-      const csvRow = logCall[1];
+      const csvRow = logCall![1] as string;
       expect(csvRow).toContain('Duration=45.68s');
     });
 
     it('should format as valid CSV row with empty exit code column', () => {
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       writeSummaryToLogs(10, 8, 2, 5.0);
 
-      const logCall = _appendFileSync.mock.calls.find(
-        (call) => call[0] === '/test/output/logs.csv'
+      const logCall = appendFileSyncMock.mock.calls.find(
+        (call: unknown[]) => call[0] === '/test/output/logs.csv'
       );
       expect(logCall).toBeDefined();
-      const csvRow = logCall[1];
+      const csvRow = logCall![1] as string;
 
       // Should be: timestamp,,summary,\n (empty exit code, empty output)
       // Format: Timestamp,"Exit Code",Input,Output
@@ -312,17 +408,17 @@ describe('utils module', () => {
     });
 
     it('should not write if logs.csv does not exist', () => {
-      _existsSync.mockReturnValue(false);
+      existsSyncMock.mockReturnValue(false);
 
       writeSummaryToLogs(10, 10, 0, 1.0);
 
       // appendFileSync should not be called for non-existent files
-      expect(_appendFileSync).not.toHaveBeenCalled();
+      expect(appendFileSyncMock).not.toHaveBeenCalled();
     });
 
     it('should handle errors gracefully', () => {
-      _existsSync.mockReturnValue(true);
-      _appendFileSync.mockImplementationOnce(() => {
+      existsSyncMock.mockReturnValue(true);
+      appendFileSyncMock.mockImplementationOnce(() => {
         throw new Error('Write failed');
       });
 
@@ -334,17 +430,17 @@ describe('utils module', () => {
     });
 
     it('should write to both log files when both exist', () => {
-      _existsSync.mockReturnValue(true);
+      existsSyncMock.mockReturnValue(true);
 
       writeSummaryToLogs(20, 15, 5, 10.0);
 
       // Should append to both files
-      expect(_appendFileSync).toHaveBeenCalledTimes(2);
-      expect(_appendFileSync).toHaveBeenCalledWith(
+      expect(appendFileSyncMock).toHaveBeenCalledTimes(2);
+      expect(appendFileSyncMock).toHaveBeenCalledWith(
         '/test/output/logs.csv',
         expect.any(String)
       );
-      expect(_appendFileSync).toHaveBeenCalledWith(
+      expect(appendFileSyncMock).toHaveBeenCalledWith(
         '/test/output/error.csv',
         expect.any(String)
       );

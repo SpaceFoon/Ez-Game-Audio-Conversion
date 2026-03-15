@@ -59,6 +59,7 @@ const { default: createConversionList } =
   await import('../createConversionList.js');
 const { convertFiles } = await import('../converterManager.js');
 const { default: finalize } = await import('../finalize.js');
+const { default: ExitProgramError } = await import('../exitProgramError.js');
 const { default: runApp } = await import('../app.js');
 
 describe('app.js', () => {
@@ -109,6 +110,36 @@ describe('app.js', () => {
     expect(finalize).toHaveBeenCalled();
   });
 
+  it('continues after ExitProgramError and stops when finalize returns false', async () => {
+    (
+      getUserInput as unknown as Mock<() => Promise<object>>
+    ).mockRejectedValueOnce(new ExitProgramError('EXIT_PROGRAM:1'));
+
+    await runApp();
+
+    expect(getUserInput).toHaveBeenCalledTimes(2);
+    expect(searchFiles).toHaveBeenCalledTimes(1);
+    expect(createConversionList).toHaveBeenCalledTimes(1);
+    expect(convertFiles).toHaveBeenCalledTimes(1);
+    expect(finalize).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('repeats the pipeline while finalize returns true', async () => {
+    (finalize as unknown as Mock<() => Promise<boolean>>)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    await runApp();
+
+    expect(getUserInput).toHaveBeenCalledTimes(3);
+    expect(searchFiles).toHaveBeenCalledTimes(3);
+    expect(createConversionList).toHaveBeenCalledTimes(3);
+    expect(convertFiles).toHaveBeenCalledTimes(3);
+    expect(finalize).toHaveBeenCalledTimes(3);
+  });
+
   it('handles errors in the promise chain', async () => {
     (getUserInput as unknown as Mock<() => Promise<never>>).mockRejectedValue(
       new Error('fail')
@@ -117,6 +148,54 @@ describe('app.js', () => {
     await runApp();
 
     expect(errorSpy).toHaveBeenCalled();
+  });
+
+  it('logs a fatal error and stops when searchFiles fails', async () => {
+    const fatalError = new Error('search failed');
+    (
+      searchFiles as unknown as Mock<() => Promise<never>>
+    ).mockRejectedValueOnce(fatalError);
+
+    await runApp();
+
+    expect(getUserInput).toHaveBeenCalledTimes(1);
+    expect(searchFiles).toHaveBeenCalledTimes(1);
+    expect(createConversionList).not.toHaveBeenCalled();
+    expect(convertFiles).not.toHaveBeenCalled();
+    expect(finalize).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith('Fatal Error', fatalError);
+  });
+
+  it('logs a fatal error and stops when convertFiles fails', async () => {
+    const fatalError = new Error('convert failed');
+    (
+      convertFiles as unknown as Mock<() => Promise<never>>
+    ).mockRejectedValueOnce(fatalError);
+
+    await runApp();
+
+    expect(getUserInput).toHaveBeenCalledTimes(1);
+    expect(searchFiles).toHaveBeenCalledTimes(1);
+    expect(createConversionList).toHaveBeenCalledTimes(1);
+    expect(convertFiles).toHaveBeenCalledTimes(1);
+    expect(finalize).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith('Fatal Error', fatalError);
+  });
+
+  it('logs a fatal error and stops when createConversionList fails', async () => {
+    const fatalError = new Error('list failed');
+    (
+      createConversionList as unknown as Mock<() => Promise<never>>
+    ).mockRejectedValueOnce(fatalError);
+
+    await runApp();
+
+    expect(getUserInput).toHaveBeenCalledTimes(1);
+    expect(searchFiles).toHaveBeenCalledTimes(1);
+    expect(createConversionList).toHaveBeenCalledTimes(1);
+    expect(convertFiles).not.toHaveBeenCalled();
+    expect(finalize).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith('Fatal Error', fatalError);
   });
 
   it('does not reinitialize globalThis.env if already set', async () => {

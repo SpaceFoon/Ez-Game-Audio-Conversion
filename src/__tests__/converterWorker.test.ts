@@ -165,6 +165,16 @@ describe('converterWorker.js', () => {
     ).rejects.toThrow(/Missing output file/i);
   }, 10000);
 
+  it('handles missing output format error', async () => {
+    fs.existsSync.mockReturnValue(true);
+    await expect(
+      converterWorker({
+        file: { inputFile: 'in.wav', outputFile: 'out.mp3', outputFormat: '' },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/Missing output format/i);
+  }, 10000);
+
   // Skip: This test requires complex mocking of the packaged runtime check
   // that doesn't work well with ESM mocks
   it.skip('throws if ffmpeg.exe is not found', async () => {
@@ -286,6 +296,113 @@ describe('converterWorker.js', () => {
       type: 'code',
       data: 0,
     });
+  }, 10000);
+
+  it.each([
+    {
+      label: 'mp3',
+      outputFormat: 'mp3',
+      oggCodec: 'vorbis',
+      expectedArgs: ['-c:a', 'libmp3lame', '-q:a', '4'],
+    },
+    {
+      label: 'ogg vorbis',
+      outputFormat: 'ogg',
+      oggCodec: 'vorbis',
+      expectedArgs: ['-c:a', 'libvorbis', '-q:a', '1.2'],
+    },
+    {
+      label: 'ogg opus',
+      outputFormat: 'ogg',
+      oggCodec: 'opus',
+      expectedArgs: ['-c:a', 'libopus', '-b:a', '64k'],
+    },
+    {
+      label: 'wav',
+      outputFormat: 'wav',
+      oggCodec: 'vorbis',
+      expectedArgs: ['-c:a', 'pcm_s16le'],
+    },
+    {
+      label: 'm4a',
+      outputFormat: 'm4a',
+      oggCodec: 'vorbis',
+      expectedArgs: ['-c:a', 'aac', '-b:a', '256k'],
+    },
+    {
+      label: 'flac',
+      outputFormat: 'flac',
+      oggCodec: 'vorbis',
+      expectedArgs: ['-c:a', 'flac', '-compression_level', '1'],
+    },
+  ])(
+    'builds the expected codec args for $label output',
+    async ({ outputFormat, oggCodec, expectedArgs }) => {
+      fs.existsSync.mockReturnValue(true);
+      spawnMock.mockClear();
+
+      await converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: `out.${outputFormat}`,
+          outputFormat,
+        },
+        settings: { oggCodec },
+      });
+
+      const args = spawnMock.mock.calls.at(-1)?.[1] as string[];
+      expect(args).toEqual(expect.arrayContaining(expectedArgs));
+    },
+    10000
+  );
+
+  it('adds an explicit sample rate arg when loop conversion changes the target rate', async () => {
+    fs.existsSync.mockReturnValue(true);
+    convertLoopPointsMock.mockReturnValue({
+      newSampleRate: 48000,
+      loopStart: 1000,
+      loopLength: 5000,
+    });
+
+    await converterWorker({
+      file: {
+        inputFile: 'in.wav',
+        outputFile: 'out.ogg',
+        outputFormat: 'ogg',
+      },
+      settings: { oggCodec: 'opus' },
+    });
+
+    const args = spawnMock.mock.calls.at(-1)?.[1] as string[];
+    expect(args).toEqual(expect.arrayContaining(['-ar', '48000']));
+  }, 10000);
+
+  it('suppresses loop metadata args when loopDataMode is skip', async () => {
+    fs.existsSync.mockReturnValue(true);
+    convertLoopPointsMock.mockReturnValue({
+      newSampleRate: null,
+      loopStart: 1000,
+      loopLength: 5000,
+    });
+    formatLoopDataMock.mockReturnValue([
+      '-metadata',
+      'LOOPSTART=1000',
+      '-metadata',
+      'LOOPLENGTH=5000',
+    ]);
+
+    await converterWorker({
+      file: {
+        inputFile: 'in.wav',
+        outputFile: 'out.ogg',
+        outputFormat: 'ogg',
+      },
+      settings: { oggCodec: 'vorbis', loopDataMode: 'skip' },
+    });
+
+    const args = spawnMock.mock.calls.at(-1)?.[1] as string[];
+    expect(formatLoopDataMock).not.toHaveBeenCalled();
+    expect(args.join(' ')).not.toContain('LOOPSTART=1000');
   }, 10000);
 
   it('does not re-apply metadata args when preserving metadata for AIFF', async () => {

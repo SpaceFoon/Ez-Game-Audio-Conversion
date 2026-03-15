@@ -1120,6 +1120,238 @@ describe('formatMetaDataArgs - Preservation scenarios', () => {
     expect(joined).not.toContain('performer=�B');
   });
 
+  it('should normalize common aliases to canonical ffmpeg keys', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'mp3',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '44100',
+          tags: {
+            TRACKNUMBER: '7',
+            DISCNUMBER: '2',
+            ALBUMARTIST: 'Lead Composer',
+            TDRC: '2025',
+          },
+        },
+      ],
+      format: {
+        filename: 'aliases.mp3',
+        format_name: 'mp3',
+        duration: '180',
+        size: '777777',
+        bit_rate: '192000',
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('track=7');
+    expect(joined).toContain('disc=2');
+    expect(joined).toContain('album_artist=Lead Composer');
+    expect(joined).toContain('date=2025');
+    expect(joined).not.toContain('TRACKNUMBER=7');
+    expect(joined).not.toContain('DISCNUMBER=2');
+    expect(joined).not.toContain('ALBUMARTIST=Lead Composer');
+    expect(joined).not.toContain('TDRC=2025');
+  });
+
+  it('should split track and disc totals from slash-separated values', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'flac',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '48000',
+          tags: {
+            track: '3/11',
+            disc: '1/2',
+          },
+        },
+      ],
+      format: {
+        filename: 'totals.flac',
+        format_name: 'flac',
+        duration: '240',
+        size: '333333',
+        bit_rate: '800000',
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('track=3');
+    expect(joined).toContain('track_total=11');
+    expect(joined).toContain('disc=1');
+    expect(joined).toContain('disc_total=2');
+  });
+
+  it('should split track totals from "N of M" values', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'aac',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '44100',
+          tags: {
+            track: '5 of 12',
+          },
+        },
+      ],
+      format: {
+        filename: 'track-of.m4a',
+        format_name: 'mov',
+        duration: '180',
+        size: '888888',
+        bit_rate: '256000',
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('track=5');
+    expect(joined).toContain('track_total=12');
+  });
+
+  it('should reject unsafe passthrough tag keys while preserving safe unknown keys', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'vorbis',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '48000',
+          tags: {
+            SAFE_CUSTOM: 'keep-me',
+            'unsafe key': 'drop-me',
+            'another@unsafe': 'drop-me-too',
+          },
+        },
+      ],
+      format: {
+        filename: 'unsafe.ogg',
+        format_name: 'ogg',
+        duration: '60',
+        size: '1000',
+        bit_rate: '128000',
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('SAFE_CUSTOM=keep-me');
+    expect(joined).not.toContain('unsafe key=drop-me');
+    expect(joined).not.toContain('another@unsafe=drop-me-too');
+  });
+
+  it('should keep only the cleaner value for duplicate unknown keys with the same normalized form', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'vorbis',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '48000',
+          tags: {
+            'X Foo': 'bad�value',
+          },
+        },
+      ],
+      format: {
+        filename: 'dup-unknown.ogg',
+        format_name: 'ogg',
+        duration: '60',
+        size: '1000',
+        bit_rate: '128000',
+        tags: {
+          'X-FOO': 'good-value',
+        },
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('X-FOO=good-value');
+    expect(joined).not.toContain('X Foo=bad�value');
+  });
+
+  it('should skip canonical tags that become empty after replacement-character cleanup', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'aiff',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '44100',
+          tags: {
+            performer: '��',
+            title: 'Still Valid',
+          },
+        },
+      ],
+      format: {
+        filename: 'cleanup.aiff',
+        format_name: 'aiff',
+        duration: '180',
+        size: '1234',
+        bit_rate: '256000',
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('title=Still Valid');
+    expect(joined).not.toContain('performer=');
+  });
+
+  it('should prefer stream canonical values unless the format value is demonstrably cleaner', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'flac',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '96000',
+          tags: {
+            artist: 'Stream Artist',
+          },
+        },
+      ],
+      format: {
+        filename: 'priority.flac',
+        format_name: 'flac',
+        duration: '180',
+        size: '555555',
+        bit_rate: '1000000',
+        tags: {
+          artist: 'Format Artist',
+        },
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('artist=Stream Artist');
+    expect(joined).not.toContain('artist=Format Artist');
+  });
+
   it('should round-trip extra/unknown tags unchanged', () => {
     const metadata: AudioMetadata = {
       streams: [
