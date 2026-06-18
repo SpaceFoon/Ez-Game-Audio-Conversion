@@ -10,20 +10,20 @@ jest.mock("worker_threads", () => ({
 }));
 jest.mock("chalk", () => ({
   cyanBright: jest.fn((text) => text),
+  greenBright: jest.fn((text) => text),
+  bgRed: jest.fn((text) => text),
 }));
 jest.mock("../utils", () => ({
+  initializeFileNames: jest.fn(),
   isFileBusy: jest.fn(),
   addToLog: jest.fn(),
-  settings: jest.fn(),
+  settings: { outputFilePath: "/tmp" },
   checkDiskSpace: jest.fn(),
+  rl: { question: jest.fn((_, cb) => cb()) },
 }));
 
 describe("convertFiles", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  const mockFiles = [
+  const createMockFiles = () => [
     {
       inputFile: "C:/Music/01 sh33n4 1s 4 b1t r0ck3r ( Ramones.mp3",
       outputFile: "C:/Music/01 sh33n4 1s 4 b1t r0ck3r ( Ramones.ogg",
@@ -34,6 +34,10 @@ describe("convertFiles", () => {
     },
   ];
 
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it("should process files successfully", async () => {
     Worker.mockImplementation(() => ({
       on: (event, callback) => {
@@ -43,7 +47,7 @@ describe("convertFiles", () => {
       },
     }));
 
-    const result = await convertFiles(mockFiles);
+    const result = await convertFiles(createMockFiles());
     expect(result.failedFiles.length).toBe(0);
     expect(result.successfulFiles.length).toBe(2);
     expect(addToLog).toHaveBeenCalledTimes(2);
@@ -64,7 +68,7 @@ describe("convertFiles", () => {
       postMessage: jest.fn(),
     }));
 
-    const result = await convertFiles(mockFiles);
+    const result = await convertFiles(createMockFiles());
     console.log("Result:", result);
     console.log("Failed Files:", result.failedFiles);
     console.log("Successful Files:", result.successfulFiles);

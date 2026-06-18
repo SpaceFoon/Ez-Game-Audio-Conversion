@@ -62,7 +62,8 @@ const convertFiles = async (files) => {
             rl.question("Press ENTER to exit...", () => process.exit(1));
           }
           addToLog(message, file);
-          reject(new Error(message.data));
+          failedFiles.push(file);
+          resolve();
           return;
         }
 
