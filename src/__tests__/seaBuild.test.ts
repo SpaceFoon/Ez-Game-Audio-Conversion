@@ -5,7 +5,7 @@
  * 1. Creates all required artifacts
  * 2. Archives contain correct files with proper extensions
  * 3. Intermediate files are cleaned up properly
- * 4. The executable name has the correct extension for Windows
+ * 4. The executable name and bundled FFmpeg binaries match the host platform
  */
 
 import { execSync } from 'child_process';
@@ -20,9 +20,15 @@ const __dirname = dirname(__filename);
 const ROOT_DIR = join(__dirname, '..', '..');
 const RELEASE_DIR = join(ROOT_DIR, 'release');
 const isWindows = platform() === 'win32';
+const platformFfmpegDir =
+  platform() === 'win32'
+    ? 'windows'
+    : platform() === 'darwin'
+      ? 'macos'
+      : 'linux';
 
 // Expected artifact names
-const EXPECTED_EXE_NAME = 'EZ-Game-Audio.exe';
+const EXPECTED_EXE_NAME = isWindows ? 'EZ-Game-Audio.exe' : 'EZ-Game-Audio';
 const EXPECTED_ZIP_NAME = 'EZ-Game-Audio-Conversion.zip'; // legacy
 const EXPECTED_7Z_NAME = 'EZ-Game-Audio-Conversion.7z'; // legacy
 
@@ -316,20 +322,21 @@ describe('SEA Build Tests', () => {
         zipContents = listZipContents(zipPath);
     });
 
-    test('ZIP contains executable with .exe extension', () => {
+    test('ZIP contains executable for the host platform', () => {
       if (zipContents.length > 0) {
-        const hasExe = zipContents.some(
+        const hasExpectedExecutable = zipContents.some(
           (f) => f === EXPECTED_EXE_NAME || f.endsWith('/' + EXPECTED_EXE_NAME)
         );
-        const hasNoExtExe = zipContents.some(
+        const hasWrongExtensionExecutable = zipContents.some(
           (f) =>
-            (f === 'EZ-Game-Audio' || f.endsWith('/EZ-Game-Audio')) &&
-            !f.includes('.exe')
+            f === (isWindows ? 'EZ-Game-Audio' : 'EZ-Game-Audio.exe') ||
+            f.endsWith(
+              '/' + (isWindows ? 'EZ-Game-Audio' : 'EZ-Game-Audio.exe')
+            )
         );
 
-        // This is a critical error - Windows users won't be able to run the executable
-        expect(hasNoExtExe && !hasExe).toBe(false);
-        expect(hasExe).toBe(true);
+        expect(hasWrongExtensionExecutable).toBe(false);
+        expect(hasExpectedExecutable).toBe(true);
       }
     });
 
@@ -348,7 +355,7 @@ describe('SEA Build Tests', () => {
     test('ZIP contains ffmpeg binaries', () => {
       if (zipContents.length > 0) {
         const hasFfmpeg = zipContents.some(
-          (f) => f.includes('ffmpeg') && f.includes('windows')
+          (f) => f.includes('ffmpeg') && f.includes(platformFfmpegDir)
         );
         expect(hasFfmpeg).toBe(true);
       }
