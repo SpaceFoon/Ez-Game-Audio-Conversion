@@ -20,7 +20,16 @@ ffmpeg-bin/
 ## Automatic install
 
 `npm install` automatically downloads FFmpeg and FFprobe for the OS you are
-installing on and places them in the matching platform folder:
+installing on and places them in the matching platform folder.
+
+To install npm dependencies and FFmpeg binaries with one explicit project
+command, run:
+
+```bash
+npm run install
+```
+
+The binaries are placed in the matching platform folder:
 
 - Windows: `ffmpeg-bin/windows/`
 - Linux: `ffmpeg-bin/linux/`
