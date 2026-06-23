@@ -18,6 +18,8 @@
     "build:sea": "npm run build && node scripts/build-sea.js",
     "package": "npm run build:sea && node scripts/post-sea.js",
     "clean": "rimraf dist/ release/",
+    "install:ffmpeg": "node scripts/install-ffmpeg.js",
+    "postinstall": "node scripts/install-ffmpeg.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --detectOpenHandles",
     "test:release": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/metadataPreservation.test.ts\" \"src/__tests__/app.test.ts\" && npm test",

@@ -36,19 +36,7 @@ function detectExecutableName() {
     return winExeName;
   }
   if (existsSync(join(releaseDir, unixExeName))) {
-    // If we're on a non-Windows platform but have a non-.exe file,
-    // check if we should be building for Windows (e.g., running in WSL)
-    // For safety, always use .exe for Windows distribution
-    console.log(
-      '[post-sea] Found executable without .exe extension. Renaming for Windows compatibility.'
-    );
-    try {
-      renameSync(join(releaseDir, unixExeName), join(releaseDir, winExeName));
-      return winExeName;
-    } catch (err) {
-      console.warn('[post-sea] Could not rename executable:', err.message);
-      return unixExeName;
-    }
+    return unixExeName;
   }
 
   // Fallback to platform detection

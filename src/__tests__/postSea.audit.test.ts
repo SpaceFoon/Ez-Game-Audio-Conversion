@@ -16,9 +16,9 @@ const releaseDir = join(rootDir, 'release');
 const packageDir = join(releaseDir, 'package');
 const readmesDir = join(packageDir, 'readmes');
 
-// Characterization test for the current packaging heuristic.
-// It proves that on a non-Windows host, a plain EZ-Game-Audio binary is renamed
-// to .exe and then treated as a Windows package target.
+// Characterization tests for host-platform packaging behavior.
+// On Linux, a plain EZ-Game-Audio binary remains extensionless and the Linux
+// FFmpeg bundle is staged.
 
 jest.unstable_mockModule('os', () => ({
   platform: jest.fn(() => 'linux'),
@@ -52,7 +52,7 @@ jest.unstable_mockModule('fs', () => ({
     if (normalized.endsWith('/ffmpeg-bin/README.md')) {
       return true;
     }
-    if (normalized.endsWith('/ffmpeg-bin/windows')) {
+    if (normalized.endsWith('/ffmpeg-bin/linux')) {
       return true;
     }
     if (normalized.endsWith('/release/dist')) {
@@ -80,10 +80,10 @@ jest.unstable_mockModule('fs', () => ({
         isFile: () => true,
       });
 
-      if (normalized.endsWith('/ffmpeg-bin/windows')) {
+      if (normalized.endsWith('/ffmpeg-bin/linux')) {
         return options?.withFileTypes
-          ? [makeFile('ffmpeg.exe'), makeFile('ffprobe.exe')]
-          : ['ffmpeg.exe', 'ffprobe.exe'];
+          ? [makeFile('ffmpeg'), makeFile('ffprobe')]
+          : ['ffmpeg', 'ffprobe'];
       }
       if (normalized.endsWith('/release/dist')) {
         return options?.withFileTypes
@@ -138,22 +138,18 @@ describe('post-sea audit characterization', () => {
     process.env.GITHUB_ACTIONS = originalGithubActions;
   });
 
-  it('proves a linux-host package with EZ-Game-Audio gets renamed and staged as windows', async () => {
+  it('keeps a linux-host executable extensionless and stages linux ffmpeg', async () => {
     await import('../../scripts/post-sea.js');
 
-    expect(unixExeRenamed).toBe(true);
+    expect(unixExeRenamed).toBe(false);
     expect(
       copiedSources.some((source) =>
-        String(source)
-          .replace(/\\/g, '/')
-          .endsWith('/ffmpeg-bin/windows/ffmpeg.exe')
+        String(source).replace(/\\/g, '/').endsWith('/ffmpeg-bin/linux/ffmpeg')
       )
     ).toBe(true);
     expect(
       copiedSources.some((source) =>
-        String(source)
-          .replace(/\\/g, '/')
-          .endsWith('/ffmpeg-bin/windows/ffprobe.exe')
+        String(source).replace(/\\/g, '/').endsWith('/ffmpeg-bin/linux/ffprobe')
       )
     ).toBe(true);
   });

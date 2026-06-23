@@ -17,7 +17,32 @@ ffmpeg-bin/
     └── ffprobe
 ```
 
-## Download Links
+## Automatic install
+
+`npm install` automatically downloads FFmpeg and FFprobe for the OS you are
+installing on and places them in the matching platform folder:
+
+- Windows: `ffmpeg-bin/windows/`
+- Linux: `ffmpeg-bin/linux/`
+- macOS: `ffmpeg-bin/macos/`
+
+If the expected binaries already exist, the installer leaves them alone. To
+force a fresh download, run:
+
+```bash
+EZ_AUDIO_FORCE_FFMPEG_DOWNLOAD=1 npm run install:ffmpeg
+```
+
+To skip the download step, run:
+
+```bash
+EZ_AUDIO_SKIP_FFMPEG_DOWNLOAD=1 npm install
+```
+
+## Manual download links
+
+Use these links only if the automatic install fails or if you want to replace
+the bundled binaries yourself.
 
 ### Windows
 1. Download: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
