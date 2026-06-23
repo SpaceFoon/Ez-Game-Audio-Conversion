@@ -65,7 +65,11 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
 
 1. Clone the repository or download.
 
-2. Install dependencies with `npm install`.
+2. Install dependencies and download FFmpeg/FFprobe for your current OS:
+
+   ```bash
+   npm run install
+   ```
 
 3. Choose the workflow you want:
    - `npm run dev` builds TypeScript and runs the app from `dist/`
@@ -73,8 +77,13 @@ Prefer a hands-on approach over trusting random files from the internet? Here's 
    - `npm run build:sea` builds the single executable application
    - `npm run package` builds the SEA release package, docs, checksums, and archives
 
-4. Download FFmpeg and FFprobe for your platform and place them in `ffmpeg-bin/windows/`, `ffmpeg-bin/linux/`, or `ffmpeg-bin/macos/` before building packages.
-   See [ffmpeg-bin/README.md](ffmpeg-bin/README.md) for download links and setup instructions.
+`npm run install` downloads binaries for the OS running the command:
+
+- Windows PowerShell/CMD: `ffmpeg-bin/windows/`
+- Linux/WSL: `ffmpeg-bin/linux/`
+- macOS: `ffmpeg-bin/macos/`
+
+See [ffmpeg-bin/README.md](ffmpeg-bin/README.md) for manual fallback links and setup details.
 
 To change codec or bitrate defaults, look in `src/converterWorker.ts`.
 
@@ -223,7 +232,7 @@ Compare the output hash to the contents of the `.sha256` file.
 
 - Building from source: Windows, Linux, and macOS are supported
 - Node.js 24
-- FFmpeg and FFprobe binaries for target OS at `ffmpeg-bin/<platform>/`
+- FFmpeg and FFprobe binaries for the target OS at `ffmpeg-bin/<platform>/` (`npm run install` downloads them automatically)
 - Optional on Windows: Windows Terminal from the Windows Store for enhanced visual experience (emoji support 😎 ).
 
 ### Testing
