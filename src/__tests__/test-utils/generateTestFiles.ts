@@ -17,6 +17,18 @@ function findFfmpegExecutables() {
   const isWindows = process.platform === 'win32';
   const ffmpegExe = isWindows ? 'ffmpeg.exe' : 'ffmpeg';
   const ffprobeExe = isWindows ? 'ffprobe.exe' : 'ffprobe';
+  const platformSlug = isWindows
+    ? 'windows'
+    : process.platform === 'darwin'
+      ? 'macos'
+      : 'linux';
+
+  const bundledDir = join(process.cwd(), 'ffmpeg-bin', platformSlug);
+  const bundledFfmpeg = join(bundledDir, ffmpegExe);
+  const bundledFfprobe = join(bundledDir, ffprobeExe);
+  if (existsSync(bundledFfmpeg) && existsSync(bundledFfprobe)) {
+    return { ffmpegPath: bundledFfmpeg, ffprobePath: bundledFfprobe };
+  }
 
   let ffmpegPath = ffmpegExe;
   let ffprobePath = ffprobeExe;

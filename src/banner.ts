@@ -7,7 +7,7 @@
 
 const BANNER_SNAPSHOT = '__SEA_BANNER__';
 
-function stripAnsiSgr(input: string): string {
+export function stripAnsiSgr(input: string): string {
   let output = '';
 
   for (let i = 0; i < input.length; i++) {

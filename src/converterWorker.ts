@@ -14,6 +14,18 @@ import { platformSlug, getErrorMessage, findBinary } from './utils.js';
 import logger from './logger.js';
 import type { LoopDataMode } from './types/settings.js';
 
+/** Returns true when output path contains characters unsafe for ffmpeg spawn args. */
+export const outputPathHasInvalidCharacters = (outputFile: string): boolean => {
+  if (outputFile.includes('"')) return true;
+  if (outputFile.includes('\n') || outputFile.includes('\r')) return true;
+
+  const pathToCheck = /^[A-Za-z]:/.test(outputFile)
+    ? outputFile.slice(2)
+    : outputFile;
+  // eslint-disable-next-line no-control-regex
+  return /[\x00-\x1F<>:|?*]/.test(pathToCheck);
+};
+
 type WorkerFileContext = {
   inputFile?: string;
   outputFile?: string;
@@ -25,15 +37,15 @@ type WorkerErrorMessage = {
   file?: WorkerFileContext;
 };
 
-// Helper function for failures
-const failWorker = (reason: unknown): never => {
+// Helper function for failures — posts to parent, then rejects (no throw after postMessage)
+const failWorker = (reason: unknown): Promise<never> => {
   const f = (workerData && workerData.file) || {};
   postError(reason, { inputFile: f.inputFile, outputFile: f.outputFile });
   const msg =
     reason instanceof Error
       ? reason.message
       : String(reason || 'Unknown error');
-  throw new Error(msg);
+  return Promise.reject(new Error(msg));
 };
 
 // Send structured error to manager (no hard exit here; allow caller to throw/reject)
@@ -69,38 +81,30 @@ const converterWorker = async ({
 }): Promise<void> => {
   // Basic validation to prevent crashes
   if (!inputFile) {
-    failWorker('Missing input file');
+    return failWorker('Missing input file');
   }
 
   if (!outputFile) {
-    failWorker('Missing output file');
+    return failWorker('Missing output file');
   }
 
   if (!outputFormat) {
-    failWorker('Missing output format');
+    return failWorker('Missing output format');
   }
 
   // Validate output file path
   if (outputFile.includes('"')) {
-    failWorker(
+    return failWorker(
       `Output file path contains quotes which will cause problems: ${outputFile}`
     );
   }
 
   if (outputFile.includes('\n') || outputFile.includes('\r')) {
-    failWorker(`Output file path contains line breaks: ${outputFile}`);
+    return failWorker(`Output file path contains line breaks: ${outputFile}`);
   }
 
-  // Block Windows-invalid characters and control characters, but allow Unicode
-  // Windows NTFS doesn't allow: < > : " | ? *
-  // Quotes are already checked above, so we check the rest here
-  // Allow : only as drive letter (e.g., C:\) - strip it before checking
-  const pathToCheck = /^[A-Za-z]:/.test(outputFile)
-    ? outputFile.slice(2)
-    : outputFile;
-  // eslint-disable-next-line no-control-regex
-  if (/[\x00-\x1F<>:|?*]/.test(pathToCheck)) {
-    failWorker(
+  if (outputPathHasInvalidCharacters(outputFile)) {
+    return failWorker(
       `Output file path contains invalid characters (control chars or <>:|?*): ${outputFile}`
     );
   }
@@ -116,13 +120,18 @@ const converterWorker = async ({
   // The upstream guard in createConversionList should prevent this, but if
   // anything slips through, this hard stop protects the user's data.
   if (resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()) {
-    failWorker(
+    return failWorker(
       `CRITICAL: output path resolves to input file — refusing to overwrite: ${inputFile}`
     );
   }
 
   // Get metadata from input file
   const metadata = await getMetaData(inputFile);
+  if (metadata === null) {
+    return failWorker(
+      `Could not read metadata from input file (ffprobe failed): ${inputFile}`
+    );
+  }
 
   // Get formatted metadata and channels as arrays (safe for spawn)
   const { metaDataArgs, channelsArgs } = formatMetaDataArgs(
@@ -143,7 +152,6 @@ const converterWorker = async ({
   // Format loop data for ffmpeg command
   let loopDataArgs: string[] = [];
   if (loopDataMode === 'skip') {
-    // User explicitly disabled loop point handling
     loopDataArgs = [];
   } else if (
     loopStart !== null &&
@@ -152,9 +160,9 @@ const converterWorker = async ({
     !isNaN(loopLength) &&
     !(loopStart === 0 && loopLength === 0)
   ) {
-    // Skip loop points for unsupported formats (WAV and M4A)
     const fmt = outputFormat.toLowerCase();
-    if (fmt === 'm4a' || fmt === 'wav') {
+    const unsupportedFormat = fmt === 'm4a' || fmt === 'wav';
+    if (unsupportedFormat && loopDataMode !== 'force') {
       logger.log(
         `Loop points are not supported for ${fmt.toUpperCase()} format`
       );
@@ -169,7 +177,7 @@ const converterWorker = async ({
   const ffmpegPath = findBinary(executableName, [`ffmpeg-bin/${platformSlug}`]);
 
   if (ffmpegPath === null) {
-    failWorker(
+    return failWorker(
       `${executableName} not found. Place it in ffmpeg-bin/${platformSlug}/`
     );
   }
@@ -315,32 +323,32 @@ const converterWorker = async ({
 const runConversion = async (): Promise<void> => {
   // Detailed validation of worker data
   if (!workerData) {
-    failWorker('Worker data is completely missing');
+    return failWorker('Worker data is completely missing');
   }
 
   if (!workerData.file) {
-    failWorker('Worker data missing file object');
+    return failWorker('Worker data missing file object');
   }
 
   const { inputFile, outputFile, outputFormat } = workerData.file;
 
   // Validate input file
   if (!inputFile) {
-    failWorker('Missing input file path');
+    return failWorker('Missing input file path');
   }
 
   if (!existsSync(inputFile)) {
-    failWorker(`Input file does not exist: ${inputFile}`);
+    return failWorker(`Input file does not exist: ${inputFile}`);
   }
 
   // Validate output file
   if (!outputFile) {
-    failWorker('Missing output file path');
+    return failWorker('Missing output file path');
   }
 
   // Validate output format
   if (!outputFormat) {
-    failWorker('Missing output format');
+    return failWorker('Missing output format');
   }
 
   // Ensure codec is set for OGG
@@ -373,10 +381,13 @@ const runFFMPEG = (
       // Collect error output for better diagnostics
       let errorOutput = '';
 
-      // Capture stderr output (don't forward individually - only send accumulated on error)
+      // Capture stderr output and forward to parent for fatal-error detection
       ffmpegCommand.stderr.on('data', (data: Buffer) => {
-        const errorText = data.toString().trim();
-        errorOutput += errorText + '\n';
+        const errorText = data.toString();
+        errorOutput += errorText;
+        if (errorText) {
+          parentPort?.postMessage({ type: 'stderr', data: errorText });
+        }
       });
 
       // Handle successful completion
@@ -423,7 +434,9 @@ if (
   workerData !== null &&
   'file' in workerData
 ) {
-  runConversion();
+  void runConversion().catch(() => {
+    // Failure already reported to parent via postError
+  });
 }
 
 export { runConversion, converterWorker };

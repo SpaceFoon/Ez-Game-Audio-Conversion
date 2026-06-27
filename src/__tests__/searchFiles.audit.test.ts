@@ -1,12 +1,21 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { join } from 'path';
 
-// Characterization tests for audit findings.
-// These intentionally assert the CURRENT broken behavior so the audit can be
-// verified in code, then inverted when the implementation is fixed.
+// These tests originally characterized BROKEN behavior (one unreadable entry or
+// a symlink loop crashing the whole search). The walk is now resilient, so they
+// assert the fixed behavior: skip-and-continue plus loop protection.
 
 jest.unstable_mockModule('fs', () => ({
   readdirSync: jest.fn(),
   statSync: jest.fn(),
+  realpathSync: jest.fn((p: string) => p),
+  // Present so utils.js (imported transitively) can link its fs named imports.
+  openSync: jest.fn(),
+  closeSync: jest.fn(),
+  existsSync: jest.fn(),
+  appendFileSync: jest.fn(),
+  writeFileSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 
 jest.unstable_mockModule('chalk', () => ({
@@ -21,7 +30,9 @@ jest.unstable_mockModule('chalk', () => ({
 }));
 
 const fs = await import('fs');
-const { default: searchFiles } = await import('../searchFiles.js');
+const { default: searchFiles, MAX_WALK_DEPTH } =
+  await import('../searchFiles.js');
+const { getSearchErrors, clearSearchErrors } = await import('../utils.js');
 
 const readdirSyncMock = fs.readdirSync as unknown as jest.MockedFunction<
   typeof fs.readdirSync
@@ -29,17 +40,22 @@ const readdirSyncMock = fs.readdirSync as unknown as jest.MockedFunction<
 const statSyncMock = fs.statSync as unknown as jest.MockedFunction<
   typeof fs.statSync
 >;
+const realpathSyncMock = fs.realpathSync as unknown as jest.MockedFunction<
+  typeof fs.realpathSync
+>;
 
-describe('searchFiles audit characterization', () => {
+describe('searchFiles resilience', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSearchErrors();
+    realpathSyncMock.mockImplementation((p) => p as string);
     console.log = jest.fn();
     console.warn = jest.fn();
     console.error = jest.fn();
   });
 
-  it('proves one unreadable entry aborts the entire walk instead of being skipped', async () => {
-    readdirSyncMock.mockReturnValueOnce(['good.mp3', 'broken.wav']);
+  it('skips an unreadable entry, keeps going, and records the error', async () => {
+    readdirSyncMock.mockReturnValueOnce(['good.mp3', 'broken.wav'] as never);
     statSyncMock.mockImplementation((targetPath) => {
       if (String(targetPath).endsWith('broken.wav')) {
         throw new Error('EACCES: permission denied');
@@ -47,37 +63,58 @@ describe('searchFiles audit characterization', () => {
       return { isDirectory: () => false } as ReturnType<typeof fs.statSync>;
     });
 
-    expect(() =>
-      searchFiles({
-        inputFilePath: '/audit/input',
-        inputFormats: ['mp3', 'wav'],
-      } as never)
-    ).toThrow('EACCES: permission denied');
+    const result = await searchFiles({
+      inputFilePath: '/audit/input',
+      inputFormats: ['mp3', 'wav'],
+    } as never);
+
+    expect(result).toEqual([join('/audit/input', 'good.mp3')]);
+
+    const errors = getSearchErrors();
+    expect(
+      errors.some(
+        (e) => e.path.endsWith('broken.wav') && /EACCES/.test(e.message)
+      )
+    ).toBe(true);
   });
 
-  it('proves there is no cycle protection when recursion revisits the same logical directory', async () => {
-    let readCount = 0;
-
-    readdirSyncMock.mockImplementation(() => {
-      readCount += 1;
-      if (readCount > 6) {
-        throw new Error('cycle sentinel');
-      }
-      return ['loop'];
-    });
-
+  it('does not recurse forever when a directory loops back on itself', async () => {
+    readdirSyncMock.mockReturnValue(['loop'] as never);
     statSyncMock.mockReturnValue({
       isDirectory: () => true,
     } as ReturnType<typeof fs.statSync>);
+    // Simulate a symlink/junction loop: every path resolves to the same dir.
+    realpathSyncMock.mockReturnValue('/audit/root' as never);
 
-    expect(() =>
-      searchFiles({
-        inputFilePath: '/audit/root',
-        inputFormats: ['wav'],
-      } as never)
-    ).toThrow('cycle sentinel');
+    const result = await searchFiles({
+      inputFilePath: '/audit/root',
+      inputFormats: ['wav'],
+    } as never);
 
-    expect(readdirSyncMock).toHaveBeenCalledTimes(7);
-    expect(statSyncMock).toHaveBeenCalledTimes(6);
+    expect(result).toEqual([]);
+    // The loop is detected after the first directory read, so we never spin.
+    expect(readdirSyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  it(`stops descending past MAX_WALK_DEPTH (${MAX_WALK_DEPTH}) and records an error`, async () => {
+    readdirSyncMock.mockReturnValue(['child'] as never);
+    statSyncMock.mockReturnValue({
+      isDirectory: () => true,
+    } as ReturnType<typeof fs.statSync>);
+    realpathSyncMock.mockImplementation((p) => String(p) as never);
+
+    await searchFiles({
+      inputFilePath: '/audit/deep',
+      inputFormats: ['wav'],
+    } as never);
+
+    expect(readdirSyncMock.mock.calls.length).toBeLessThanOrEqual(
+      MAX_WALK_DEPTH + 2
+    );
+    expect(
+      getSearchErrors().some((error) =>
+        error.message.includes(String(MAX_WALK_DEPTH))
+      )
+    ).toBe(true);
   });
 });

@@ -4,6 +4,14 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 jest.unstable_mockModule('fs', () => ({
   readdirSync: jest.fn(),
   statSync: jest.fn(),
+  realpathSync: jest.fn((p: string) => p),
+  // Present so utils.js (imported transitively) can link its fs named imports.
+  openSync: jest.fn(),
+  closeSync: jest.fn(),
+  existsSync: jest.fn(),
+  appendFileSync: jest.fn(),
+  writeFileSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 
 jest.unstable_mockModule('chalk', () => ({
@@ -25,10 +33,12 @@ jest.unstable_mockModule('chalk', () => ({
 const { readdirSync: _readdirSync, statSync: _statSync } = await import('fs');
 const { join } = await import('path');
 const { default: searchFiles } = await import('../searchFiles.js');
+const { getSearchErrors, clearSearchErrors } = await import('../utils.js');
 
 describe('searchFiles', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSearchErrors();
     // Reset console.log to avoid polluting test output
     console.log = jest.fn();
   });
@@ -73,29 +83,6 @@ describe('searchFiles', () => {
     expect(
       result.every((file) => !file.endsWith(join('subdir', 'file4.jpg')))
     ).toBe(true);
-  });
-
-  it('should handle midi files with both .mid and .midi extensions', async () => {
-    // Mock file structure with midi files
-    _readdirSync.mockReturnValueOnce(['song1.mid', 'song2.midi', 'song3.mp3']);
-
-    // Mock stats to make all files non-directories
-    _statSync.mockImplementation((_path) => ({
-      isDirectory: () => false,
-    }));
-
-    const settings = {
-      inputFilePath: '/test/dir',
-      inputFormats: ['midi', 'mp3'],
-    };
-
-    const result = await searchFiles(settings);
-
-    // Should find all three files
-    expect(result).toHaveLength(3);
-    expect(result.some((file) => file.endsWith('song1.mid'))).toBe(true);
-    expect(result.some((file) => file.endsWith('song2.midi'))).toBe(true);
-    expect(result.some((file) => file.endsWith('song3.mp3'))).toBe(true);
   });
 
   it('should return an empty array when no matching files are found', async () => {
@@ -232,5 +219,52 @@ describe('searchFiles', () => {
 
     expect(result).toEqual(['/music/special track.wav']);
     expect(_readdirSync).not.toHaveBeenCalled();
+  });
+
+  it('skips unreadable directories and records the error without aborting', async () => {
+    _readdirSync
+      .mockReturnValueOnce(['good.mp3', 'locked-subdir'])
+      .mockImplementationOnce(() => {
+        throw new Error('EACCES: permission denied');
+      });
+    _statSync.mockImplementation((targetPath) => ({
+      isDirectory: () => String(targetPath).endsWith('locked-subdir'),
+    }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/dir',
+      inputFormats: ['mp3'],
+    });
+
+    expect(result).toEqual([join('/test/dir', 'good.mp3')]);
+    expect(getSearchErrors()).toEqual([
+      expect.objectContaining({
+        path: join('/test/dir', 'locked-subdir'),
+        message: expect.stringContaining('EACCES'),
+      }),
+    ]);
+  });
+
+  it('skips unreadable files and keeps matching other files', async () => {
+    _readdirSync.mockReturnValueOnce(['good.mp3', 'broken.wav']);
+    _statSync.mockImplementation((targetPath) => {
+      if (String(targetPath).endsWith('broken.wav')) {
+        throw new Error('EBUSY: resource busy');
+      }
+      return { isDirectory: () => false };
+    });
+
+    const result = await searchFiles({
+      inputFilePath: '/test/dir',
+      inputFormats: ['mp3', 'wav'],
+    });
+
+    expect(result).toEqual([join('/test/dir', 'good.mp3')]);
+    expect(getSearchErrors()[0]).toEqual(
+      expect.objectContaining({
+        path: join('/test/dir', 'broken.wav'),
+        message: expect.stringContaining('EBUSY'),
+      })
+    );
   });
 });

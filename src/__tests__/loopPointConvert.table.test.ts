@@ -151,4 +151,48 @@ describe('convertLoopPoints table cases', () => {
     expect(res.loopStart).toBeNaN();
     expect(res.loopLength).toBeNaN();
   });
+
+  it('ignores non-numeric loop tags', () => {
+    const meta = {
+      streams: [
+        {
+          sample_rate: '44100',
+          channels: 2,
+          tags: { LOOPSTART: 'not-a-number', LOOPLENGTH: 'also-bad' },
+        },
+      ],
+      format: { tags: {} },
+    };
+    const res = convertLoopPoints(meta as any, 'mp3', 'vorbis');
+    expect(res.loopStart).toBeNaN();
+    expect(res.loopLength).toBeNaN();
+  });
+
+  it('treats zero loop start and length as no loop', () => {
+    const meta = makeMeta(44100, 0, 0);
+    const res = convertLoopPoints(meta as any, 'mp3', 'vorbis');
+    expect(res.loopStart).toBe(0);
+    expect(res.loopLength).toBe(0);
+  });
+
+  it('uses only the first audio stream for loop conversion', () => {
+    const meta = {
+      streams: [
+        {
+          sample_rate: '44100',
+          channels: 2,
+          tags: { LOOPSTART: '100', LOOPLENGTH: '200' },
+        },
+        {
+          sample_rate: '48000',
+          channels: 2,
+          tags: { LOOPSTART: '999', LOOPLENGTH: '888' },
+        },
+      ],
+      format: { tags: {} },
+    };
+    const res = convertLoopPoints(meta as any, 'mp3', 'vorbis');
+    expect(res.loopStart).toBe(100);
+    expect(res.loopLength).toBe(200);
+  });
 });

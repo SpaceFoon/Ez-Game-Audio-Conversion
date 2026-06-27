@@ -143,7 +143,7 @@ try {
         ProductName: 'EZ Game Audio Conversion',
         FileDescription: 'Batch audio converter for game developers',
         CompanyName: packageJson.author || 'SpaceFoon',
-        LegalCopyright: '© 2024',
+        LegalCopyright: `© ${new Date().getFullYear()}`,
         FileVersion: packageJson.version,
         ProductVersion: packageJson.version,
       }

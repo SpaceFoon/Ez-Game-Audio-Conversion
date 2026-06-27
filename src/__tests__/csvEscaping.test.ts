@@ -171,6 +171,24 @@ describe('escapeCsvField', () => {
     });
   });
 
+  describe('formula injection (Excel)', () => {
+    it('should prefix leading =, +, -, and @ with a single quote', () => {
+      expect(escapeCsvField('=SUM(A1)')).toBe("'=SUM(A1)");
+      expect(escapeCsvField('+cmd|calc')).toBe("'+cmd|calc");
+      expect(escapeCsvField('-2+3')).toBe("'-2+3");
+      expect(escapeCsvField('@evil')).toBe("'@evil");
+    });
+
+    it('should neutralize formulas before RFC-4180 quoting', () => {
+      expect(escapeCsvField('=1+2, note')).toBe('"\'=1+2, note"');
+      expect(escapeCsvField('=hello, world')).toBe('"\'=hello, world"');
+    });
+
+    it('should not double-prefix values already escaped', () => {
+      expect(escapeCsvField("'=safe")).toBe("'=safe");
+    });
+  });
+
   describe('edge cases', () => {
     it('should handle empty string', () => {
       expect(escapeCsvField('')).toBe('');

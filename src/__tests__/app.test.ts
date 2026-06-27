@@ -206,8 +206,9 @@ describe('app.js', () => {
     expect(globalThis.env).toEqual({ already: true });
   });
 
-  // Skip: process.stdin/stdout are read-only getters in Node 20+
-  it.skip('logs debug mode and TTY info if env.isDebug is true', async () => {
+  it('logs debug mode when env.isDebug is true', async () => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
     globalThis.env = {
       isDebug: true,
       isDev: false,
@@ -222,9 +223,14 @@ describe('app.js', () => {
 
     await runApp();
 
-    expect(logSpy).toHaveBeenCalledWith('debug mode');
-    expect(logSpy).toHaveBeenCalledWith('stdin is TTY:', true);
-    expect(logSpy).toHaveBeenCalledWith('stdout is TTY:', true);
+    expect(debugSpy).toHaveBeenCalledWith('debug mode');
+    expect(debugSpy).toHaveBeenCalledWith('stdin is TTY:', process.stdin.isTTY);
+    expect(debugSpy).toHaveBeenCalledWith(
+      'stdout is TTY:',
+      process.stdout.isTTY
+    );
+
+    debugSpy.mockRestore();
   });
 
   it('logs dev mode if env.isDev is true', async () => {

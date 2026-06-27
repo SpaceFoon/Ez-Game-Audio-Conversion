@@ -137,6 +137,8 @@ For best results with loop points, use OGG or FLAC formats.
 
 - Source: [RPGMaker.net](https://rpgmaker.net/articles/2633/)
 
+> **Note:** The MIDI column describes RPG Maker engine support, not this tool. EZ Game Audio does not convert MIDI (`.mid`/`.midi`) — ffmpeg requires a soundfont for MIDI playback and the input prompt only accepts standard audio formats (MP3, OGG, WAV, M4A, AIFF, FLAC).
+
 RPG Maker **MV and MZ will play Opus but do not support loop tags**. MV will not play Opus in the editor.
 
 If you want Opus loop tags to work to work in RMMV-MZ then you will need my plugin.
@@ -241,18 +243,25 @@ All tests are organized in the `src/__tests__/` directory with the following str
 
 ```
 src/__tests__/
-├── integration/                  # Integration tests
+├── integration/                  # Real ffmpeg/worker integration tests
 ├── test-utils/                   # Reusable test utilities
-├── test-assets/                  # Location for test assets
-└── unit tests                    # Various .test.js files
+├── test-assets/                  # Generated test assets (gitignored output)
+├── KNOWN_TEST_FINDINGS.md        # Audit-documented production gaps
+├── ci.integration.guard.test.ts # Fails CI if ffmpeg/worker deps missing
+├── *.audit.test.ts               # Characterization tests for known gaps
+├── *Fuzz.test.ts                 # Deterministic fuzz/property-style tests
+└── *.test.ts                     # Unit and hybrid tests
 ```
 
 To run tests:
 
 - `npm test` - Run all Jest tests
+- `npm run test:unit` - Unit/hybrid tests only (fast local loop)
+- `npm run test:integration` - Real ffmpeg integration tests only
+- `npm run test:pre-release` - Full verification ladder before tagging
 - `npm run test:ci` - Run tests with open handle detection (CI-safe)
 - `npm run test:coverage` - Run tests with coverage report
 - `npm run smoke` - Build/package and run the smoke test
 
-CI runs the same checks in the workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml).
+CI downloads ffmpeg and runs the full suite. Coverage artifacts (`coverage/`, including `coverage-summary.json`) are uploaded on every run.
 Release steps are documented in [.github/workflows/RELEASE-GUIDE.md](.github/workflows/RELEASE-GUIDE.md).

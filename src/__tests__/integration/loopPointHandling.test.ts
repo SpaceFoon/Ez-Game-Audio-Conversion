@@ -2,7 +2,30 @@ import { describe, expect, it } from '@jest/globals';
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
-import { execSync } from 'child_process';
+import { execSync, spawnSync } from 'child_process';
+import { platform } from 'os';
+
+const PLATFORM_SLUG =
+  platform() === 'win32'
+    ? 'windows'
+    : platform() === 'darwin'
+      ? 'macos'
+      : 'linux';
+const FFMPEG_EXE = platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+const FFPROBE_EXE = platform() === 'win32' ? 'ffprobe.exe' : 'ffprobe';
+const FFMPEG_PATH = join(
+  process.cwd(),
+  'ffmpeg-bin',
+  PLATFORM_SLUG,
+  FFMPEG_EXE
+);
+const FFPROBE_PATH = join(
+  process.cwd(),
+  'ffmpeg-bin',
+  PLATFORM_SLUG,
+  FFPROBE_EXE
+);
+const quote = (value: string) => `"${value.replace(/"/g, '\\"')}"`;
 
 // Constants
 const TEST_DIR = join(
@@ -116,17 +139,28 @@ function createDirectories() {
   }
 }
 
-// Check for ffmpeg executable
+// Check for bundled ffmpeg executable
 function checkForFfmpeg() {
   console.log('Checking for ffmpeg...');
-  try {
-    execSync('ffmpeg -version', { encoding: 'utf8' });
-    console.log('✅ ffmpeg found');
-    return true;
-  } catch {
-    console.error('❌ ffmpeg not found. Please install ffmpeg to continue.');
+  if (!existsSync(FFMPEG_PATH)) {
+    console.error(`❌ ffmpeg not found at ${FFMPEG_PATH}`);
     return false;
   }
+  try {
+    const result = spawnSync(FFMPEG_PATH, ['-version'], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+      timeout: 5000,
+    });
+    if (result.status === 0) {
+      console.log('✅ ffmpeg found');
+      return true;
+    }
+  } catch {
+    // fall through
+  }
+  console.error('❌ ffmpeg not found. Place binaries in ffmpeg-bin/');
+  return false;
 }
 
 // Generate test files
@@ -136,7 +170,7 @@ function generateTestFiles() {
 
   // Generate a sine wave base file with no metadata
   const baseCmd = [
-    'ffmpeg',
+    quote(FFMPEG_PATH),
     '-y',
     '-f',
     'lavfi',
@@ -145,8 +179,8 @@ function generateTestFiles() {
     '-c:a',
     'pcm_s16le',
     '-ar',
-    SAMPLE_RATE,
-    baseWavPath,
+    String(SAMPLE_RATE),
+    quote(baseWavPath),
   ];
 
   try {
@@ -160,10 +194,10 @@ function generateTestFiles() {
 }
 
 // Extract metadata using ffprobe
-function getMetadata(filePath) {
+function getMetadata(filePath: string) {
   try {
     const output = execSync(
-      `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
+      `${quote(FFPROBE_PATH)} -v quiet -print_format json -show_format -show_streams ${quote(filePath)}`,
       { encoding: 'utf8' }
     );
 
@@ -255,15 +289,15 @@ function runTests(baseFilePath) {
 
         // Build ffmpeg command
         const cmd = [
-          'ffmpeg',
+          quote(FFMPEG_PATH),
           '-y',
           '-i',
-          `"${baseFilePath}"`,
+          quote(baseFilePath),
           '-c:a',
           format.codec,
           ...format.quality,
           ...metadataFlags,
-          `"${outputFilePath}"`,
+          quote(outputFilePath),
         ];
 
         // Execute ffmpeg
@@ -461,14 +495,14 @@ async function main() {
   }
 
   if (!checkForFfmpeg()) {
-    return;
+    return false;
   }
 
   // Generate base test file
   const baseFilePath = generateTestFiles();
   if (!baseFilePath) {
     console.error('Failed to generate test files, aborting tests.');
-    return;
+    return false;
   }
 
   // Run tests
@@ -483,9 +517,18 @@ async function main() {
   return true;
 }
 
-// Long-running integration test requiring ffmpeg — skipped in standard test runs
-describe.skip('Loop Point Handling Integration', () => {
+const ffmpegAvailable =
+  existsSync(FFMPEG_PATH) &&
+  spawnSync(FFMPEG_PATH, ['-version'], {
+    encoding: 'utf8',
+    stdio: 'pipe',
+    timeout: 5000,
+  }).status === 0;
+
+const describeWithFfmpeg = ffmpegAvailable ? describe : describe.skip;
+
+describeWithFfmpeg('Loop Point Handling Integration', () => {
   it('converts loop points across formats without throwing', async () => {
     await expect(main()).resolves.toBe(true);
-  });
+  }, 120000);
 });

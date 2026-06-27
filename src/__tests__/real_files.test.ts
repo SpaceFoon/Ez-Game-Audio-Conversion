@@ -1,4 +1,11 @@
-import { describe, it, expect, beforeAll } from '@jest/globals';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterEach,
+  jest,
+} from '@jest/globals';
 import { fileURLToPath } from 'url';
 
 import {
@@ -10,8 +17,10 @@ import {
 } from 'fs';
 import { join, dirname, basename, extname } from 'path';
 import { convertFiles } from '../../src/converterManager.js';
-import { settings } from '../../src/utils.js';
+import { settings, findBinary } from '../../src/utils.js';
+import { resolveDuplicateBasenames } from '../../src/searchFiles.js';
 import type { ConversionItem } from '../../src/types/audio.js';
+import generateTestFiles from './test-utils/generateTestFiles.js';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -22,80 +31,64 @@ const TEST_FILES_DIR = join(__dirname, 'test_files');
 const TEST_INPUT_DIR = join(TEST_FILES_DIR, 'input');
 const TEST_OUTPUT_DIR = join(TEST_FILES_DIR, 'output');
 
-// Simplified version of deleteDuplicateFiles for test purposes only
-const handleDuplicateFiles = (files: string[]) => {
-  const priorityList = [
-    '.midi',
-    '.mid',
-    '.ogg',
-    '.mp3',
-    '.m4a',
-    '.wav',
-    '.flac',
-    '.aiff',
-  ];
-  const fileobjs: Array<[string, string]> = files.map((file) => [
-    join(dirname(file), basename(file, extname(file))),
-    extname(file),
-  ]);
+const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'];
 
-  const uniq = new Map<string, string>();
-  const droppedFiles: string[] = [];
+const ffmpegAvailable = (() => {
+  const { ffmpegPath, ffprobePath } = generateTestFiles.findFfmpegExecutables();
+  return existsSync(ffmpegPath) && existsSync(ffprobePath);
+})();
 
-  for (const [name, ext] of fileobjs) {
-    if (!uniq.has(name)) {
-      uniq.set(name, ext);
-      continue;
-    }
+const workerReady = findBinary('converterWorker.js', ['dist']) !== null;
+const canRunRealTests = ffmpegAvailable && workerReady;
 
-    const current = uniq.get(name);
-    if (!current) {
-      uniq.set(name, ext);
-      continue;
-    }
-
-    if (priorityList.indexOf(ext) > priorityList.indexOf(current)) {
-      droppedFiles.push(`${name}${current}`);
-      uniq.set(name, ext);
-    } else {
-      droppedFiles.push(`${name}${ext}`);
-    }
+const listAudioFiles = (): string[] => {
+  if (!existsSync(TEST_INPUT_DIR)) {
+    return [];
   }
-
-  const uniqueFiles = Array.from(uniq.entries()).reduce(
-    (p: string[], c: [string, string]) => [...p, `${c[0]}${c[1]}`],
-    [] as string[]
+  return readdirSync(TEST_INPUT_DIR).filter((file) =>
+    AUDIO_EXTENSIONS.includes(extname(file).toLowerCase())
   );
-
-  return {
-    uniqueFiles,
-    droppedFiles,
-  };
 };
 
-// Skip these tests if no audio files are found or if running in CI
-const shouldRunTests = () => {
-  // Check if test input directory exists and has files
-  if (!existsSync(TEST_INPUT_DIR)) {
-    console.log('Test input directory not found, skipping real file tests');
-    return false;
-  }
-
-  // Check if there are any audio files
-  const files = readdirSync(TEST_INPUT_DIR);
-  const audioFiles = files.filter((file) => {
-    const ext = extname(file).toLowerCase();
-    return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
-  });
-
-  if (audioFiles.length === 0) {
+/** Use bundled ffmpeg to create sample inputs when the folder is empty. */
+const provisionTestInputFiles = (): boolean => {
+  const { ffmpegPath } = generateTestFiles.findFfmpegExecutables();
+  if (!existsSync(ffmpegPath)) {
     console.log(
-      'No audio files found in test directory, skipping real file tests'
+      `Bundled ffmpeg not found at ${ffmpegPath}, skipping real file tests`
     );
     return false;
   }
 
-  return true;
+  mkdirSync(TEST_INPUT_DIR, { recursive: true });
+  const generated = generateTestFiles.generateTestAudioFiles(TEST_INPUT_DIR, {
+    formats: ['wav', 'mp3', 'flac', 'ogg', 'm4a', 'aiff'],
+    duration: 2,
+  });
+
+  return Object.keys(generated).length > 0;
+};
+
+// Run when user-supplied files exist, or when bundled ffmpeg can generate them.
+const shouldRunTests = (): boolean => {
+  if (!canRunRealTests) {
+    console.log(
+      'Real file tests need bundled ffmpeg and dist/converterWorker.js (npm run build)'
+    );
+    return false;
+  }
+
+  if (listAudioFiles().length > 0) {
+    return true;
+  }
+
+  if (provisionTestInputFiles()) {
+    console.log('Generated sample audio files for real file tests');
+    return listAudioFiles().length > 0;
+  }
+
+  console.log('No audio files available for real file tests');
+  return false;
 };
 
 // Create a function to setup the test environment
@@ -121,25 +114,21 @@ const setupTestEnvironment = () => {
   return true;
 };
 
-// Skip all tests if we don't have real files to test with
+// Skip entire suite when prerequisites are missing
 const runTests = shouldRunTests();
+const describeReal = runTests ? describe : describe.skip;
 
-describe('Real file tests', () => {
+describeReal('Real file tests', () => {
   let logSpy: ReturnType<typeof jest.spyOn> | undefined;
   let errorSpy: ReturnType<typeof jest.spyOn> | undefined;
   let warnSpy: ReturnType<typeof jest.spyOn> | undefined;
 
-  // Skip all tests if no audio files are available
   beforeAll(() => {
-    if (runTests) {
-      setupTestEnvironment();
-    }
+    setupTestEnvironment();
   });
 
   // Setup before each test
   beforeEach(() => {
-    if (!runTests) return;
-
     // Capture console output
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -148,8 +137,6 @@ describe('Real file tests', () => {
 
   // Cleanup after each test
   afterEach(() => {
-    if (!runTests) return;
-
     // Restore console
     logSpy?.mockRestore();
     errorSpy?.mockRestore();
@@ -157,11 +144,6 @@ describe('Real file tests', () => {
   });
 
   it('should find and process real audio files', async () => {
-    // Skip if no real files
-    if (!runTests) {
-      return;
-    }
-
     // Get all audio files in the test input directory
     const files = readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
@@ -174,20 +156,21 @@ describe('Real file tests', () => {
     console.log('Found audio files:', files);
 
     // Use our local implementation
-    const result = handleDuplicateFiles(files);
+    const result = resolveDuplicateBasenames(files);
     expect(Array.isArray(result.uniqueFiles)).toBe(true);
     expect(Array.isArray(result.droppedFiles)).toBe(true);
 
     // Create conversion file list
     const conversionList: ConversionItem[] = result.uniqueFiles.map(
-      (inputFile) => ({
-        inputFile,
-        outputFile: join(
-          TEST_OUTPUT_DIR,
-          `${basename(inputFile, extname(inputFile))}.mp3`
-        ),
-        outputFormat: 'mp3',
-      })
+      (inputFile) => {
+        const ext = extname(inputFile).slice(1);
+        const base = basename(inputFile, extname(inputFile));
+        return {
+          inputFile,
+          outputFile: join(TEST_OUTPUT_DIR, `${base}_from_${ext}.mp3`),
+          outputFormat: 'mp3',
+        };
+      }
     );
 
     // Only test conversion if we have files
@@ -205,6 +188,9 @@ describe('Real file tests', () => {
         failed: result.failedFiles.length,
       });
 
+      expect(result.failedFiles).toHaveLength(0);
+      expect(result.successfulFiles.length).toBe(conversionList.length);
+
       // Check output files were created
       const outputFiles = readdirSync(TEST_OUTPUT_DIR);
       expect(outputFiles.length).toBeGreaterThan(0);
@@ -213,11 +199,6 @@ describe('Real file tests', () => {
 
   // Add a new test that verifies metadata preservation
   it('should preserve metadata during conversion', async () => {
-    // Skip if no real files
-    if (!runTests) {
-      return;
-    }
-
     // For this test, we'll convert to multiple formats
     settings.outputFormats = ['mp3', 'ogg'];
 
@@ -252,8 +233,8 @@ describe('Real file tests', () => {
     // Run the conversion
     const result = await convertFiles(conversionList);
 
-    // Check we have successful files
-    expect(result.successfulFiles.length).toBeGreaterThan(0);
+    expect(result.failedFiles).toHaveLength(0);
+    expect(result.successfulFiles.length).toBe(conversionList.length);
 
     // The metadataService test already covers the details of metadata extraction
     // so this is just a high-level integration test
@@ -261,11 +242,6 @@ describe('Real file tests', () => {
 
   // Add a test for duplicate file handling
   it('should correctly handle duplicate filenames with different extensions', async () => {
-    // Skip if no real files
-    if (!runTests) {
-      return;
-    }
-
     // Get all audio files in the test input directory
     const files = readdirSync(TEST_INPUT_DIR)
       .filter((file) => {
@@ -306,7 +282,7 @@ describe('Real file tests', () => {
     }
 
     // Run duplicate test
-    const result = handleDuplicateFiles(duplicateFiles);
+    const result = resolveDuplicateBasenames(duplicateFiles);
 
     // Should only keep one file (the "better" format)
     expect(result.uniqueFiles.length).toBe(1);

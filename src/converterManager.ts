@@ -73,7 +73,8 @@ const convertFiles = async (
     );
   }
 
-  const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, files.length));
+  const queue = [...files];
+  const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, queue.length));
   const failedFiles: ConversionResult[] = [];
   const successfulFiles: ConversionResult[] = [];
   let abortRequested = false;
@@ -248,9 +249,9 @@ const convertFiles = async (
                   workerCounter,
                   `finished task`,
                   task,
-                  `\n   Input"${file.inputFile}\n   Output"${
+                  `\n   Input: ${file.inputFile}\n   Output: ${
                     file.outputFile
-                  }✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
+                  } ✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
                 )
               );
               resolveOnce();
@@ -321,11 +322,11 @@ const convertFiles = async (
   for (let i = 0; i < maxConcurrentWorkers; i++) {
     workerPromises.push(
       (async () => {
-        while (files.length > 0) {
+        while (queue.length > 0) {
           if (abortRequested) break;
-          const file = files.pop();
+          const file = queue.pop();
           try {
-            const tasksLeft = files.length;
+            const tasksLeft = queue.length;
             task++;
             workerCounter++;
             if (workerCounter > maxConcurrentWorkers) workerCounter = 1;

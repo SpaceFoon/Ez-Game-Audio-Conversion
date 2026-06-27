@@ -486,6 +486,21 @@ describe('convertFiles', () => {
     expect(result.failedFiles).toHaveLength(1);
   }, 30000);
 
+  it('should not mutate the input conversion list', async () => {
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+
+    const files = createTestFiles(2);
+    const snapshot = [...files];
+
+    await withTimeout(
+      convertFiles(files),
+      5000,
+      "Test 'should not mutate the input conversion list' timed out"
+    );
+
+    expect(files).toEqual(snapshot);
+  }, 30000);
+
   it('should call addToLog for both successful and failed conversions', async () => {
     const exitCodes = [0, 1];
     workerMock.mockImplementation(() =>

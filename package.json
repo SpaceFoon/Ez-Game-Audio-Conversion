@@ -21,6 +21,9 @@
     "install": "node scripts/install.js",
     "install:ffmpeg": "node scripts/install-ffmpeg.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --testPathIgnorePatterns=/integration/ --testPathIgnorePatterns=real_files.test.ts",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/\" \"src/__tests__/real_files.test.ts\"",
+    "test:pre-release": "npm run test:unit && npm run test:integration && npm run test:release && npm run test:smoke",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --detectOpenHandles",
     "test:release": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/metadataPreservation.test.ts\" \"src/__tests__/app.test.ts\" && npm test",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand",
@@ -116,6 +119,17 @@
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/__tests__/**",
+      "!src/types/**",
+      "!src/ico/**"
+    ],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "json-summary"
     ],
     "verbose": false,
     "forceExit": true,

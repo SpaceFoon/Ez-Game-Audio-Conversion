@@ -1,4 +1,9 @@
-import { settings, rl, writeSummaryToLogs } from './utils.js';
+import {
+  settings,
+  rl,
+  writeSummaryToLogs,
+  reportSearchErrors,
+} from './utils.js';
 import chalk from 'chalk';
 import logger from './logger.js';
 import type { ConversionResult } from './types/audio.js';
@@ -48,6 +53,10 @@ const finalize = async (
   } else {
     logger.log('No conversions failed.');
   }
+
+  // Surface any files/folders that couldn't be read during the search, both in
+  // the terminal and appended to the same error.csv as the conversion errors.
+  await reportSearchErrors();
 
   logger.log(`Log files are in: ${settings.outputFilePath}.`);
 

@@ -67,6 +67,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   handleExit: jest.fn(),
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error),
+  reportSearchErrors: jest.fn(async () => {}),
 }));
 
 const fs = await import('fs');

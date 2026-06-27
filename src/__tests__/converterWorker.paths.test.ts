@@ -79,7 +79,10 @@ jest.unstable_mockModule('../utils.js', () => ({
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
-  getMetaData: jest.fn(async () => null),
+  getMetaData: jest.fn(async () => ({
+    streams: [{ sample_rate: '44100', channels: 2, tags: {} }],
+    format: { tags: {} },
+  })),
   formatMetaDataArgs: jest.fn(() => ({
     metaDataArgs: [],
     channelsArgs: ['-ac', '2'],

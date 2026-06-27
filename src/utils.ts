@@ -67,6 +67,29 @@ export const platformSlug =
 export const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error || 'Unknown error');
 
+// Files/folders that could not be read during the recursive search.
+// Collected here so the search can keep going and report everything at the
+// end of the batch (terminal + error.csv) instead of crashing the whole app.
+export interface SearchError {
+  path: string;
+  message: string;
+}
+
+let searchErrors: SearchError[] = [];
+
+/** Record a path that could not be read during the recursive file search. */
+export const recordSearchError = (path: string, error: unknown): void => {
+  searchErrors.push({ path, message: getErrorMessage(error) });
+};
+
+/** Snapshot of the search errors collected so far. */
+export const getSearchErrors = (): SearchError[] => [...searchErrors];
+
+/** Clear collected search errors. Called at the start of each search run. */
+export const clearSearchErrors = (): void => {
+  searchErrors = [];
+};
+
 /**
  * Locate a bundled binary (ffmpeg, ffprobe, or worker file) by searching
  * the two directory roots that actually exist at runtime:
@@ -211,13 +234,17 @@ export const initializeFileNames = () => {
   fileNameE = initFileName(basePath, 'error');
 };
 
-const initFileName = (basePath: string, fileName: string): string => {
+/** Resolve the next available CSV log path, optionally using a custom occupancy check. */
+export const nextAvailableLogCsvPath = (
+  basePath: string,
+  fileName: string,
+  isTaken: (path: string) => boolean = existsSync
+): string => {
   let num = 1;
-  // Use OS-aware join and normalize to forward slashes for test stability on Windows
   const norm = (p: string) => p.replace(/\\/g, '/');
   let fullFileName = norm(join(basePath || '', `${fileName}.csv`));
 
-  while (existsSync(fullFileName)) {
+  while (isTaken(fullFileName)) {
     fullFileName = norm(join(basePath || '', `${fileName}(${num}).csv`));
     num++;
   }
@@ -225,22 +252,34 @@ const initFileName = (basePath: string, fileName: string): string => {
   return fullFileName;
 };
 
+const initFileName = (basePath: string, fileName: string): string =>
+  nextAvailableLogCsvPath(basePath, fileName);
+
+/** Leading chars Excel/LibreOffice may interpret as formulas when opening CSV. */
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
 /**
  * Escapes a value for CSV format.
+ * Prefixes formula-triggering leading characters with a single quote (Excel-safe).
  * If the value contains commas, quotes, or newlines, wrap it in quotes and escape internal quotes.
  * This is platform-agnostic - works on Windows, Mac, and Linux.
  */
 export function escapeCsvField(value: string): string {
+  const safe =
+    CSV_FORMULA_PREFIX.test(value) && !value.startsWith("'")
+      ? `'${value}`
+      : value;
+
   if (
-    value.includes(',') ||
-    value.includes('"') ||
-    value.includes('\n') ||
-    value.includes('\r')
+    safe.includes(',') ||
+    safe.includes('"') ||
+    safe.includes('\n') ||
+    safe.includes('\r')
   ) {
     // Escape double quotes by doubling them, then wrap in quotes
-    return `"${value.replace(/"/g, '""')}"`;
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return value;
+  return safe;
 }
 
 const normalizeCsvValue = (value: string): string =>
@@ -392,6 +431,53 @@ export const addToLog = async (
   if (!wroteLogRow) {
     return false;
   }
+};
+
+/**
+ * Print a summary of any files/folders that could not be read during the
+ * recursive search, write each one to error.csv, then clear the list.
+ * No-op when there were no search errors. Never throws.
+ */
+export const reportSearchErrors = async (): Promise<void> => {
+  const errors = getSearchErrors();
+  if (errors.length === 0) return;
+
+  logger.warn(
+    chalk.yellowBright(
+      `\n⚠️  ${errors.length} item(s) could not be read and were skipped during the file search:`
+    )
+  );
+  const MAX_SHOWN = 20;
+  for (const entry of errors.slice(0, MAX_SHOWN)) {
+    logger.warn(chalk.yellow(`   • ${entry.path}\n     ${entry.message}`));
+  }
+  if (errors.length > MAX_SHOWN) {
+    logger.warn(
+      chalk.gray(`   ... and ${errors.length - MAX_SHOWN} more (see error.csv)`)
+    );
+  }
+  logger.warn(
+    chalk.gray('   These were recorded in error.csv for your reference.')
+  );
+
+  for (const entry of errors) {
+    try {
+      await addToLog(
+        {
+          type: 'error',
+          data: `Unreadable path skipped during search: ${entry.message}`,
+        },
+        { inputFile: entry.path, outputFile: '[search]' }
+      );
+    } catch (logError) {
+      logger.error(
+        'Failed to log search error to CSV:',
+        getErrorMessage(logError)
+      );
+    }
+  }
+
+  clearSearchErrors();
 };
 
 export function handleExit(code: number = 0): void {

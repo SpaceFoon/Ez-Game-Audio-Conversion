@@ -54,6 +54,9 @@ npm run clean            # Remove dist/ and release/ folders
 
 ```bash
 npm test                 # Run all tests sequentially
+npm run test:unit        # Fast unit tests (no ffmpeg integration)
+npm run test:integration # Real ffmpeg/worker integration tests only
+npm run test:pre-release # Full verification ladder before tagging
 npm run test:ci          # CI mode with open handle detection
 npm run test:coverage    # Generate coverage report
 npm run smoke            # Package and run smoke tests
@@ -227,7 +230,9 @@ ffmpeg-bin/
 Tests are located in `src/__tests__/`:
 
 - **Unit tests**: `*.test.ts` - Test individual modules with ESM mocking
-- **Integration tests**: `integration/*.test.ts` - Test complete workflows
+- **Integration tests**: `integration/*.test.ts` - Test complete workflows (real ffmpeg + worker threads)
+- **Audit tests**: `*.audit.test.ts` - Characterize known production gaps (see `KNOWN_TEST_FINDINGS.md`)
+- **Fuzz tests**: `*Fuzz.test.ts` - Deterministic string/path edge-case generators
 - **Smoke test**: `smokeTest.mjs` - Verifies packaged binary starts correctly
 - **Test utilities**: `test-utils/` - Shared helpers and mock data generators
 
@@ -235,7 +240,14 @@ Tests are located in `src/__tests__/`:
 
 All tests run sequentially (`--runInBand`) to prevent file system race conditions.
 
-**Test count:** 468 tests across 26 test files.
+CI downloads ffmpeg and runs the full suite including integration tests. See `ci.integration.guard.test.ts`.
+
+**Test count:** 594 tests across 40 test files.
+
+**Scripts:**
+- `npm run test:unit` - Fast loop (no ffmpeg integration)
+- `npm run test:integration` - Real ffmpeg/worker tests only
+- `npm run test:pre-release` - Full ladder before tagging (unit → integration → release subset → smoke)
 
 ## TypeScript Configuration
 
@@ -290,7 +302,7 @@ The project uses GitHub Actions to automatically build releases for all platform
 Runs on every push/PR to `dev` or `main`:
 - Linting and formatting
 - TypeScript compilation
-- Tests with coverage (468 tests)
+- Tests with coverage (594 tests; ffmpeg installed in CI)
 - Build verification
 
 ### Creating a Release

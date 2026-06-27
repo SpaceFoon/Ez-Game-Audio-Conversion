@@ -62,11 +62,13 @@ jest.unstable_mockModule('../utils.js', () => ({
   handleExit: jest.fn(),
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
+  reportSearchErrors: jest.fn(async () => {}),
 }));
 
 // Dynamic imports after mock declarations
 const fs = await import('fs');
-const { getAnswer, settings, handleExit } = await import('../utils.js');
+const { getAnswer, settings, handleExit, reportSearchErrors } =
+  await import('../utils.js');
 const { default: createConversionList } =
   await import('../createConversionList.js');
 
@@ -243,24 +245,46 @@ describe('createConversionList', () => {
 
     it('applies rename-all (ra) to subsequent conflicts', async () => {
       settings.outputFormats = ['mp3'];
-      // Both output files exist
       existsSyncMock.mockImplementation(
         (path) =>
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
           String(path) === join(settings.outputFilePath, 'b.mp3')
       );
-      getAnswerMock
-        .mockResolvedValueOnce('ra') // rename all
-        .mockResolvedValue('yes'); // confirm
+      getAnswerMock.mockResolvedValueOnce('ra').mockResolvedValue('yes');
 
       const files = ['a.wav', 'b.wav'].map((name) =>
         join(settings.inputFilePath, name)
       );
       const result = await createConversionList(files);
 
-      // Both should be renamed
       expect(result[0].outputFile).toContain('-copy');
       expect(result[1].outputFile).toContain('-copy');
+    });
+
+    it('applies mixed sticky overwrite then rename-all in one batch', async () => {
+      settings.outputFormats = ['mp3'];
+      existsSyncMock.mockImplementation((path) => {
+        const p = String(path);
+        return (
+          p === join(settings.outputFilePath, 'a.mp3') ||
+          p === join(settings.outputFilePath, 'b.mp3') ||
+          p === join(settings.outputFilePath, 'c.mp3')
+        );
+      });
+      getAnswerMock
+        .mockResolvedValueOnce('o')
+        .mockResolvedValueOnce('ra')
+        .mockResolvedValue('yes');
+
+      const files = ['a.wav', 'b.wav', 'c.wav'].map((name) =>
+        join(settings.inputFilePath, name)
+      );
+      const result = await createConversionList(files);
+
+      expect(result).toHaveLength(3);
+      expect(result[0].outputFile).toBe(join(settings.outputFilePath, 'a.mp3'));
+      expect(result[1].outputFile).toContain('-copy');
+      expect(result[2].outputFile).toContain('-copy');
     });
 
     it('applies skip-all (sa) to subsequent conflicts', async () => {
@@ -395,6 +419,7 @@ describe('createConversionList', () => {
       const files: string[] = [];
       await createConversionList(files);
 
+      expect(reportSearchErrors).toHaveBeenCalled();
       expect(handleExitMock).toHaveBeenCalledWith(1);
     });
 

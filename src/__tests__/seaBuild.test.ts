@@ -148,35 +148,19 @@ function list7zContents(archivePath: string): string[] {
   }
 }
 
-describe('SEA Build Tests', () => {
+const releaseAvailable = existsSync(RELEASE_DIR);
+const describeRelease = releaseAvailable ? describe : describe.skip;
+
+describeRelease('SEA Build Tests', () => {
   // These tests check the current state of release/ directory
   // They don't run the build - use npm run package for that
 
   describe('Release directory structure', () => {
-    beforeAll(() => {
-      if (!existsSync(RELEASE_DIR)) {
-        console.warn(
-          'Release directory does not exist. Run `npm run package` first.'
-        );
-      }
-    });
-
     test('release directory exists', () => {
-      if (!existsSync(RELEASE_DIR)) {
-        console.warn(
-          'Skipping: release directory does not exist. Run `npm run package` first.'
-        );
-        return;
-      }
       expect(existsSync(RELEASE_DIR)).toBe(true);
     });
 
     test('executable has correct .exe extension on Windows', () => {
-      if (!existsSync(RELEASE_DIR)) {
-        console.warn('Skipping: release directory does not exist');
-        return;
-      }
-
       const exePath = join(RELEASE_DIR, EXPECTED_EXE_NAME);
       const exeWithoutExt = join(RELEASE_DIR, 'EZ-Game-Audio');
       const files = readdirSync(RELEASE_DIR);
@@ -220,12 +204,7 @@ describe('SEA Build Tests', () => {
     });
 
     test('ZIP archive exists', () => {
-      if (!existsSync(RELEASE_DIR)) {
-        console.warn('Skipping: release directory does not exist');
-        return;
-      }
       const zipPath = findArchive('zip');
-      // Skip if release dir exists but is from partial build
       if (!readdirSync(RELEASE_DIR).some((f) => f.endsWith('.zip'))) {
         console.warn('Skipping: no ZIP files found (run npm run package)');
         return;
@@ -234,13 +213,8 @@ describe('SEA Build Tests', () => {
     });
 
     test('ZIP checksum file exists', () => {
-      if (!existsSync(RELEASE_DIR)) {
-        console.warn('Skipping: release directory does not exist');
-        return;
-      }
       const zipPath = findArchive('zip');
       const checksumPath = zipPath ? `${zipPath}.sha256` : '';
-      // Skip if no checksum files exist
       if (!readdirSync(RELEASE_DIR).some((f) => f.endsWith('.sha256'))) {
         console.warn('Skipping: no checksum files found (run npm run package)');
         return;
@@ -249,12 +223,7 @@ describe('SEA Build Tests', () => {
     });
 
     test('update.json manifest exists', () => {
-      if (!existsSync(RELEASE_DIR)) {
-        console.warn('Skipping: release directory does not exist');
-        return;
-      }
       const manifestPath = join(RELEASE_DIR, 'update.json');
-      // Skip if manifest doesn't exist (partial build)
       if (!existsSync(manifestPath)) {
         console.warn('Skipping: update.json not found (run npm run package)');
         return;

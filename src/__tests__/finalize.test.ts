@@ -8,6 +8,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   isPackagedRuntime: false,
   runtimeBaseDir: '/mock/base',
   writeSummaryToLogs: jest.fn(),
+  reportSearchErrors: jest.fn(async () => {}),
 }));
 
 jest.unstable_mockModule('chalk', () => ({
@@ -16,7 +17,8 @@ jest.unstable_mockModule('chalk', () => ({
 }));
 
 // Dynamic imports after mock declarations
-const { rl, writeSummaryToLogs } = await import('../utils.js');
+const { rl, writeSummaryToLogs, reportSearchErrors } =
+  await import('../utils.js');
 const { default: finalize } = await import('../finalize.js');
 
 import type { ConversionResult } from '../types/audio.js';
@@ -64,6 +66,19 @@ describe('finalize', () => {
     await finalize(failedFiles, successfulFiles, 0);
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('No conversions failed')
+    );
+    logSpy.mockRestore();
+  });
+
+  it('reports zero average task duration when nothing succeeded', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await finalize(
+      [{ success: false, inputFile: 'in.wav', outputFile: 'fail.mp3' }],
+      [],
+      Date.now() - 5000
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Average task duration 0.00 seconds')
     );
     logSpy.mockRestore();
   });
@@ -171,6 +186,11 @@ describe('finalize', () => {
       0, // fail count
       expect.any(Number) // duration
     );
+  });
+
+  it('calls reportSearchErrors at the end of the batch', async () => {
+    await finalize([], [], 0);
+    expect(reportSearchErrors).toHaveBeenCalled();
   });
 
   it('logs formatted total and average durations', async () => {

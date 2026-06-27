@@ -23,7 +23,9 @@ jest.unstable_mockModule('fs', () => ({
 jest.unstable_mockModule('chalk', () => ({
   default: {
     red: { bold: jest.fn((text) => text) },
-    yellow: { bold: jest.fn((text) => text) },
+    yellow: jest.fn((text) => text),
+    yellowBright: jest.fn((text) => text),
+    gray: jest.fn((text) => text),
     redBright: jest.fn((text) => text),
   },
 }));
@@ -69,6 +71,12 @@ const {
   addToLog,
   __setLogFileStateForTests,
   writeSummaryToLogs,
+  recordSearchError,
+  getSearchErrors,
+  clearSearchErrors,
+  reportSearchErrors,
+  nextAvailableLogCsvPath,
+  escapeCsvField,
 } = await import('../utils.js');
 
 describe('utils module', () => {
@@ -444,6 +452,105 @@ describe('utils module', () => {
         '/test/output/error.csv',
         expect.any(String)
       );
+    });
+  });
+
+  describe('search error collection and reporting', () => {
+    beforeEach(() => {
+      clearSearchErrors();
+      settings.outputFilePath = '/test/output';
+      __setLogFileStateForTests(null, null);
+    });
+
+    it('records, snapshots, and clears search errors', () => {
+      recordSearchError(
+        '/bad/file.wav',
+        new Error('EACCES: permission denied')
+      );
+      expect(getSearchErrors()).toEqual([
+        {
+          path: '/bad/file.wav',
+          message: 'EACCES: permission denied',
+        },
+      ]);
+
+      clearSearchErrors();
+      expect(getSearchErrors()).toEqual([]);
+    });
+
+    it('reportSearchErrors is a no-op when there are no errors', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await reportSearchErrors();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+      expect(appendFileSyncMock).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('reportSearchErrors prints a terminal summary and writes each error to error.csv', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      existsSyncMock.mockReturnValue(false);
+
+      recordSearchError(
+        '/locked/track.wav',
+        new Error('EBUSY: file is locked')
+      );
+      await reportSearchErrors();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('1 item(s) could not be read')
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/locked/track.wav')
+      );
+      expect(getSearchErrors()).toEqual([]);
+      expect(writeFileSyncMock).toHaveBeenCalledWith(
+        expect.stringContaining('error.csv'),
+        expect.stringContaining('Timestamp'),
+        expect.any(Object)
+      );
+      expect(appendFileSyncMock).toHaveBeenCalledWith(
+        expect.stringContaining('error.csv'),
+        expect.stringContaining('Unreadable path skipped during search')
+      );
+
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('nextAvailableLogCsvPath', () => {
+    it('increments when base logs.csv path is already taken', () => {
+      const existing = ['/logs/logs.csv'];
+      const result = nextAvailableLogCsvPath('/logs', 'logs', (path) =>
+        existing.includes(path)
+      );
+      expect(result.replace(/\\/g, '/')).toBe('/logs/logs(1).csv');
+    });
+  });
+
+  describe('isFileBusy non-EBUSY errors', () => {
+    it('rethrows unexpected filesystem errors after logging', async () => {
+      existsSyncMock.mockReturnValueOnce(true);
+      const error = new Error('EPERM: operation not permitted') as Error & {
+        code?: string;
+      };
+      error.code = 'EPERM';
+      openSyncMock.mockImplementationOnce(() => {
+        throw error;
+      });
+
+      await expect(isFileBusy('/test/locked.csv')).rejects.toThrow('EPERM');
+      expect(console.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('escapeCsvField round-trip safety', () => {
+    it('wraps values containing commas and preserves content', () => {
+      const value = 'hello, "world"';
+      const escaped = escapeCsvField(value);
+      expect(escaped.startsWith('"')).toBe(true);
+      expect(escaped).toContain('hello, ""world""');
     });
   });
 });

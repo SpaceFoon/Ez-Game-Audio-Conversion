@@ -11,7 +11,7 @@ const inputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 const outputTypes: AudioFormat[] = ['flac', 'aiff', 'wav', 'mp3', 'm4a', 'ogg'];
 
 /** Parse comma/space-separated format string. Returns all allowed if blank. Silently drops invalid tokens. */
-const parseFormats = (
+export const parseFormats = (
   formatString: string,
   allowed: AudioFormat[]
 ): AudioFormat[] => {

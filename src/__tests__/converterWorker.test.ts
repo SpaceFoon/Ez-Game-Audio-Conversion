@@ -15,13 +15,15 @@ jest.unstable_mockModule('fs', () => ({
   appendFileSync: jest.fn(),
 }));
 
+let findBinaryMock = jest.fn(() => '/mock/base/ffmpeg.exe');
+
 jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   isPackagedRuntime: false,
   platformSlug: 'win32-x64',
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
-  findBinary: () => '/mock/base/ffmpeg.exe',
+  findBinary: (...args: unknown[]) => findBinaryMock(...args),
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
@@ -80,13 +82,29 @@ const childProcess = jest.mocked(await import('child_process'), {
   shallow: true,
 });
 const spawnMock = childProcess.spawn as unknown as jest.MockedFunction<any>;
-const { runConversion, converterWorker } =
-  await import('../converterWorker.js');
 
 type MockSpawnProcess = {
   stderr: { on: jest.Mock<any> };
   on: jest.Mock<any>;
 };
+
+const defaultSpawnImplementation = () => {
+  const mockProcess: MockSpawnProcess = {
+    on: jest.fn((event: string, callback: (code: number) => void) => {
+      if (event === 'exit') {
+        setTimeout(() => callback(0), 0);
+      }
+      return mockProcess;
+    }),
+    stderr: {
+      on: jest.fn(),
+    },
+  };
+  return mockProcess;
+};
+
+const { runConversion, converterWorker } =
+  await import('../converterWorker.js');
 
 const getMetaDataMock = metadataService.getMetaData as jest.MockedFunction<
   typeof metadataService.getMetaData
@@ -109,6 +127,8 @@ describe('converterWorker.js', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    findBinaryMock.mockReturnValue('/mock/base/ffmpeg.exe');
+    spawnMock.mockImplementation(defaultSpawnImplementation);
 
     // Save original NODE_ENV and set it to test
     originalEnv = process.env.NODE_ENV;
@@ -175,33 +195,27 @@ describe('converterWorker.js', () => {
     ).rejects.toThrow(/Missing output format/i);
   }, 10000);
 
-  // Skip: This test requires complex mocking of the packaged runtime check
-  // that doesn't work well with ESM mocks
-  it.skip('throws if ffmpeg.exe is not found', async () => {
-    // Input file exists but ffmpeg.exe doesn't
-    fs.existsSync.mockImplementation((p) => {
-      if (p === 'in.wav') return true;
-      if (typeof p === 'string' && p.includes('ffmpeg.exe')) return false;
-      return true;
-    });
+  it('rejects conversion when ffmpeg binary is not found', async () => {
+    fs.existsSync.mockReturnValue(true);
+    findBinaryMock.mockReturnValue(null);
 
-    const savedEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'out.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/ffmpeg.*not found/i);
 
-    try {
-      await expect(
-        converterWorker({
-          file: {
-            inputFile: 'in.wav',
-            outputFile: 'out.mp3',
-            outputFormat: 'mp3',
-          },
-          settings: { oggCodec: 'vorbis' },
-        })
-      ).rejects.toThrow(/ffmpeg\.exe not found/);
-    } finally {
-      process.env.NODE_ENV = savedEnv;
-    }
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        data: expect.stringMatching(/ffmpeg.*not found/i),
+      })
+    );
   }, 10000);
 
   it('allows Unicode characters in output path', async () => {
@@ -510,64 +524,14 @@ describe('converterWorker.js', () => {
     ).rejects.toThrow(/ffmpeg exited with code 2/i);
 
     expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'error' })
+      expect.objectContaining({
+        type: 'error',
+        data: expect.stringContaining('bad!'),
+      })
     );
   }, 10000);
 
-  // This test is brittle due to event-loop timing and the module's fail() throwing inside event handlers.
-  // It's not critical for behavior validation and causes flakiness, so skip for now.
-  it.skip('handles runFFMPEG failures', async () => {
-    process.env.NODE_ENV = 'test';
-
-    // Mock spawn to exit with non-zero code
-    spawnMock.mockImplementation(() => {
-      const mockProcess: MockSpawnProcess = {
-        on: jest.fn((event: string, callback: (code: number) => void) => {
-          if (event === 'exit') {
-            setTimeout(() => callback(1), 0);
-          }
-          return mockProcess;
-        }),
-        stderr: { on: jest.fn() },
-      };
-      return mockProcess as unknown as ChildProcessWithoutNullStreams;
-    });
-
-    fs.existsSync.mockReturnValue(true);
-
-    await expect(
-      converterWorker({
-        file: {
-          inputFile: 'in.wav',
-          outputFile: 'out.flac',
-          outputFormat: 'flac',
-        },
-        settings: { oggCodec: 'vorbis' },
-      })
-    ).rejects.toThrow();
-  }, 10000);
-
-  it('skips loop points for unsupported formats (WAV and M4A)', async () => {
-    process.env.NODE_ENV = 'test';
-
-    // Ensure fs mock used by the module under test reports files exist
-    fs.existsSync.mockReturnValue(true);
-
-    // Force child_process to simulate successful exit for this test
-    spawnMock.mockImplementation(() => {
-      const mockProcess: MockSpawnProcess = {
-        on: jest.fn((event: string, callback: (code: number) => void) => {
-          if (event === 'exit') {
-            setTimeout(() => callback(0), 0);
-          }
-          return mockProcess;
-        }),
-        stderr: { on: jest.fn() },
-      };
-      return mockProcess as unknown as ChildProcessWithoutNullStreams;
-    });
-
-    // Reconfigure metadata service for loop points present
+  it('skips loop points for unsupported formats in auto mode (WAV and M4A)', async () => {
     getMetaDataMock.mockResolvedValue({
       streams: [
         {

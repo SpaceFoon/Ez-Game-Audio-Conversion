@@ -1512,4 +1512,37 @@ describe('convertLoopPoints - Loop preservation detail', () => {
     expect(loopArgs).toContain('LOOPSTART=1088435');
     expect(loopArgs).toContain('LOOPLENGTH=2176871');
   });
+
+  it('silently drops passthrough tags with unsafe metadata keys', () => {
+    const metadata: AudioMetadata = {
+      streams: [
+        {
+          index: 0,
+          codec_name: 'mp3',
+          codec_type: 'audio',
+          channels: 2,
+          sample_rate: '44100',
+          tags: {},
+        },
+      ],
+      format: {
+        filename: 'unsafe.mp3',
+        format_name: 'mp3',
+        duration: '1',
+        size: '1',
+        bit_rate: '1',
+        tags: {
+          'bad key!': 'drop-me',
+          safe_tag: 'keep-me',
+        },
+      },
+    };
+
+    const { metaDataArgs } = formatMetaDataArgs(metadata);
+    const joined = metaDataArgs.join(' ');
+
+    expect(joined).toContain('safe_tag=keep-me');
+    expect(joined).not.toContain('bad key');
+    expect(joined).not.toContain('drop-me');
+  });
 });

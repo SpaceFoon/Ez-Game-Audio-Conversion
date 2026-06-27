@@ -22,10 +22,12 @@ jest.unstable_mockModule('fs', () => ({
   appendFileSync: jest.fn(),
 }));
 
+let findBinaryMock = jest.fn(() => '/mock/base/ffprobe.exe');
+
 jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   platformSlug: 'windows',
-  findBinary: () => '/mock/base/ffprobe.exe',
+  findBinary: (...args: unknown[]) => findBinaryMock(...args),
   addToLog: jest.fn(async () => true),
 }));
 
@@ -64,6 +66,7 @@ describe('metadataService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    findBinaryMock.mockReturnValue('/mock/base/ffprobe.exe');
     // Suppress all console output
     console.log = jest.fn();
     console.error = jest.fn();
@@ -128,27 +131,16 @@ describe('metadataService', () => {
       );
     });
 
-    // Skip: The path resolution logic differs between packaged and dev modes
-    it.skip('should handle file not found errors', async () => {
-      // Mock file doesn't exist
-      existsSyncMock.mockReturnValue(false);
+    it('returns null when ffprobe binary is not found', async () => {
+      findBinaryMock.mockReturnValue(null);
 
-      // Mock spawnSync to still return something
-      spawnSyncMock.mockReturnValue({
-        stdout: JSON.stringify({}),
-        stderr: '',
-        status: 0,
-        error: undefined,
-      });
+      const result = await getMetaData('missing.mp3');
 
-      await getMetaData('nonexistent.mp3');
-
-      // Function should still work, but with different ffprobe path
-      expect(spawnSyncMock).toHaveBeenCalledWith(
-        expect.stringContaining('bin/ffprobe'),
-        expect.any(Array),
-        expect.objectContaining({ encoding: 'utf8' })
+      expect(result).toBeNull();
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('ffprobe.exe not found')
       );
+      expect(spawnSyncMock).not.toHaveBeenCalled();
     });
 
     it('should handle malformed JSON response', async () => {

@@ -22,6 +22,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install ffmpeg
+        run: npm run install:ffmpeg
+        env:
+          EZ_AUDIO_FORCE_FFMPEG_DOWNLOAD: "1"
+
       - name: Lint and format
         run: npm run fix
 
@@ -39,5 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage/
+          path: |
+            coverage/lcov.info
+            coverage/coverage-summary.json
           if-no-files-found: ignore

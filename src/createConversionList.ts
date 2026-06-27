@@ -9,7 +9,13 @@ import {
   isAbsolute,
 } from 'path';
 import chalk from 'chalk';
-import { getAnswer, settings, handleExit, getErrorMessage } from './utils.js';
+import {
+  getAnswer,
+  settings,
+  handleExit,
+  getErrorMessage,
+  reportSearchErrors,
+} from './utils.js';
 import logger from './logger.js';
 import type {
   AudioFormat,
@@ -18,6 +24,46 @@ import type {
   OggCodec,
 } from './types/audio.js';
 
+/** Parse `-copy(n)` suffix from a filename for rename conflict resolution. */
+export const parseCopyFilename = (
+  filename: string
+): { base: string; num: number } => {
+  const baseName = basename(filename, extname(filename));
+  const match = baseName.match(/^(.+)-copy\((\d+)\)$/);
+
+  if (match?.[1] && match[2]) {
+    return { base: match[1], num: parseInt(match[2], 10) };
+  }
+
+  return { base: baseName, num: 0 };
+};
+
+/** Build output path preserving folder structure relative to input root. */
+export const buildOutputPath = (
+  inputFile: string,
+  inputRoot: string,
+  outputRoot: string,
+  outputFormat: string
+): string => {
+  const relativePath = getRelativeOutputDir(inputRoot, inputFile);
+  const outputFolder = join(outputRoot, relativePath);
+  return join(
+    outputFolder,
+    `${basename(inputFile, extname(inputFile))}.${outputFormat}`
+  );
+};
+
+export const buildBasenameWithFormat = (
+  inputFile: string,
+  outputFormat: string
+): string => `${basename(inputFile, extname(inputFile))}.${outputFormat}`;
+
+export const pathsResolveToSameFile = (
+  inputFile: string,
+  outputFile: string
+): boolean =>
+  resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase();
+
 // Get a unique output file name
 const getOutputFileCopy = async (
   inputFile: string,
@@ -25,13 +71,10 @@ const getOutputFileCopy = async (
   outputFolder: string,
   copyNumber: number = 1
 ): Promise<string> => {
-  let baseNameCopy = basename(inputFile, extname(inputFile));
-  let match = baseNameCopy.match(/^(.+)-copy\((\d+)\)/);
-
-  if (match && match[1] && match[2]) {
-    baseNameCopy = match[1];
-    copyNumber = parseInt(match[2], 10);
-    copyNumber++;
+  const parsed = parseCopyFilename(inputFile);
+  let baseNameCopy = parsed.base;
+  if (parsed.num > 0) {
+    copyNumber = parsed.num + 1;
   }
   let outputFileCopy = `${join(
     outputFolder,
@@ -74,7 +117,10 @@ const askOggCodec = async (): Promise<OggCodec> => {
   return input;
 };
 
-const getRelativeOutputDir = (inputRoot: string, inputFile: string): string => {
+export const getRelativeOutputDir = (
+  inputRoot: string,
+  inputFile: string
+): string => {
   const normalizedRoot = resolve(inputRoot);
   const normalizedFile = resolve(inputFile);
   const relFilePath = relative(normalizedRoot, normalizedFile);
@@ -133,6 +179,9 @@ const createConversionList = async (
     logger.error(
       chalk.redBright('\n❌ Error: No input files found to process.')
     );
+    // Conversion never starts here, so report any search errors now instead of
+    // relying on finalize (which won't run in this branch).
+    await reportSearchErrors();
     handleExit(1);
   }
 

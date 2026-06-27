@@ -2,9 +2,6 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
 let capturedSpawnArgs: string[] = [];
 
-// Characterization test for the current conversion-integrity bug where ffprobe
-// failure still lets conversion continue with stereo forcing and metadata drop.
-
 jest.unstable_mockModule('fs', () => ({
   existsSync: jest.fn((path: string) => {
     if (path.includes('ffmpeg')) return true;
@@ -59,7 +56,7 @@ jest.unstable_mockModule('../utils.js', () => ({
 const { converterWorker } = await import('../converterWorker.js');
 const { parentPort } = await import('worker_threads');
 
-describe('ffprobe fallback audit characterization', () => {
+describe('ffprobe fallback audit (KB-001 fixed)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedSpawnArgs = [];
@@ -68,22 +65,24 @@ describe('ffprobe fallback audit characterization', () => {
     console.error = jest.fn();
   });
 
-  it('proves conversion continues with -map_metadata -1 and -ac 2 when ffprobe fails', async () => {
-    await converterWorker({
-      file: {
-        inputFile: '/input/mono-source.wav',
-        outputFile: '/output/result.mp3',
-        outputFormat: 'mp3',
-      },
-      settings: { oggCodec: 'vorbis' },
-    });
+  it('fails conversion when ffprobe cannot read input metadata', async () => {
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: '/input/mono-source.wav',
+          outputFile: '/output/result.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/ffprobe failed/i);
 
-    expect(capturedSpawnArgs).toEqual(
-      expect.arrayContaining(['-map_metadata', '-1', '-ac', '2'])
+    expect(capturedSpawnArgs).toEqual([]);
+    expect(parentPort!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        data: expect.stringMatching(/ffprobe failed/i),
+      })
     );
-    expect(parentPort!.postMessage).toHaveBeenCalledWith({
-      type: 'code',
-      data: 0,
-    });
   });
 });
