@@ -23,10 +23,12 @@ jest.unstable_mockModule('chalk', () => ({
     whiteBright: { bold: jest.fn((...args) => args.join(' ')) },
     white: jest.fn((...args) => args.join(' ')),
     gray: jest.fn((...args) => args.join(' ')),
+    yellowBright: jest.fn((...args) => args.join(' ')),
   },
   whiteBright: { bold: jest.fn((...args) => args.join(' ')) },
   white: jest.fn((...args) => args.join(' ')),
   gray: jest.fn((...args) => args.join(' ')),
+  yellowBright: jest.fn((...args) => args.join(' ')),
 }));
 
 const fs = await import('fs');
@@ -96,6 +98,35 @@ describe('searchFiles resilience', () => {
     expect(readdirSyncMock).toHaveBeenCalledTimes(1);
   });
 
+  it('continues walking when realpathSync throws for a directory', async () => {
+    readdirSyncMock
+      .mockReturnValueOnce(['good.mp3', 'symlink-dir'] as never)
+      .mockReturnValueOnce(['nested.wav'] as never);
+    statSyncMock.mockImplementation((targetPath) => {
+      const pathStr = String(targetPath);
+      if (pathStr.endsWith('symlink-dir')) {
+        return { isDirectory: () => true } as ReturnType<typeof fs.statSync>;
+      }
+      return { isDirectory: () => false } as ReturnType<typeof fs.statSync>;
+    });
+    realpathSyncMock.mockImplementation((targetPath) => {
+      if (String(targetPath).endsWith('symlink-dir')) {
+        throw new Error('ELOOP: too many symbolic links');
+      }
+      return String(targetPath) as never;
+    });
+
+    const result = await searchFiles({
+      inputFilePath: '/audit/symlink-root',
+      inputFormats: ['mp3', 'wav'],
+    } as never);
+
+    expect(result).toEqual([
+      join('/audit/symlink-root', 'good.mp3'),
+      join('/audit/symlink-root', 'symlink-dir', 'nested.wav'),
+    ]);
+  });
+
   it(`stops descending past MAX_WALK_DEPTH (${MAX_WALK_DEPTH}) and records an error`, async () => {
     readdirSyncMock.mockReturnValue(['child'] as never);
     statSyncMock.mockReturnValue({
@@ -116,5 +147,37 @@ describe('searchFiles resilience', () => {
         error.message.includes(String(MAX_WALK_DEPTH))
       )
     ).toBe(true);
+  });
+
+  it('rejects a non-audio CLI path in single-file mode and records the error', async () => {
+    const result = await searchFiles({
+      inputFilePath: '/audit/input',
+      inputFormats: ['mp3', 'wav'],
+      singleFileMode: true,
+      singleFilePath: '/audit/input/readme.txt',
+    } as never);
+
+    // The unsupported .txt file is not handed off to ffmpeg.
+    expect(result).toEqual([]);
+
+    const errors = getSearchErrors();
+    expect(
+      errors.some(
+        (e) =>
+          e.path.endsWith('readme.txt') &&
+          /Unsupported input type/.test(e.message)
+      )
+    ).toBe(true);
+  });
+
+  it('accepts a supported single-file CLI path', async () => {
+    const result = await searchFiles({
+      inputFilePath: '/audit/input',
+      inputFormats: ['mp3', 'wav'],
+      singleFileMode: true,
+      singleFilePath: '/audit/input/song.wav',
+    } as never);
+
+    expect(result).toEqual(['/audit/input/song.wav']);
   });
 });

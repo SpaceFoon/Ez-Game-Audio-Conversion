@@ -220,7 +220,6 @@ describe('converterWorker.js', () => {
 
   it('allows Unicode characters in output path', async () => {
     fs.existsSync.mockReturnValue(true);
-    // Should NOT throw - Unicode is now allowed
     await converterWorker({
       file: {
         inputFile: 'in.wav',
@@ -233,6 +232,88 @@ describe('converterWorker.js', () => {
       type: 'code',
       data: 0,
     });
+  }, 10000);
+
+  it('rejects via failWorker when validation fails before spawn', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'bad"name.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/quotes/i);
+
+    expect(spawnMock).not.toHaveBeenCalled();
+  }, 10000);
+
+  it('throws before spawn for unsupported output format', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'out.xyz',
+          outputFormat: 'xyz' as never,
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/Unsupported output format/i);
+  }, 10000);
+
+  it('throws before spawn for unsupported ogg codec', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'out.ogg',
+          outputFormat: 'ogg',
+        },
+        settings: { oggCodec: 'mp3' },
+      })
+    ).rejects.toThrow(/Unsupported ogg codec/i);
+  }, 10000);
+
+  it('rejects when ffmpeg spawn emits an error event', async () => {
+    fs.existsSync.mockReturnValue(true);
+
+    spawnMock.mockImplementation(() => {
+      const mockProcess: MockSpawnProcess = {
+        stderr: { on: jest.fn() },
+        on: jest.fn((event: string, cb: (...args: unknown[]) => void) => {
+          if (event === 'error') {
+            setTimeout(() => cb(new Error('ENOENT: ffmpeg not executable')), 0);
+          }
+          return mockProcess;
+        }),
+      };
+      return mockProcess as unknown as ChildProcessWithoutNullStreams;
+    });
+
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: 'in.wav',
+          outputFile: 'out.mp3',
+          outputFormat: 'mp3',
+        },
+        settings: { oggCodec: 'vorbis' },
+      })
+    ).rejects.toThrow(/ERROR in ffmpegCommand/i);
+
+    expect(workerThreads.parentPort!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'error',
+        data: expect.stringContaining('ENOENT'),
+      })
+    );
   }, 10000);
 
   it('rejects output paths containing quotes or newlines', async () => {

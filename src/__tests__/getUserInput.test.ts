@@ -106,6 +106,23 @@ describe('getUserInput', () => {
     expect(result.outputFormats).toEqual(['ogg']);
   });
 
+  it('clears a prior ogg codec so each batch can choose Vorbis or Opus again', async () => {
+    existsSyncMock.mockReturnValue(true);
+    statSyncMock.mockReturnValue(directoryStats);
+
+    settings.oggCodec = 'opus';
+
+    getAnswerMock
+      .mockResolvedValueOnce('/input/path')
+      .mockResolvedValueOnce('/output/path')
+      .mockResolvedValueOnce('wav')
+      .mockResolvedValueOnce('mp3');
+
+    const result = await getUserInput(settings);
+
+    expect(result.oggCodec).toBeNull();
+  });
+
   it('returns all allowed formats when both format prompts are blank', async () => {
     existsSyncMock.mockReturnValue(true);
     statSyncMock.mockReturnValue(directoryStats);

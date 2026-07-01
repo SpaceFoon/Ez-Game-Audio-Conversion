@@ -23,6 +23,7 @@ import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
+import { resolveE2eDescribe, resolveE2eIt } from '../test-utils/e2eDeps.js';
 
 const PLATFORM_SLUG =
   process.platform === 'win32'
@@ -132,12 +133,20 @@ const testConversion = (
   };
 };
 
-describe('Unicode Path Support (Integration)', () => {
-  const ffmpegAvailable = checkFfmpegAvailable();
+const ffmpegAvailable = checkFfmpegAvailable();
+const describeUnicode = resolveE2eDescribe(
+  ffmpegAvailable,
+  `bundled ffmpeg not found at ${FFMPEG_CMD}`
+);
+
+describeUnicode('Unicode Path Support (Integration)', () => {
+  const itWithFfmpeg = resolveE2eIt(
+    ffmpegAvailable,
+    `bundled ffmpeg not found at ${FFMPEG_CMD}`
+  );
 
   beforeAll(() => {
     if (!ffmpegAvailable) {
-      console.log('Skipping Unicode path integration tests: ffmpeg not found');
       return;
     }
 
@@ -166,9 +175,6 @@ describe('Unicode Path Support (Integration)', () => {
     }
     jest.clearAllMocks();
   });
-
-  // Helper to run test only if ffmpeg is available
-  const itWithFfmpeg = ffmpegAvailable ? it : it.skip;
 
   describe('Chinese character paths', () => {
     const chineseInput = join(INPUT_DIR, '测试音频.wav');
@@ -384,6 +390,16 @@ describe('Unicode Path Support (Integration)', () => {
       for (const char of invalidChars) {
         expect(invalidCharRegex.test(`file${char}name.mp3`)).toBe(true);
       }
+    });
+
+    it('allows paths with spaces, parentheses, hash, and percent signs', () => {
+      // eslint-disable-next-line no-control-regex
+      const invalidCharRegex = /[\x00-\x1F<>:|?*]/;
+
+      expect(invalidCharRegex.test('my song (mix).mp3')).toBe(false);
+      expect(invalidCharRegex.test('track #1.wav')).toBe(false);
+      expect(invalidCharRegex.test('100% complete.ogg')).toBe(false);
+      expect(invalidCharRegex.test('folder/sub dir/file.flac')).toBe(false);
     });
 
     it('validates control characters are blocked', () => {

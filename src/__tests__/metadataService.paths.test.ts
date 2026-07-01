@@ -94,6 +94,23 @@ describe('metadataService ffprobe path resolution', () => {
     );
   }, 10000);
 
+  it('uses ffmpeg-bin/macos/ffprobe on macos when present', async () => {
+    config = {
+      sep: '/',
+      runtimeBaseDir: '/app',
+      platformSlug: 'macos',
+      exists: new Set<string>(['/app/ffmpeg-bin/macos/ffprobe']),
+    };
+
+    const { getMetaData } = await importSubject();
+    await getMetaData('/in/in.mp3');
+
+    expect(spawnSyncMock).toHaveBeenCalled();
+    expect((spawnSyncMock.mock.calls as any[][])[0][0]).toBe(
+      '/app/ffmpeg-bin/macos/ffprobe'
+    );
+  }, 10000);
+
   it('returns null when no ffprobe candidates exist', async () => {
     config = {
       sep: '/',

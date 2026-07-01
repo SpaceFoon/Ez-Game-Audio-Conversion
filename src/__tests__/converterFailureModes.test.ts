@@ -204,7 +204,7 @@ describe('converter failure modes', () => {
     expect(result.failedFiles[0].outputFile).toBe(sharedOutput);
   });
 
-  it('treats worker exit 0 without code message as success', async () => {
+  it('treats worker exit 0 without a code message as a failure (no false success)', async () => {
     workerMock.mockImplementation(() => {
       const handlers: WorkerHandlers = {};
       const worker = {
@@ -225,7 +225,9 @@ describe('converter failure modes', () => {
 
     const result = await convertFiles(createTestFiles(1));
 
-    expect(result.successfulFiles).toHaveLength(1);
-    expect(result.failedFiles).toHaveLength(0);
+    // A clean OS exit code is not proof the conversion happened. Success must be
+    // confirmed by the worker's 'code' message, so an unconfirmed exit is a failure.
+    expect(result.successfulFiles).toHaveLength(0);
+    expect(result.failedFiles).toHaveLength(1);
   });
 });

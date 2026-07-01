@@ -1,37 +1,27 @@
 import { describe, it, expect } from '@jest/globals';
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { platform } from 'os';
-import { findBinary } from '../utils.js';
-
-const PLATFORM_SLUG =
-  platform() === 'win32'
-    ? 'windows'
-    : platform() === 'darwin'
-      ? 'macos'
-      : 'linux';
-const FFMPEG_EXE = platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-const FFMPEG_PATH = join(
-  process.cwd(),
-  'ffmpeg-bin',
-  PLATFORM_SLUG,
-  FFMPEG_EXE
-);
+import {
+  canRunIntegration,
+  integrationSkipReason,
+  e2eRequired,
+  requireIntegrationDeps,
+} from './test-utils/integrationGuard.js';
 
 describe('CI integration guard', () => {
-  it('requires ffmpeg binaries when running in CI', () => {
-    if (process.env.CI !== 'true') {
+  it('requires ffmpeg and worker when E2E_REQUIRED=1', () => {
+    if (!e2eRequired) {
       return;
     }
 
-    expect(existsSync(FFMPEG_PATH)).toBe(true);
+    expect(canRunIntegration).toBe(true);
+    expect(integrationSkipReason).toBe('');
+    expect(() => requireIntegrationDeps()).not.toThrow();
   });
 
-  it('requires compiled worker when running in CI', () => {
-    if (process.env.CI !== 'true') {
+  it('documents skip reason when integration deps are missing locally', () => {
+    if (e2eRequired || canRunIntegration) {
       return;
     }
 
-    expect(findBinary('converterWorker.js', ['dist'])).not.toBeNull();
+    expect(integrationSkipReason.length).toBeGreaterThan(0);
   });
 });

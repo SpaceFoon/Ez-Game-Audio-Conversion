@@ -5,12 +5,13 @@
  * survives the conversion process and the output file is valid.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, expect, beforeAll, afterAll } from '@jest/globals';
 import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
 import { platform } from 'os';
+import { resolveE2eDescribe, resolveE2eIt } from '../test-utils/e2eDeps.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -144,7 +145,7 @@ const METADATA_TEST_CASES = [
 ];
 
 // Output formats to test
-const OUTPUT_FORMATS = ['mp3', 'ogg', 'flac'];
+const OUTPUT_FORMATS = ['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aiff'];
 
 // Check if ffmpeg is available (use bundled binary)
 const checkFfmpeg = (): boolean => {
@@ -349,12 +350,20 @@ const checkPhase = (
   }
 };
 
-describe('Metadata Preservation E2E Tests', () => {
-  const ffmpegAvailable = checkFfmpeg();
+const ffmpegAvailable = checkFfmpeg();
+const describeMetadata = resolveE2eDescribe(
+  ffmpegAvailable,
+  `ffmpeg/ffprobe not found under ${FFMPEG_BIN_DIR}`
+);
+
+describeMetadata('Metadata Preservation E2E Tests', () => {
+  const itWithFfmpeg = resolveE2eIt(
+    ffmpegAvailable,
+    `ffmpeg/ffprobe not found under ${FFMPEG_BIN_DIR}`
+  );
 
   beforeAll(() => {
     if (!ffmpegAvailable) {
-      console.log('Skipping metadata preservation tests: ffmpeg not found');
       return;
     }
 
@@ -376,8 +385,6 @@ describe('Metadata Preservation E2E Tests', () => {
       }
     }
   });
-
-  const itWithFfmpeg = ffmpegAvailable ? it : it.skip;
 
   describe('Input file generation', () => {
     for (const testCase of METADATA_TEST_CASES) {

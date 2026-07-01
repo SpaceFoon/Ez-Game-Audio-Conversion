@@ -77,15 +77,17 @@ const convertFiles = async (
   const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, queue.length));
   const failedFiles: ConversionResult[] = [];
   const successfulFiles: ConversionResult[] = [];
+  const activeWorkers = new Set<Worker>();
   let abortRequested = false;
 
-  /** De-duplicate and record a failed conversion */
-  const recordFailure = (file: ConversionItem) => {
+  /** De-duplicate and record a failed conversion, preserving the reason. */
+  const recordFailure = (file: ConversionItem, error?: string) => {
     if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
       failedFiles.push({
         success: false,
         inputFile: file.inputFile,
         outputFile: file.outputFile,
+        ...(error ? { error } : {}),
       });
     }
   };
@@ -133,7 +135,7 @@ const convertFiles = async (
         logger.error(
           chalk.red(`\n❌ Error: ${file.outputFile}\n   ${displayMessage}`)
         );
-        recordFailure(file);
+        recordFailure(file, logData);
         resolveOnce();
       };
 
@@ -163,6 +165,7 @@ const convertFiles = async (
         const worker = new Worker(workerPath, {
           workerData,
         });
+        activeWorkers.add(worker);
 
         worker.on('message', (message: unknown) => {
           if (!isRecord(message) || typeof message.type !== 'string') return;
@@ -184,6 +187,16 @@ const convertFiles = async (
               fatalExitRequested = true;
               abortRequested = true;
               errorLogged = true;
+
+              // A fatal condition (disk full / permission denied) affects every
+              // job, not just this one. Stop in-flight workers immediately so we
+              // don't keep hammering a full disk; queued jobs are already
+              // skipped via the abortRequested check in the worker loop.
+              for (const other of activeWorkers) {
+                if (other !== worker) {
+                  void other.terminate?.();
+                }
+              }
 
               const fatalMessage =
                 fatalKind === 'disk-space'
@@ -209,7 +222,7 @@ const convertFiles = async (
 
               void getAnswer('Press ENTER to return to the main menu...').then(
                 () => {
-                  recordFailure(file);
+                  recordFailure(file, `${fatalMessage} ${stderrOutput.trim()}`);
                   resolveOnce();
                 }
               );
@@ -276,25 +289,19 @@ const convertFiles = async (
         });
 
         worker.on('exit', (exitCode: number) => {
+          activeWorkers.delete(worker);
           if (settled) return;
-          if (exitCode === 0) {
-            if (
-              !successfulFiles.some((s) => s.outputFile === file.outputFile) &&
-              !failedFiles.some((f) => f.outputFile === file.outputFile)
-            ) {
-              successfulFiles.push({
-                success: true,
-                inputFile: file.inputFile,
-                outputFile: file.outputFile,
-              });
-            }
-            resolveOnce();
-            return;
-          }
 
+          // A successful conversion always settles first via the worker's
+          // 'code' (data: 0) message. If we reach the exit handler still
+          // unsettled, the worker exited WITHOUT confirming success — a clean
+          // OS exit code is not proof the file was written. Treat it as a
+          // failure to avoid silently counting lost work as a success.
           recordFailureWithLog(
-            `Worker exited with code ${exitCode}. ${stderrOutput.trim()}`,
-            `Worker exited with code ${exitCode}: ${stderrOutput.trim() || 'No error output'}`
+            `Worker exited (code ${exitCode}) without reporting success. ${stderrOutput.trim()}`,
+            `Worker exited (code ${exitCode}) without confirming the conversion completed.${
+              stderrOutput.trim() ? `\n   ${stderrOutput.trim()}` : ''
+            }`
           );
         });
       } catch (error) {
@@ -309,7 +316,7 @@ const convertFiles = async (
           },
           file
         );
-        recordFailure(file);
+        recordFailure(file, message);
         resolveOnce();
       }
     });

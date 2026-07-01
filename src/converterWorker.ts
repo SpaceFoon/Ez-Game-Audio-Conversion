@@ -230,8 +230,10 @@ const converterWorker = async ({
     oggCodec: string
   ): FormatConfig => {
     if (outputFormat === 'ogg') {
-      const oggKey = oggCodec === 'opus' ? 'opus' : 'vorbis';
-      const cfg = (formatConfig.ogg as Record<string, FormatConfig>)[oggKey];
+      if (oggCodec !== 'opus' && oggCodec !== 'vorbis') {
+        throw new Error(`Unsupported ogg codec: ${oggCodec}`);
+      }
+      const cfg = (formatConfig.ogg as Record<string, FormatConfig>)[oggCodec];
       if (!cfg) throw new Error(`Unsupported ogg codec: ${oggCodec}`);
       return cfg;
     }

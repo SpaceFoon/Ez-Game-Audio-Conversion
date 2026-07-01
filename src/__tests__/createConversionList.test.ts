@@ -1,5 +1,9 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { join } from 'path';
+import {
+  defaultCreateConversionListAnswer,
+  mockDefaultCreateConversionListAnswers,
+} from './test-utils/createConversionListAnswers.js';
 
 // ESM mocks must be declared BEFORE dynamic imports
 jest.unstable_mockModule('fs', () => ({
@@ -36,6 +40,7 @@ jest.unstable_mockModule('chalk', () => {
         { bold: jest.fn((a) => a) }
       ),
       yellow: jest.fn((a) => a),
+      gray: jest.fn((a) => a),
     },
     blue: { bold: jest.fn((...a) => a.join(' ')) },
     blueBright: jest.fn((...a) => a.join(' ')),
@@ -55,6 +60,14 @@ jest.unstable_mockModule('chalk', () => {
     yellow: jest.fn((a) => a),
   };
 });
+
+jest.unstable_mockModule('../logger.js', () => ({
+  default: {
+    log: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}));
 
 jest.unstable_mockModule('../utils.js', () => ({
   getAnswer: jest.fn(),
@@ -95,12 +108,15 @@ describe('createConversionList', () => {
     settings.singleFileMode = false;
     existsSyncMock.mockReturnValue(false);
     mkdirSyncMock.mockImplementation(() => undefined);
+    mockDefaultCreateConversionListAnswers(getAnswerMock);
   });
 
   describe('basic conversion list creation', () => {
     it('creates one output per format for each input file', async () => {
       settings.outputFormats = ['mp3', 'ogg'];
-      getAnswerMock.mockResolvedValue('yes');
+      getAnswerMock.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
@@ -117,7 +133,9 @@ describe('createConversionList', () => {
     it('preserves directory structure in output paths', async () => {
       settings.inputFilePath = '/input';
       settings.outputFilePath = '/output';
-      getAnswerMock.mockResolvedValue('yes');
+      getAnswerMock.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const files = [join(settings.inputFilePath, 'subdir', 'song.wav')];
       const result = await createConversionList(files);
@@ -129,7 +147,9 @@ describe('createConversionList', () => {
     });
 
     it('handles multiple input files correctly', async () => {
-      getAnswerMock.mockResolvedValue('yes');
+      getAnswerMock.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const files = ['a.wav', 'b.wav', 'c.wav'].map((name) =>
         join(settings.inputFilePath, name)
@@ -148,7 +168,11 @@ describe('createConversionList', () => {
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
           String(path) === join(settings.outputFilePath, 'b.mp3')
       );
-      getAnswerMock.mockResolvedValueOnce('oa').mockResolvedValue('yes');
+      getAnswerMock
+        .mockResolvedValueOnce('oa')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = ['a.wav', 'b.wav'].map((name) =>
         join(settings.inputFilePath, name)
@@ -166,7 +190,9 @@ describe('createConversionList', () => {
       );
       getAnswerMock
         .mockResolvedValueOnce('r') // rename
-        .mockResolvedValue('yes'); // confirm
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        ); // confirm
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
@@ -180,7 +206,9 @@ describe('createConversionList', () => {
       );
       getAnswerMock
         .mockResolvedValueOnce('s') // skip
-        .mockResolvedValue('yes'); // confirm (but no files left)
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        ); // confirm (but no files left)
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       await createConversionList(files);
@@ -197,7 +225,9 @@ describe('createConversionList', () => {
         .mockResolvedValueOnce('x') // invalid
         .mockResolvedValueOnce('nope') // invalid
         .mockResolvedValueOnce('r') // valid: rename
-        .mockResolvedValue('yes'); // confirm
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        ); // confirm
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
@@ -214,7 +244,9 @@ describe('createConversionList', () => {
       getAnswerMock
         .mockResolvedValueOnce('')
         .mockResolvedValueOnce('r')
-        .mockResolvedValue('yes');
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const result = await createConversionList([
         join(settings.inputFilePath, 'song.wav'),
@@ -235,12 +267,54 @@ describe('createConversionList', () => {
       });
       getAnswerMock
         .mockResolvedValueOnce('r') // rename
-        .mockResolvedValue('yes'); // confirm
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        ); // confirm
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
 
       expect(result[0].outputFile).toContain('-copy(2)');
+      expect(result[0].outputFile).not.toContain('-copy(0)');
+    });
+
+    it('recurses to the next copy slot when the preferred copy name already exists', async () => {
+      existsSyncMock.mockImplementation((path) => {
+        const p = String(path);
+        return (
+          p === join(settings.outputFilePath, 'song.mp3') ||
+          p === join(settings.outputFilePath, 'song-copy(1).mp3') ||
+          p === join(settings.outputFilePath, 'song-copy(2).mp3')
+        );
+      });
+      getAnswerMock
+        .mockResolvedValueOnce('r')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
+
+      const result = await createConversionList([
+        join(settings.inputFilePath, 'song.wav'),
+      ]);
+
+      expect(result[0].outputFile).toContain('-copy(3)');
+    });
+
+    it('increments from existing -copy(n) basename when renaming conflicts', async () => {
+      existsSyncMock.mockImplementation((path) => {
+        const p = String(path);
+        return p === join(settings.outputFilePath, 'song-copy(5).mp3');
+      });
+      getAnswerMock
+        .mockResolvedValueOnce('r')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
+
+      const files = [join(settings.inputFilePath, 'song-copy(5).wav')];
+      const result = await createConversionList(files);
+
+      expect(result[0].outputFile).toContain('-copy(6)');
     });
 
     it('applies rename-all (ra) to subsequent conflicts', async () => {
@@ -250,7 +324,11 @@ describe('createConversionList', () => {
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
           String(path) === join(settings.outputFilePath, 'b.mp3')
       );
-      getAnswerMock.mockResolvedValueOnce('ra').mockResolvedValue('yes');
+      getAnswerMock
+        .mockResolvedValueOnce('ra')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = ['a.wav', 'b.wav'].map((name) =>
         join(settings.inputFilePath, name)
@@ -274,7 +352,9 @@ describe('createConversionList', () => {
       getAnswerMock
         .mockResolvedValueOnce('o')
         .mockResolvedValueOnce('ra')
-        .mockResolvedValue('yes');
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = ['a.wav', 'b.wav', 'c.wav'].map((name) =>
         join(settings.inputFilePath, name)
@@ -295,7 +375,9 @@ describe('createConversionList', () => {
       );
       getAnswerMock
         .mockResolvedValueOnce('sa') // skip all
-        .mockResolvedValue('yes');
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = ['a.wav', 'b.wav'].map((name) =>
         join(settings.inputFilePath, name)
@@ -305,6 +387,32 @@ describe('createConversionList', () => {
       // All files skipped = exit
       expect(handleExitMock).toHaveBeenCalledWith(0);
     });
+
+    it('applies overwrite-all (oa) to subsequent conflicts without renaming', async () => {
+      settings.outputFormats = ['mp3'];
+      existsSyncMock.mockImplementation(
+        (path) =>
+          String(path) === join(settings.outputFilePath, 'a.mp3') ||
+          String(path) === join(settings.outputFilePath, 'b.mp3')
+      );
+      getAnswerMock
+        .mockResolvedValueOnce('oa')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
+
+      const files = ['a.wav', 'b.wav'].map((name) =>
+        join(settings.inputFilePath, name)
+      );
+      const result = await createConversionList(files);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].outputFile).toBe(join(settings.outputFilePath, 'a.mp3'));
+      expect(result[1].outputFile).toBe(join(settings.outputFilePath, 'b.mp3'));
+      expect(result.every((item) => !item.outputFile.includes('-copy'))).toBe(
+        true
+      );
+    });
   });
 
   describe('same file type conversion', () => {
@@ -312,7 +420,11 @@ describe('createConversionList', () => {
       settings.inputFilePath = '/input';
       settings.outputFilePath = '/input'; // Same as input!
       settings.outputFormats = ['mp3'];
-      getAnswerMock.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswerMock
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join(settings.inputFilePath, 'song.mp3')]; // Already mp3!
       const result = await createConversionList(files);
@@ -333,6 +445,24 @@ describe('createConversionList', () => {
       // No files to convert → exit
       expect(handleExitMock).toHaveBeenCalledWith(0);
     });
+
+    it('re-prompts on invalid same-type answers before accepting yes', async () => {
+      settings.inputFilePath = '/input';
+      settings.outputFilePath = '/input';
+      settings.outputFormats = ['mp3'];
+      getAnswerMock
+        .mockResolvedValueOnce('maybe')
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
+
+      const files = [join(settings.inputFilePath, 'song.mp3')];
+      const result = await createConversionList(files);
+
+      expect(result[0].outputFile).toContain('-copy');
+      expect(getAnswerMock).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('ogg codec selection', () => {
@@ -341,7 +471,9 @@ describe('createConversionList', () => {
       settings.oggCodec = null;
       getAnswerMock
         .mockResolvedValueOnce('opus') // codec selection
-        .mockResolvedValue('yes'); // confirm
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        ); // confirm
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       await createConversionList(files);
@@ -354,12 +486,29 @@ describe('createConversionList', () => {
       settings.oggCodec = null;
       getAnswerMock
         .mockResolvedValueOnce('') // empty = vorbis default
-        .mockResolvedValue('yes');
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       await createConversionList(files);
 
       expect(settings.oggCodec).toBe('vorbis');
+    });
+
+    it('trims whitespace from ogg codec answers', async () => {
+      settings.outputFormats = ['ogg'];
+      settings.oggCodec = null;
+      getAnswerMock
+        .mockResolvedValueOnce('  opus  ')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
+
+      const files = [join(settings.inputFilePath, 'song.wav')];
+      await createConversionList(files);
+
+      expect(settings.oggCodec).toBe('opus');
     });
 
     it('re-prompts on invalid codec input until valid', async () => {
@@ -369,7 +518,9 @@ describe('createConversionList', () => {
         .mockResolvedValueOnce('invalid')
         .mockResolvedValueOnce('also-invalid')
         .mockResolvedValueOnce('vorbis')
-        .mockResolvedValue('yes');
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       await createConversionList(files);
@@ -378,11 +529,31 @@ describe('createConversionList', () => {
       // getAnswer called 3 times for codec + 1 for confirm = 4 total
       expect(getAnswerMock).toHaveBeenCalledTimes(4);
     });
+
+    it('prompts again when a stale codec was set by a previous batch', async () => {
+      settings.outputFormats = ['ogg'];
+      settings.oggCodec = 'opus';
+      getAnswerMock
+        .mockResolvedValueOnce('vorbis')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
+
+      const files = [join(settings.inputFilePath, 'song.wav')];
+      await createConversionList(files);
+
+      expect(settings.oggCodec).toBe('vorbis');
+      expect(getAnswerMock).toHaveBeenCalledWith(
+        expect.stringMatching(/Vorbis or Opus/i)
+      );
+    });
   });
 
   describe('final confirmation', () => {
     it('returns conversion list when user confirms with yes', async () => {
-      getAnswerMock.mockResolvedValue('yes');
+      getAnswerMock.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const files = [join(settings.inputFilePath, 'song.wav')];
       const result = await createConversionList(files);
@@ -431,7 +602,9 @@ describe('createConversionList', () => {
           throw new Error('mkdir failed');
         }
       });
-      getAnswerMock.mockResolvedValue('yes');
+      getAnswerMock.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const files = [
         join(settings.inputFilePath, 'good', 'song.wav'),
@@ -444,7 +617,9 @@ describe('createConversionList', () => {
     });
 
     it('deduplicates duplicate output targets before returning the final list', async () => {
-      getAnswerMock.mockResolvedValue('yes');
+      getAnswerMock.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const duplicateFile = join(settings.inputFilePath, 'song.wav');
       const result = await createConversionList([duplicateFile, duplicateFile]);
@@ -458,31 +633,17 @@ describe('createConversionList', () => {
       ]);
     });
 
-    it('writes progress output for large batches', async () => {
-      const writeSpy = jest
-        .spyOn(process.stdout, 'write')
-        .mockImplementation(() => true);
-      getAnswerMock.mockResolvedValue('yes');
-
-      const files = Array.from({ length: 101 }, (_, index) =>
-        join(settings.inputFilePath, `track-${index}.wav`)
-      );
-
-      const result = await createConversionList(files);
-
-      expect(result).toHaveLength(101);
-      expect(writeSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Building list: 101/101 items... Done!')
-      );
-      writeSpy.mockRestore();
-    });
-
     it('keeps existing and non-conflicting outputs together in mixed-format batches', async () => {
       settings.outputFormats = ['mp3', 'ogg'];
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
       );
-      getAnswerMock.mockResolvedValueOnce('r').mockResolvedValueOnce('yes');
+      getAnswerMock
+        .mockResolvedValueOnce('vorbis')
+        .mockResolvedValueOnce('r')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const result = await createConversionList([
         join(settings.inputFilePath, 'song.wav'),

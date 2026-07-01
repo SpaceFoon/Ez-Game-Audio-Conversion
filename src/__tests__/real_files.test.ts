@@ -1,26 +1,17 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  afterEach,
-  jest,
-} from '@jest/globals';
+import { it, expect, beforeAll, afterEach, jest } from '@jest/globals';
 import { fileURLToPath } from 'url';
 
-import {
-  existsSync,
-  readdirSync,
-  mkdirSync,
-  unlinkSync,
-  copyFileSync,
-} from 'fs';
+import { existsSync, readdirSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname, basename, extname } from 'path';
 import { convertFiles } from '../../src/converterManager.js';
-import { settings, findBinary } from '../../src/utils.js';
-import { resolveDuplicateBasenames } from '../../src/searchFiles.js';
+import { settings } from '../../src/utils.js';
 import type { ConversionItem } from '../../src/types/audio.js';
 import generateTestFiles from './test-utils/generateTestFiles.js';
+import {
+  canRunIntegration,
+  integrationSkipReason,
+} from './test-utils/ffmpegGate.js';
+import { resolveE2eDescribe } from './test-utils/e2eDeps.js';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -33,13 +24,7 @@ const TEST_OUTPUT_DIR = join(TEST_FILES_DIR, 'output');
 
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'];
 
-const ffmpegAvailable = (() => {
-  const { ffmpegPath, ffprobePath } = generateTestFiles.findFfmpegExecutables();
-  return existsSync(ffmpegPath) && existsSync(ffprobePath);
-})();
-
-const workerReady = findBinary('converterWorker.js', ['dist']) !== null;
-const canRunRealTests = ffmpegAvailable && workerReady;
+const canRunRealTests = canRunIntegration;
 
 const listAudioFiles = (): string[] => {
   if (!existsSync(TEST_INPUT_DIR)) {
@@ -116,7 +101,11 @@ const setupTestEnvironment = () => {
 
 // Skip entire suite when prerequisites are missing
 const runTests = shouldRunTests();
-const describeReal = runTests ? describe : describe.skip;
+const describeReal = resolveE2eDescribe(
+  runTests,
+  integrationSkipReason ||
+    'ffmpeg binaries or dist/converterWorker.js missing — run npm run build and npm run install:ffmpeg'
+);
 
 describeReal('Real file tests', () => {
   let logSpy: ReturnType<typeof jest.spyOn> | undefined;
@@ -155,23 +144,18 @@ describeReal('Real file tests', () => {
     // Log the files we found
     console.log('Found audio files:', files);
 
-    // Use our local implementation
-    const result = resolveDuplicateBasenames(files);
-    expect(Array.isArray(result.uniqueFiles)).toBe(true);
-    expect(Array.isArray(result.droppedFiles)).toBe(true);
-
-    // Create conversion file list
-    const conversionList: ConversionItem[] = result.uniqueFiles.map(
-      (inputFile) => {
-        const ext = extname(inputFile).slice(1);
-        const base = basename(inputFile, extname(inputFile));
-        return {
-          inputFile,
-          outputFile: join(TEST_OUTPUT_DIR, `${base}_from_${ext}.mp3`),
-          outputFormat: 'mp3',
-        };
-      }
-    );
+    // Create conversion file list directly from the discovered files. Output
+    // names embed the source extension (`_from_<ext>`) so there are no output
+    // collisions even when several inputs share a basename.
+    const conversionList: ConversionItem[] = files.map((inputFile) => {
+      const ext = extname(inputFile).slice(1);
+      const base = basename(inputFile, extname(inputFile));
+      return {
+        inputFile,
+        outputFile: join(TEST_OUTPUT_DIR, `${base}_from_${ext}.mp3`),
+        outputFormat: 'mp3',
+      };
+    });
 
     // Only test conversion if we have files
     if (conversionList.length > 0) {
@@ -239,64 +223,4 @@ describeReal('Real file tests', () => {
     // The metadataService test already covers the details of metadata extraction
     // so this is just a high-level integration test
   }, 30000); // 30 second timeout
-
-  // Add a test for duplicate file handling
-  it('should correctly handle duplicate filenames with different extensions', async () => {
-    // Get all audio files in the test input directory
-    const files = readdirSync(TEST_INPUT_DIR)
-      .filter((file) => {
-        const ext = extname(file).toLowerCase();
-        return ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aiff'].includes(ext);
-      })
-      .map((file) => join(TEST_INPUT_DIR, file));
-
-    // Create files array with duplicates (if we have enough files)
-    let duplicateFiles = [];
-
-    if (files.length >= 2) {
-      const file1 = files[0];
-      const file2 = files[1];
-
-      // Rename the files to have the same base name but different extensions
-      const testFile1 = join(TEST_INPUT_DIR, `duplicate_test.mp3`);
-      const testFile2 = join(TEST_INPUT_DIR, `duplicate_test.wav`);
-
-      // Skip this test if we can't create the test files
-      try {
-        // Only copy if the files don't already exist
-        if (!existsSync(testFile1)) {
-          copyFileSync(file1, testFile1);
-        }
-        if (!existsSync(testFile2)) {
-          copyFileSync(file2, testFile2);
-        }
-
-        duplicateFiles = [testFile1, testFile2];
-      } catch (error) {
-        console.log('Could not create duplicate test files', error);
-        return;
-      }
-    } else {
-      console.log('Not enough files for duplicate test');
-      return;
-    }
-
-    // Run duplicate test
-    const result = resolveDuplicateBasenames(duplicateFiles);
-
-    // Should only keep one file (the "better" format)
-    expect(result.uniqueFiles.length).toBe(1);
-    expect(result.droppedFiles.length).toBe(1);
-
-    // Cleanup test files
-    try {
-      for (const file of duplicateFiles) {
-        if (existsSync(file)) {
-          unlinkSync(file);
-        }
-      }
-    } catch (error) {
-      console.error('Error cleaning up test files', error);
-    }
-  }, 10000); // 10 second timeout
 });

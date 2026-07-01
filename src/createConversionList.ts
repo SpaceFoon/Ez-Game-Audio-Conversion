@@ -105,7 +105,11 @@ const askOggCodec = async (): Promise<OggCodec> => {
   // Process the user input
   const input = userResponse.trim().toLowerCase();
 
-  if (input === '') return 'vorbis';
+  if (input === '') {
+    settings.oggCodec = 'vorbis';
+    logger.log(chalk.green.italic('\n ✨ Ogg Codec 🔌 Selected: vorbis ✅'));
+    return 'vorbis';
+  }
   if (input !== 'vorbis' && input !== 'opus') {
     logger.warn('\n⚠️ Did not enter Vorbis or Opus! 😧😓😯');
     return await askOggCodec(); // Keep asking until a valid input is provided
@@ -154,15 +158,16 @@ const createConversionList = async (
   } = settings;
   let outputFolder: string | null = null;
 
+  // Choose Vorbis/Opus fresh for each batch that includes OGG output.
+  if (outputFormats.includes('ogg')) {
+    settings.oggCodec = null;
+    oggCodec = null;
+  }
+
   let convertSelf: string | null = null;
   const conversionList: ConversionCandidate[] = [];
   let response: string | null = null;
   let relativePath: string | null = null;
-
-  // Ensure we have the ogg codec set
-  if (!settings.oggCodec) {
-    settings.oggCodec = 'vorbis';
-  }
 
   // Batch summary information
   logger.log(chalk.blueBright('\n📝 Conversion parameters:'));
@@ -434,15 +439,26 @@ const createConversionList = async (
 
   // Process the conversion list
   while (true) {
-    // Function to remove duplicates based on outputFile
+    // Function to remove duplicates based on outputFile.
+    // Two different inputs can resolve to the same output path (e.g. song.wav
+    // and song.flac from different folders both targeting /out/song.mp3). We
+    // keep the first and warn so the dropped input isn't lost silently.
     const removeDuplicates = (
       list: ConversionCandidate[]
     ): ConversionCandidate[] => {
-      const seen = new Set<string>();
+      const seen = new Map<string, string>();
       return list.filter((conversion: ConversionCandidate) => {
-        const duplicate = seen.has(conversion.outputFile);
-        seen.add(conversion.outputFile);
-        return !duplicate;
+        const firstInput = seen.get(conversion.outputFile);
+        if (firstInput !== undefined) {
+          logger.warn(
+            chalk.yellow(
+              `⚠️  Skipping duplicate output: "${conversion.outputFile}" would be produced by both "${firstInput}" and "${conversion.inputFile}". Keeping the first.`
+            )
+          );
+          return false;
+        }
+        seen.set(conversion.outputFile, conversion.inputFile);
+        return true;
       });
     };
 

@@ -194,6 +194,7 @@ export const sanitizeMetaValueForArgs = (raw: string): string =>
     .replace(/\uFFFD/g, '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
+    .replace(/\n/g, ' ')
     .trim();
 
 const parseNumberAndTotal = (

@@ -1,5 +1,5 @@
 import { readdirSync, statSync, realpathSync } from 'fs';
-import { join, extname, dirname, basename } from 'path';
+import { join, extname } from 'path';
 import chalk from 'chalk';
 import logger from './logger.js';
 import { recordSearchError, clearSearchErrors } from './utils.js';
@@ -8,61 +8,6 @@ import type { Settings } from './types/settings.js';
 // Safety net against pathological symlink/junction loops in case canonical-path
 // resolution is unavailable. Real loops are caught earlier by the visited set.
 export const MAX_WALK_DEPTH = 512;
-
-export const AUDIO_EXTENSION_PRIORITY = [
-  '.midi',
-  '.mid',
-  '.ogg',
-  '.mp3',
-  '.m4a',
-  '.wav',
-  '.flac',
-  '.aiff',
-] as const;
-
-/** When multiple files share a basename, keep the highest-priority extension. */
-export const resolveDuplicateBasenames = (
-  files: string[]
-): { uniqueFiles: string[]; droppedFiles: string[] } => {
-  const fileobjs = files.map(
-    (file) =>
-      [
-        join(dirname(file), basename(file, extname(file))),
-        extname(file),
-      ] as const
-  );
-
-  const uniq = new Map<string, string>();
-  const droppedFiles: string[] = [];
-
-  for (const [name, ext] of fileobjs) {
-    if (!uniq.has(name)) {
-      uniq.set(name, ext);
-      continue;
-    }
-
-    const current = uniq.get(name)!;
-    if (
-      AUDIO_EXTENSION_PRIORITY.indexOf(
-        ext as (typeof AUDIO_EXTENSION_PRIORITY)[number]
-      ) >
-      AUDIO_EXTENSION_PRIORITY.indexOf(
-        current as (typeof AUDIO_EXTENSION_PRIORITY)[number]
-      )
-    ) {
-      droppedFiles.push(`${name}${current}`);
-      uniq.set(name, ext);
-    } else {
-      droppedFiles.push(`${name}${ext}`);
-    }
-  }
-
-  const uniqueFiles = Array.from(uniq.entries()).map(
-    ([name, ext]) => `${name}${ext}`
-  );
-
-  return { uniqueFiles, droppedFiles };
-};
 
 //Searches for files that meet criteria
 const searchFiles = (settings: Settings): Promise<string[]> => {
@@ -77,6 +22,22 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
   if (settings.singleFileMode && settings.singleFilePath) {
     const fileExtension = extname(settings.singleFilePath).toLowerCase();
     logger.log('File extension:', fileExtension);
+
+    // Validate the explicit file against the allowed input formats so a
+    // mistyped path or non-audio file (e.g. readme.txt) is rejected up front
+    // instead of being handed to ffmpeg and failing mid-batch.
+    if (!fileExtensions.includes(fileExtension)) {
+      recordSearchError(
+        settings.singleFilePath,
+        `Unsupported input type "${fileExtension || '(none)'}". Expected one of: ${fileExtensions.join(', ')}`
+      );
+      logger.warn(
+        chalk.yellowBright(
+          `\n⚠️ Skipping "${settings.singleFilePath}" — not a supported input format (${settings.inputFormats.join(', ')}).`
+        )
+      );
+      return Promise.resolve(allFiles);
+    }
 
     allFiles.push(settings.singleFilePath);
     logger.log(chalk.whiteBright.bold('\n🔍 Processing single file:\n'));

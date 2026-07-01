@@ -129,12 +129,31 @@ describe('convertLoopPoints table cases', () => {
     }
   );
 
-  it('returns original loop points for non-opus', () => {
+  it('does not apply opus sample-rate rules to mp3 even when oggCodec is opus', () => {
     const meta = makeMeta(44100, baseLoopStart, baseLoopLength);
-    const res = (convertLoopPoints as any)(meta, 'mp3', 'vorbis');
+    const res = convertLoopPoints(meta as any, 'mp3', 'opus');
+
     expect(res.newSampleRate).toBeNull();
     expect(res.loopStart).toBe(baseLoopStart);
     expect(res.loopLength).toBe(baseLoopLength);
+  });
+
+  it('returns null sample rate when either loop point is NaN during opus conversion', () => {
+    const meta = {
+      streams: [
+        {
+          sample_rate: '44100',
+          channels: 2,
+          tags: { LOOPSTART: '1000' },
+        },
+      ],
+      format: { tags: {} },
+    };
+    const res = convertLoopPoints(meta as any, 'ogg', 'opus');
+
+    expect(res.newSampleRate).toBeNull();
+    expect(res.loopStart).toBe(1000);
+    expect(res.loopLength).toBeNaN();
   });
 
   it('returns original loop points for ogg when codec is not opus', () => {

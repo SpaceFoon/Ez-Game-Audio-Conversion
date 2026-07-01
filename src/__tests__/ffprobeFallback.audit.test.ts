@@ -56,7 +56,17 @@ jest.unstable_mockModule('../utils.js', () => ({
 const { converterWorker } = await import('../converterWorker.js');
 const { parentPort } = await import('worker_threads');
 
-describe('ffprobe fallback audit (KB-001 fixed)', () => {
+const runFfprobeFailureCase = (file: {
+  inputFile: string;
+  outputFile: string;
+  outputFormat: string;
+}) =>
+  converterWorker({
+    file,
+    settings: { oggCodec: 'vorbis' },
+  });
+
+describe('AUDIT: ffprobe failure behavior (KB-001 fixed)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedSpawnArgs = [];
@@ -65,24 +75,49 @@ describe('ffprobe fallback audit (KB-001 fixed)', () => {
     console.error = jest.fn();
   });
 
-  it('fails conversion when ffprobe cannot read input metadata', async () => {
+  it('AUDIT: aborts mono-source conversion when ffprobe fails (no -ac 2 forcing)', async () => {
     await expect(
-      converterWorker({
-        file: {
-          inputFile: '/input/mono-source.wav',
-          outputFile: '/output/result.mp3',
-          outputFormat: 'mp3',
-        },
-        settings: { oggCodec: 'vorbis' },
+      runFfprobeFailureCase({
+        inputFile: '/input/mono-source.wav',
+        outputFile: '/output/result.mp3',
+        outputFormat: 'mp3',
       })
     ).rejects.toThrow(/ffprobe failed/i);
 
     expect(capturedSpawnArgs).toEqual([]);
-    expect(parentPort!.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'error',
-        data: expect.stringMatching(/ffprobe failed/i),
-      })
+    expect(capturedSpawnArgs).not.toEqual(
+      expect.arrayContaining(['-map_metadata', '-1', '-ac', '2'])
     );
+    expect(parentPort!.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' })
+    );
+  });
+
+  it('AUDIT: aborts multi-channel source conversion when ffprobe fails', async () => {
+    await expect(
+      runFfprobeFailureCase({
+        inputFile: '/input/surround-source.flac',
+        outputFile: '/output/result.ogg',
+        outputFormat: 'ogg',
+      })
+    ).rejects.toThrow(/ffprobe failed/i);
+
+    expect(capturedSpawnArgs).toEqual([]);
+  });
+
+  it('AUDIT: aborts loop-tagged source conversion when ffprobe fails (loop tags never applied)', async () => {
+    await expect(
+      converterWorker({
+        file: {
+          inputFile: '/input/loop-tagged.wav',
+          outputFile: '/output/loop-result.ogg',
+          outputFormat: 'ogg',
+        },
+        settings: { oggCodec: 'vorbis', loopDataMode: 'auto' },
+      })
+    ).rejects.toThrow(/ffprobe failed/i);
+
+    expect(capturedSpawnArgs.join(' ')).not.toContain('LOOPSTART');
+    expect(capturedSpawnArgs.join(' ')).not.toContain('LOOPLENGTH');
   });
 });

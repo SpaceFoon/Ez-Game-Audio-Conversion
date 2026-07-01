@@ -170,6 +170,44 @@ describe('converterWorker ffmpeg path resolution', () => {
     process.env.NODE_ENV = originalEnv;
   }, 10000);
 
+  it('uses runtimeBaseDir ffmpeg-bin on macos (dev)', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'test';
+
+    const outputFile = '/out/out.mp3';
+
+    config = {
+      sep: '/',
+      runtimeBaseDir: '/app',
+      platformSlug: 'macos',
+      isPackagedRuntime: false,
+      exists: new Set<string>([
+        '/out',
+        '/app/ffmpeg-bin/macos/ffmpeg',
+        '/in/in.wav',
+      ]),
+    };
+
+    jest.resetModules();
+    const { converterWorker } = await import('../converterWorker.js');
+
+    await converterWorker({
+      file: {
+        inputFile: '/in/in.wav',
+        outputFile,
+        outputFormat: 'mp3',
+      },
+      settings: { oggCodec: 'vorbis' },
+    });
+
+    expect(spawnMock).toHaveBeenCalled();
+    expect((spawnMock.mock.calls as any[][])[0][0]).toBe(
+      '/app/ffmpeg-bin/macos/ffmpeg'
+    );
+
+    process.env.NODE_ENV = originalEnv;
+  }, 10000);
+
   it('throws in packaged+production when only PATH fallback is available (linux)', async () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'production';

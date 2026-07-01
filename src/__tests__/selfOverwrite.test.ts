@@ -9,6 +9,10 @@
 
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { join } from 'path';
+import {
+  defaultCreateConversionListAnswer,
+  mockDefaultCreateConversionListAnswers,
+} from './test-utils/createConversionListAnswers.js';
 
 // ── ESM mocks (must be declared before dynamic imports) ──────────────────────
 
@@ -83,6 +87,7 @@ describe('self-overwrite protection', () => {
     settings.singleFileMode = false;
     fs.existsSync.mockReturnValue(false);
     fs.mkdirSync.mockImplementation(() => {});
+    mockDefaultCreateConversionListAnswers(getAnswer);
   });
 
   // ────────────────────────────────────────────────────────────────────────
@@ -92,7 +97,11 @@ describe('self-overwrite protection', () => {
   describe('same format + same directory (user accepts)', () => {
     it('renames output to -copy(1) — never overwrites input', async () => {
       settings.outputFormats = ['wav'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/input', 'song.wav')];
       const result = await createConversionList(files);
@@ -120,7 +129,11 @@ describe('self-overwrite protection', () => {
   describe('batch same-format conversion', () => {
     it('renames every file — no input file is ever its own output', async () => {
       settings.outputFormats = ['mp3'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [
         join('/input', 'a.mp3'),
@@ -146,7 +159,11 @@ describe('self-overwrite protection', () => {
       settings.inputFilePath = '/Input';
       settings.outputFilePath = '/input';
       settings.outputFormats = ['wav'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/Input', 'SONG.WAV')];
       const result = await createConversionList(files);
@@ -156,7 +173,11 @@ describe('self-overwrite protection', () => {
 
     it('detects mixed case extensions as self-overwrite', async () => {
       settings.outputFormats = ['mp3'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/input', 'track.MP3')];
       const result = await createConversionList(files);
@@ -172,7 +193,11 @@ describe('self-overwrite protection', () => {
   describe('mixed format batch with one matching format', () => {
     it('renames the matching format, converts others normally', async () => {
       settings.outputFormats = ['ogg', 'wav']; // wav matches input
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/input', 'song.wav')];
       const result = await createConversionList(files);
@@ -195,7 +220,11 @@ describe('self-overwrite protection', () => {
   describe('subdirectory files with same root', () => {
     it('renames files in subdirectories when format matches', async () => {
       settings.outputFormats = ['flac'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [
         join('/input', 'sub1', 'track.flac'),
@@ -220,7 +249,9 @@ describe('self-overwrite protection', () => {
       settings.inputFilePath = '/input';
       settings.outputFilePath = '/output';
       settings.outputFormats = ['wav'];
-      getAnswer.mockResolvedValue('yes');
+      getAnswer.mockImplementation(async (prompt) =>
+        defaultCreateConversionListAnswer(prompt)
+      );
 
       const files = [join('/input', 'song.wav')];
       const result = await createConversionList(files);
@@ -250,7 +281,11 @@ describe('self-overwrite protection', () => {
       '$ext → $format: never produces inputFile === outputFile',
       async ({ ext, format }) => {
         settings.outputFormats = [format];
-        getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+        getAnswer
+          .mockResolvedValueOnce('yes')
+          .mockImplementation(async (prompt) =>
+            defaultCreateConversionListAnswer(prompt)
+          );
 
         const files = [join('/input', `track.${ext}`)];
         const result = await createConversionList(files);
@@ -267,7 +302,11 @@ describe('self-overwrite protection', () => {
   describe('input file already named with -copy suffix', () => {
     it('increments copy number instead of colliding', async () => {
       settings.outputFormats = ['wav'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/input', 'song-copy(1).wav')];
       const result = await createConversionList(files);
@@ -280,7 +319,11 @@ describe('self-overwrite protection', () => {
 
     it('handles deeply incremented copy numbers', async () => {
       settings.outputFormats = ['wav'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       // Simulate -copy(1) through -copy(4) existing on disk
       fs.existsSync.mockImplementation((p: unknown) => {
@@ -309,7 +352,11 @@ describe('self-overwrite protection', () => {
     it('still protects against self-overwrite', async () => {
       settings.singleFileMode = true;
       settings.outputFormats = ['ogg'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/input', 'music.ogg')];
       const result = await createConversionList(files);
@@ -327,7 +374,11 @@ describe('self-overwrite protection', () => {
       // Same dir + same format triggers the self-overwrite guard first.
       // Even if the user previously selected "oa", the guard should rename.
       settings.outputFormats = ['wav'];
-      getAnswer.mockResolvedValueOnce('yes').mockResolvedValue('yes');
+      getAnswer
+        .mockResolvedValueOnce('yes')
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        );
 
       const files = [join('/input', 'a.wav'), join('/input', 'b.wav')];
       const result = await createConversionList(files);
@@ -366,7 +417,9 @@ describe('self-overwrite protection', () => {
         .mockResolvedValueOnce('maybe') // invalid
         .mockResolvedValueOnce('sure') // invalid
         .mockResolvedValueOnce('yes') // valid → rename
-        .mockResolvedValue('yes'); // confirm list
+        .mockImplementation(async (prompt) =>
+          defaultCreateConversionListAnswer(prompt)
+        ); // confirm list
 
       const files = [join('/input', 'song.wav')];
       const result = await createConversionList(files);

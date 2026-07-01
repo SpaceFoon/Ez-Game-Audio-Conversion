@@ -110,6 +110,9 @@ const promptOutputFormats = async (): Promise<AudioFormat[]> => {
 
 // Entire input loop to get settings before converting.
 const getUserInput = async (settings: Settings): Promise<Settings> => {
+  // Ogg Vorbis/Opus is chosen per batch in createConversionList; never reuse a prior run.
+  settings.oggCodec = null;
+
   const argPath = process.argv[2]?.trim();
 
   if (argPath) {

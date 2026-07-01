@@ -170,31 +170,45 @@ export const getAnswer = (question: string | string[]): Promise<string> =>
   });
 
 // If a file fails to read or write, check if it is busy.
+// Returns true if the file is still locked, false if it is free to use.
 export const isFileBusy = async (file: string): Promise<boolean> => {
   if (!existsSync(file)) return false;
-  try {
-    const fd = openSync(file, 'r+');
-    closeSync(fd);
-    return false;
-  } catch (error: unknown) {
-    const err = error as NodeJS.ErrnoException;
-    if (err?.code === 'EBUSY') {
-      await getAnswer(
-        chalk.redBright(
-          `\n${String(error)}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
-        )
-      );
+
+  // After prompting the user to close the file we must actually re-check the
+  // lock; returning early would let callers write to a still-locked file. Cap
+  // the retries so a file that never gets closed can't spin forever.
+  const maxAttempts = 10;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const fd = openSync(file, 'r+');
+      closeSync(fd);
       return false;
-    } else if (err?.code === 'ENOENT') {
-      logger.error('ENOENT while checking file status:', String(error));
-      return false;
-    } else {
-      logger.error(
-        `\n🚨🚨⛔ Error checking status of Log file: ${err?.message ?? String(error)} ⛔🚨🚨`
-      );
-      throw error;
+    } catch (error: unknown) {
+      const err = error as NodeJS.ErrnoException;
+      if (err?.code === 'EBUSY') {
+        await getAnswer(
+          chalk.redBright(
+            `\n${String(error)}\n🚨🚨⛔ Close ${file} and press Enter to continue ⛔🚨🚨`
+          )
+        );
+        // Loop and re-open to confirm the user actually released the lock.
+        continue;
+      } else if (err?.code === 'ENOENT') {
+        logger.error('ENOENT while checking file status:', String(error));
+        return false;
+      } else {
+        logger.error(
+          `\n🚨🚨⛔ Error checking status of Log file: ${err?.message ?? String(error)} ⛔🚨🚨`
+        );
+        throw error;
+      }
     }
   }
+
+  logger.error(
+    `\n🚨🚨⛔ ${file} is still locked after ${maxAttempts} attempts. Giving up. ⛔🚨🚨`
+  );
+  return true;
 };
 
 // Error logging to CSV.

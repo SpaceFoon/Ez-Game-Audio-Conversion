@@ -7,7 +7,7 @@ on:
     branches: [dev, main]
 
 jobs:
-  build-test-package:
+  lint-build-unit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,27 +17,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: "npm"
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install ffmpeg
+      - name: Download ffmpeg binaries
         run: npm run install:ffmpeg
-        env:
-          EZ_AUDIO_FORCE_FFMPEG_DOWNLOAD: "1"
 
       - name: Lint and format
         run: npm run fix
 
-      - name: Type check & build
+      - name: Type check and build
         run: npm run build
 
-      - name: Run tests with coverage
-        run: npm run test:coverage
+      - name: Run unit tests with coverage
+        run: npm run test:unit -- --coverage
 
-      - name: Verify TypeScript compilation
-        run: node dist/app.js --help || echo "Build verification skipped (requires ffmpeg)"
+      - name: Run property and fuzz tests
+        run: npm run test:property && npm run test:fuzz
+
+      - name: Report coverage gaps
+        if: always()
+        run: npm run coverage:gaps
+
+      - name: Run unit tests with open-handle detection
+        run: npm run test:ci -- --testPathIgnorePatterns=/integration/ --testPathIgnorePatterns=real_files.test.ts --testPathIgnorePatterns=workerProtocol.integration.test.ts
 
       - name: Upload coverage report
         if: always()
@@ -48,3 +53,80 @@ jobs:
             coverage/lcov.info
             coverage/coverage-summary.json
           if-no-files-found: ignore
+
+  e2e-real-ffmpeg:
+    name: E2E (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            ffmpeg-url: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+
+          - os: ubuntu-latest
+            platform: linux
+            ffmpeg-url: https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+
+          - os: macos-latest
+            platform: macos
+            ffmpeg-url-1: https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
+            ffmpeg-url-2: https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          EZ_AUDIO_SKIP_FFMPEG_DOWNLOAD: "1"
+
+      - name: Download ffmpeg (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ffmpeg-bin/windows
+          Invoke-WebRequest -Uri "${{ matrix.ffmpeg-url }}" -OutFile ffmpeg.zip
+          Expand-Archive -Path ffmpeg.zip -DestinationPath temp
+          Copy-Item "temp/ffmpeg-*/bin/ffmpeg.exe" -Destination "ffmpeg-bin/windows/"
+          Copy-Item "temp/ffmpeg-*/bin/ffprobe.exe" -Destination "ffmpeg-bin/windows/"
+          Remove-Item -Recurse -Force temp, ffmpeg.zip
+
+      - name: Download ffmpeg (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p ffmpeg-bin/linux
+          cd ffmpeg-bin/linux
+          curl -L "${{ matrix.ffmpeg-url }}" -o ffmpeg.tar.xz
+          tar -xf ffmpeg.tar.xz --strip-components=1
+          rm ffmpeg.tar.xz
+          rm -rf manpages model GPLv3.txt readme.txt qt-faststart
+          chmod +x ffmpeg ffprobe
+
+      - name: Download ffmpeg (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p ffmpeg-bin/macos
+          cd ffmpeg-bin/macos
+          curl -L "${{ matrix.ffmpeg-url-1 }}" -o ffmpeg.zip
+          curl -L "${{ matrix.ffmpeg-url-2 }}" -o ffprobe.zip
+          unzip -o ffmpeg.zip
+          unzip -o ffprobe.zip
+          rm ffmpeg.zip ffprobe.zip
+          chmod +x ffmpeg ffprobe
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run E2E tests (real ffmpeg + workers)
+        run: npm run test:e2e
+        env:
+          E2E_REQUIRED: "1"

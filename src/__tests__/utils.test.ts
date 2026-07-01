@@ -77,6 +77,7 @@ const {
   reportSearchErrors,
   nextAvailableLogCsvPath,
   escapeCsvField,
+  handleExit,
 } = await import('../utils.js');
 
 describe('utils module', () => {
@@ -488,6 +489,65 @@ describe('utils module', () => {
       warnSpy.mockRestore();
     });
 
+    it('reportSearchErrors truncates terminal output when more than 20 errors exist', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      existsSyncMock.mockReturnValue(false);
+
+      for (let i = 0; i < 25; i++) {
+        recordSearchError(`/locked/track-${i}.wav`, new Error(`error ${i}`));
+      }
+
+      await reportSearchErrors();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('25 item(s) could not be read')
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('... and 5 more')
+      );
+      // Each error is written to both error.csv and logs.csv (2 append per entry).
+      expect(appendFileSyncMock).toHaveBeenCalledTimes(50);
+
+      warnSpy.mockRestore();
+    });
+
+    it('re-checks the file lock after the EBUSY prompt and clears once it is free', async () => {
+      existsSyncMock.mockReturnValueOnce(true);
+      const error = new Error('EBUSY: resource busy') as Error & {
+        code?: string;
+      };
+      error.code = 'EBUSY';
+      // First open: still locked → prompt. Second open: user closed it → free.
+      openSyncMock
+        .mockImplementationOnce(() => {
+          throw error;
+        })
+        .mockReturnValueOnce(456);
+
+      const result = await isFileBusy('/test/locked.csv');
+
+      expect(rl.question).toHaveBeenCalled();
+      // The fix re-opens the file after the prompt instead of trusting the user.
+      expect(openSyncMock).toHaveBeenCalledTimes(2);
+      expect(result).toBe(false);
+    });
+
+    it('reports the file as still busy if it never gets unlocked after repeated prompts', async () => {
+      existsSyncMock.mockReturnValue(true);
+      const error = new Error('EBUSY: resource busy') as Error & {
+        code?: string;
+      };
+      error.code = 'EBUSY';
+      openSyncMock.mockImplementation(() => {
+        throw error;
+      });
+
+      const result = await isFileBusy('/test/locked.csv');
+
+      expect(result).toBe(true);
+      expect(rl.question).toHaveBeenCalled();
+    });
+
     it('reportSearchErrors prints a terminal summary and writes each error to error.csv', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       existsSyncMock.mockReturnValue(false);
@@ -516,6 +576,13 @@ describe('utils module', () => {
       );
 
       warnSpy.mockRestore();
+    });
+  });
+
+  describe('handleExit', () => {
+    it('throws ExitProgramError with the requested exit code', () => {
+      expect(() => handleExit(0)).toThrow(/EXIT_PROGRAM:0/);
+      expect(() => handleExit(1)).toThrow(/EXIT_PROGRAM:1/);
     });
   });
 

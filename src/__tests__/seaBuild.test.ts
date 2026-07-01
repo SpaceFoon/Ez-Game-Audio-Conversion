@@ -420,7 +420,9 @@ describeRelease('SEA Build Tests', () => {
   });
 });
 
-describe('Smoke Test Cleanup', () => {
+const describeSmokeCleanup = releaseAvailable ? describe : describe.skip;
+
+describeSmokeCleanup('Smoke Test Cleanup', () => {
   test('smokeTest.mjs should clean up smoke-temp directory', () => {
     const smokeTempPath = join(RELEASE_DIR, 'smoke-temp');
     expect(existsSync(smokeTempPath)).toBe(false);

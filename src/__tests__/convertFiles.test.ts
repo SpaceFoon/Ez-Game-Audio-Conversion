@@ -334,6 +334,34 @@ describe('convertFiles', () => {
     process.exit = originalExit;
   }, 30000);
 
+  it('should abort remaining jobs after a fatal disk-space error mid-batch', async () => {
+    cpusMock.mockReturnValueOnce([{}]);
+    let workerCalls = 0;
+
+    workerMock.mockImplementation(() => {
+      workerCalls++;
+      const isFatalJob = workerCalls === 2;
+      return createWorkerMock({
+        triggerStderr: isFatalJob,
+        noSpaceLeft: isFatalJob,
+        exitCode: isFatalJob ? 1 : 0,
+      });
+    });
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(5)),
+      10000,
+      "Test 'should abort remaining jobs after fatal error' timed out"
+    );
+
+    expect(workerCalls).toBeLessThanOrEqual(3);
+    expect(result.failedFiles.length).toBeGreaterThan(0);
+    expect(result.successfulFiles.length).toBeLessThan(5);
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('Stopping due to insufficient disk space')
+    );
+  }, 30000);
+
   it('should detect permission errors and stop the batch', async () => {
     workerMock.mockImplementation(() => {
       const handlers: WorkerHandlers = {};
@@ -715,5 +743,33 @@ describe('convertFiles', () => {
 
     expect(result.failedFiles).toHaveLength(1);
     expect(result.successfulFiles).toHaveLength(0);
+  });
+
+  it('processes queued files in LIFO order when a single worker is available', async () => {
+    cpusMock.mockReturnValueOnce([{}]);
+    const processedInputs: string[] = [];
+
+    workerMock.mockImplementation(
+      (_path: string, options: { workerData: { file: ConversionItem } }) => {
+        processedInputs.push(options.workerData.file.inputFile);
+        return createWorkerMock({ exitCode: 0 });
+      }
+    );
+
+    const files = createTestFiles(6);
+    await withTimeout(
+      convertFiles(files),
+      5000,
+      "Test 'LIFO queue order' timed out"
+    );
+
+    expect(processedInputs).toEqual([
+      files[5].inputFile,
+      files[4].inputFile,
+      files[3].inputFile,
+      files[2].inputFile,
+      files[1].inputFile,
+      files[0].inputFile,
+    ]);
   });
 });

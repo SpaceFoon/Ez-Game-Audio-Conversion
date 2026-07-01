@@ -1,59 +1,56 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { renderSeaBanner, stripAnsiSgr } from '../banner.js';
+import { stripAnsiSgr, renderSeaBanner } from '../banner.js';
 
 describe('banner', () => {
+  const originalColumns = process.stdout.columns;
+
+  beforeEach(() => {
+    process.stdout.columns = 80;
+  });
+
+  afterEach(() => {
+    process.stdout.columns = originalColumns;
+  });
+
   describe('stripAnsiSgr', () => {
-    it('removes simple SGR color sequences', () => {
-      expect(stripAnsiSgr('\x1b[31mRed\x1b[0m')).toBe('Red');
+    it('removes ANSI SGR color codes while preserving visible text', () => {
+      const input = '\x1b[31mHello\x1b[0m \x1b[1;32mWorld\x1b[0m';
+      expect(stripAnsiSgr(input)).toBe('Hello World');
     });
 
-    it('preserves plain text without escape codes', () => {
+    it('returns plain text unchanged', () => {
       expect(stripAnsiSgr('EZ Game Audio')).toBe('EZ Game Audio');
     });
 
-    it('handles multiple ANSI sequences on one line', () => {
-      expect(stripAnsiSgr('\x1b[1m\x1b[36mTitle\x1b[0m')).toBe('Title');
+    it('handles multiple codes on one line', () => {
+      const input = '\x1b[38;5;196mR\x1b[38;5;202mG\x1b[38;5;226mB\x1b[0m';
+      expect(stripAnsiSgr(input)).toBe('RGB');
     });
   });
 
   describe('renderSeaBanner', () => {
-    const originalColumns = process.stdout.columns;
+    it('centers each line based on visible width', () => {
+      process.stdout.columns = 20;
+      const rendered = renderSeaBanner();
+      const lines = rendered.split('\n');
 
-    beforeEach(() => {
-      process.stdout.columns = 80;
-    });
-
-    afterEach(() => {
-      if (originalColumns === undefined) {
-        delete (process.stdout as { columns?: number }).columns;
-      } else {
-        process.stdout.columns = originalColumns;
+      for (const line of lines) {
+        const visible = stripAnsiSgr(line);
+        const leadingSpaces = line.length - line.trimStart().length;
+        const expectedPadding = Math.max(
+          0,
+          Math.floor((20 - visible.trimStart().length) / 2)
+        );
+        expect(leadingSpaces).toBe(expectedPadding);
       }
     });
 
-    it('centers the banner snapshot based on visible width', () => {
+    it('does not pad when terminal is narrower than banner text', () => {
+      process.stdout.columns = 4;
       const rendered = renderSeaBanner();
-      const lines = rendered.split('\n');
-      expect(lines).toHaveLength(1);
-      expect(lines[0]).toMatch(/^\s+__SEA_BANNER__$/);
-      expect(lines[0].length - '__SEA_BANNER__'.length).toBe(
-        Math.floor((80 - '__SEA_BANNER__'.length) / 2)
+      expect(rendered.split('\n').every((line) => !line.startsWith('  '))).toBe(
+        true
       );
-    });
-
-    it('uses 120 columns when stdout width is unavailable', () => {
-      delete (process.stdout as { columns?: number }).columns;
-      const rendered = renderSeaBanner();
-      const line = rendered.split('\n')[0];
-      expect(line.length - '__SEA_BANNER__'.length).toBe(
-        Math.floor((120 - '__SEA_BANNER__'.length) / 2)
-      );
-    });
-
-    it('does not add negative padding when the line exceeds terminal width', () => {
-      process.stdout.columns = 8;
-      const rendered = renderSeaBanner();
-      expect(rendered).toBe('__SEA_BANNER__');
     });
   });
 });

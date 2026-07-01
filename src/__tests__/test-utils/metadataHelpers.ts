@@ -5,7 +5,9 @@
  */
 
 import { spawnSync } from 'child_process';
-import { findFfmpegExecutables } from './generateTestFiles';
+import generateTestFiles from './generateTestFiles.js';
+
+const findFfmpegExecutables = generateTestFiles.findFfmpegExecutables;
 
 /**
  * Extract metadata from an audio file

@@ -209,4 +209,19 @@ describe('full mocked pipeline integration', () => {
       expect.stringContaining('Fatal Error')
     );
   });
+
+  it('calls reportSearchErrors during finalize when search errors were recorded', async () => {
+    const { getSearchErrors, reportSearchErrors } =
+      await import('../../utils.js');
+    (getSearchErrors as jest.Mock).mockReturnValueOnce([
+      {
+        path: join(testRoot, 'locked.wav'),
+        message: 'EACCES: permission denied',
+      },
+    ]);
+
+    await runApp();
+
+    expect(reportSearchErrors).toHaveBeenCalled();
+  });
 });

@@ -23,6 +23,10 @@ lib-cov
 coverage
 *.lcov
 
+# Stryker mutation testing output
+reports/
+.stryker-tmp/
+
 # nyc test coverage
 .nyc_output
 

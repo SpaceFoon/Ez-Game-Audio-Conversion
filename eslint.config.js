@@ -62,6 +62,8 @@ export default [
       'dist/**',
       'build/**',
       'release/**',
+      '.stryker-tmp/**',
+      'reports/**',
       '**/*.d.ts',
     ],
   },

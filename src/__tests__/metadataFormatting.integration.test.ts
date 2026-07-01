@@ -224,8 +224,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // With spawn args array (shell: false), newlines are normalized to \n and preserved
-      expect(result.metaDataArgs).toContain('comment=Line 1\nLine 2\nLine 3');
+      // sanitizeMetaValueForArgs collapses newlines to spaces for spawn safety
+      expect(result.metaDataArgs).toContain('comment=Line 1 Line 2 Line 3');
     });
 
     it('should convert Unix newlines to escaped \\n', () => {
@@ -253,8 +253,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // With spawn args array (shell: false), newlines are preserved as-is
-      expect(result.metaDataArgs).toContain('lyrics=Verse 1\nChorus\nVerse 2');
+      expect(result.metaDataArgs).toContain('lyrics=Verse 1 Chorus Verse 2');
     });
 
     it('should convert old Mac newlines (CR only) to escaped \\n', () => {
@@ -282,8 +281,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // With spawn args array (shell: false), CR is normalized to LF
-      expect(result.metaDataArgs).toContain('comment=Old\nMac\nStyle');
+      expect(result.metaDataArgs).toContain('comment=Old Mac Style');
     });
 
     it('should remove null bytes', () => {
@@ -339,9 +337,8 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // With spawn args array (shell: false), chars are preserved; newlines normalized
       expect(result.metaDataArgs).toContain(
-        'comment=Path: C:\\Music\\"Best" Songs\nLine 2'
+        'comment=Path: C:\\Music\\"Best" Songs Line 2'
       );
     });
   });

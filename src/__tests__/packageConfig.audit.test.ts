@@ -41,6 +41,9 @@ describe('package.json audit characterizations', () => {
     );
     expect(packageJson.scripts?.['test:integration']).toContain('integration/');
     expect(packageJson.scripts?.['test:pre-release']).toContain('test:unit');
+    expect(packageJson.scripts?.['test:pre-release']).toContain(
+      'test:property'
+    );
     expect(packageJson.scripts?.['test:pre-release']).toContain('test:smoke');
   });
 });

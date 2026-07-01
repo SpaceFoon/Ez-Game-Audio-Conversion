@@ -1,4 +1,5 @@
-import { describe, expect, it } from '@jest/globals';
+import { expect, it, beforeAll } from '@jest/globals';
+import { resolveE2eDescribe } from '../test-utils/e2eDeps.js';
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
@@ -78,6 +79,11 @@ const FORMATS = [
   },
   { name: 'm4a', extension: 'm4a', codec: 'aac', quality: ['-q:a', '1.4'] },
 ];
+
+/** WAV/M4A do not round-trip loop tags through ffmpeg the way game formats do. */
+const LOOP_ROUNDTRIP_FORMATS = FORMATS.filter(
+  (format) => format.name !== 'wav' && format.name !== 'm4a'
+);
 
 // Different approaches to store loop points
 const METADATA_APPROACHES = [
@@ -268,12 +274,15 @@ function extractLoopPoints(metadata) {
 }
 
 // Run tests with all format and metadata combinations
-function runTests(baseFilePath) {
+function runTests(baseFilePath: string, formatFilter?: string) {
   console.log('\nRunning tests for all format and metadata combinations...');
   const results = [];
 
   // For each format
   for (const format of FORMATS) {
+    if (formatFilter && format.name !== formatFilter) {
+      continue;
+    }
     console.log(`\n=== Testing ${format.name} format ===`);
 
     // For each metadata approach
@@ -395,128 +404,6 @@ function runTests(baseFilePath) {
   return results;
 }
 
-// Generate summary report
-function generateReport(results) {
-  console.log('\n\n=============================================');
-  console.log('             SUMMARY REPORT                 ');
-  console.log('=============================================\n');
-
-  // Group by format
-  const formatGroups = {};
-
-  for (const result of results) {
-    if (!formatGroups[result.format]) {
-      formatGroups[result.format] = [];
-    }
-    formatGroups[result.format].push(result);
-  }
-
-  // Generate format compatibility table
-  console.log('FORMAT COMPATIBILITY MATRIX:\n');
-
-  // Table header
-  const approaches = METADATA_APPROACHES.map((a) => a.name);
-  let header = 'Format'.padEnd(15);
-  approaches.forEach((approach) => {
-    header += approach.padEnd(20);
-  });
-  console.log(header);
-  console.log('='.repeat(header.length));
-
-  // Table rows
-  for (const format in formatGroups) {
-    let row = format.padEnd(15);
-
-    for (const approach of approaches) {
-      const result = formatGroups[format].find((r) => r.approach === approach);
-      if (result && result.success) {
-        row += '✅ Works'.padEnd(20);
-      } else if (result && result.error) {
-        row += '❌ Error'.padEnd(20);
-      } else {
-        row += '❌ Fails'.padEnd(20);
-      }
-    }
-
-    console.log(row);
-  }
-
-  // Show best approach for each format
-  console.log('\n\nRECOMMENDED APPROACHES:\n');
-
-  for (const format in formatGroups) {
-    const workingApproaches = formatGroups[format]
-      .filter((r) => r.success)
-      .map((r) => r.approach);
-
-    console.log(
-      `${format.padEnd(15)}: ${
-        workingApproaches.length > 0
-          ? workingApproaches.join(', ')
-          : '❌ No working approach found'
-      }`
-    );
-  }
-
-  // Count overall success rate
-  const totalTests = results.length;
-  const successfulTests = results.filter((r) => r.success).length;
-  const successRate = ((successfulTests / totalTests) * 100).toFixed(2);
-
-  console.log(
-    `\nOverall success rate: ${successfulTests}/${totalTests} (${successRate}%)`
-  );
-
-  // Additional notes
-  console.log('\n\nNOTES:');
-  console.log('- OGG formats (Vorbis & Opus) support standard metadata tags');
-  console.log(
-    '- WAV format does not support loop points in this application - WAV loop points require special chunks not standard metadata'
-  );
-  console.log(
-    '- M4A format does not support loop points in this application - not compatible with standard audio loop metadata'
-  );
-  console.log('- MP3 and FLAC provide consistent metadata tag support');
-  console.log(
-    '- AIFF can store loop metadata but relies on player support for actual looping'
-  );
-}
-
-// Main function
-async function main() {
-  console.log('=== Audio Format Loop Point Metadata Test ===');
-
-  // Use try/catch for directory creation to avoid issues
-  try {
-    createDirectories();
-  } catch (error) {
-    console.error('Error creating directories:', error);
-    return false;
-  }
-
-  if (!checkForFfmpeg()) {
-    return false;
-  }
-
-  // Generate base test file
-  const baseFilePath = generateTestFiles();
-  if (!baseFilePath) {
-    console.error('Failed to generate test files, aborting tests.');
-    return false;
-  }
-
-  // Run tests
-  const results = runTests(baseFilePath);
-
-  // Generate report
-  generateReport(results);
-
-  console.log('\nTest completed.');
-
-  // Return success
-  return true;
-}
-
 const ffmpegAvailable =
   existsSync(FFMPEG_PATH) &&
   spawnSync(FFMPEG_PATH, ['-version'], {
@@ -525,10 +412,48 @@ const ffmpegAvailable =
     timeout: 5000,
   }).status === 0;
 
-const describeWithFfmpeg = ffmpegAvailable ? describe : describe.skip;
+const describeWithFfmpeg = resolveE2eDescribe(
+  ffmpegAvailable,
+  `ffmpeg not found at ${FFMPEG_PATH}`
+);
+
+let sharedBaseFilePath: string | null = null;
+
+const LOOP_WRITE_UNSUPPORTED = new Set(['wav', 'm4a']);
 
 describeWithFfmpeg('Loop Point Handling Integration', () => {
-  it('converts loop points across formats without throwing', async () => {
-    await expect(main()).resolves.toBe(true);
-  }, 120000);
+  beforeAll(() => {
+    createDirectories();
+    if (!checkForFfmpeg()) {
+      throw new Error(`ffmpeg not available at ${FFMPEG_PATH}`);
+    }
+    sharedBaseFilePath = generateTestFiles();
+    if (!sharedBaseFilePath) {
+      throw new Error('Failed to generate base loop test audio file');
+    }
+  });
+
+  for (const format of LOOP_ROUNDTRIP_FORMATS) {
+    it(`preserves loop points for ${format.name} (${format.codec})`, () => {
+      const results = runTests(sharedBaseFilePath!, format.name);
+      if (LOOP_WRITE_UNSUPPORTED.has(format.name)) {
+        expect(results.length).toBeGreaterThan(0);
+        expect(results.every((entry) => !entry.success)).toBe(true);
+        return;
+      }
+
+      const failures = results.filter((entry) => !entry.success);
+      if (failures.length > 0) {
+        const detail = failures
+          .map(
+            (entry) =>
+              `${entry.approach}: expected start=${LOOP_START} length=${LOOP_LENGTH}, actual start=${entry.actual?.start} length=${entry.actual?.length}${entry.error ? ` (${entry.error})` : ''}`
+          )
+          .join('; ');
+        throw new Error(`${format.name} loop failures: ${detail}`);
+      }
+      expect(results.length).toBeGreaterThan(0);
+      expect(results.every((entry) => entry.success)).toBe(true);
+    }, 120000);
+  }
 });

@@ -32,7 +32,8 @@ jest.unstable_mockModule('chalk', () => ({
 // Dynamic imports after mock declarations
 const { readdirSync: _readdirSync, statSync: _statSync } = await import('fs');
 const { join } = await import('path');
-const { default: searchFiles } = await import('../searchFiles.js');
+const { default: searchFiles, MAX_WALK_DEPTH } =
+  await import('../searchFiles.js');
 const { getSearchErrors, clearSearchErrors } = await import('../utils.js');
 
 describe('searchFiles', () => {
@@ -191,6 +192,39 @@ describe('searchFiles', () => {
     expect(result).toEqual([join('/test/no-ext', 'theme.ogg')]);
   });
 
+  it('does not match MIDI files when searching for standard audio formats', async () => {
+    _readdirSync.mockReturnValueOnce(['theme.mid', 'theme.midi', 'song.mp3']);
+    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/midi',
+      inputFormats: ['mp3', 'wav', 'ogg'],
+    });
+
+    expect(result).toEqual([join('/test/midi', 'song.mp3')]);
+  });
+
+  it('truncates terminal display when more than 200 files are matched', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const files = Array.from(
+      { length: 201 },
+      (_, index) => `track-${index}.mp3`
+    );
+    _readdirSync.mockReturnValueOnce(files);
+    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+
+    const result = await searchFiles({
+      inputFilePath: '/test/huge',
+      inputFormats: ['mp3'],
+    });
+
+    expect(result).toHaveLength(201);
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('... and 181 more files')
+    );
+    logSpy.mockRestore();
+  });
+
   it('handles large flat directories without truncating the result set', async () => {
     const files = Array.from(
       { length: 250 },
@@ -266,5 +300,26 @@ describe('searchFiles', () => {
         message: expect.stringContaining('EBUSY'),
       })
     );
+  });
+
+  it(`stops descending past MAX_WALK_DEPTH (${MAX_WALK_DEPTH}) and records an error`, async () => {
+    _readdirSync.mockReturnValue(['child'] as never);
+    _statSync.mockReturnValue({
+      isDirectory: () => true,
+    } as ReturnType<typeof _statSync>);
+
+    await searchFiles({
+      inputFilePath: '/test/deep',
+      inputFormats: ['wav'],
+    });
+
+    expect(_readdirSync.mock.calls.length).toBeLessThanOrEqual(
+      MAX_WALK_DEPTH + 2
+    );
+    expect(
+      getSearchErrors().some((error) =>
+        error.message.includes(String(MAX_WALK_DEPTH))
+      )
+    ).toBe(true);
   });
 });

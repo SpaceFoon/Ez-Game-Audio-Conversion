@@ -180,12 +180,12 @@ describe('metadataService', () => {
   });
 
   describe('sanitizeMetaValueForArgs', () => {
-    it('removes null bytes and replacement chars, normalizes line endings, and trims whitespace', () => {
+    it('removes null bytes and replacement chars, normalizes line endings to spaces, and trims whitespace', () => {
       const result = sanitizeMetaValueForArgs(
         '  A\u0000B\uFFFDC\r\nD\rE\u0000  '
       );
 
-      expect(result).toBe('ABC\nD\nE');
+      expect(result).toBe('ABC D E');
     });
   });
 
@@ -573,6 +573,63 @@ describe('metadataService', () => {
 
       expect(result.metaDataArgs).toContain('track=5');
       expect(result.metaDataArgs).not.toContain('tracknumber=5');
+    });
+
+    it('drops passthrough metadata keys that fail isSafeMetaKey', () => {
+      const metadata = asMeta({
+        streams: [{ channels: 2, tags: {} }],
+        format: {
+          tags: {
+            'title;injected': 'malicious',
+            SAFE_CUSTOM: 'ok',
+            '$(whoami)': 'bad',
+          },
+        },
+      });
+
+      const joined = formatMetaDataArgs(metadata).metaDataArgs.join(' ');
+      expect(joined).not.toContain('title;injected');
+      expect(joined).not.toContain('$(whoami)');
+      expect(joined).toContain('SAFE_CUSTOM=ok');
+    });
+
+    it('skips empty string tags during metadata collection', () => {
+      const metadata = asMeta({
+        streams: [{ channels: 2, tags: { title: 'Kept', comment: '' } }],
+      });
+
+      const joined = formatMetaDataArgs(metadata).metaDataArgs.join(' ');
+      expect(joined).toContain('title=Kept');
+      expect(joined).not.toContain('comment=');
+    });
+
+    it('does not overwrite track totals when the first parsed value wins', () => {
+      const metadata = asMeta({
+        streams: [{ channels: 2, tags: { tracknumber: '4/11' } }],
+        format: { tags: { tracknumber: '9/99' } },
+      });
+
+      const joined = formatMetaDataArgs(metadata).metaDataArgs.join(' ');
+      expect(joined).toContain('track=4');
+      expect(joined).toContain('track_total=11');
+      expect(joined).not.toContain('track=9');
+      expect(joined).not.toContain('track_total=99');
+    });
+
+    it('cleans replacement characters from passthrough metadata tags', () => {
+      const metadata = asMeta({
+        streams: [{ channels: 2, tags: {} }],
+        format: { tags: { CUSTOM_FIELD: 'A\uFFFDB' } },
+      });
+
+      const joined = formatMetaDataArgs(
+        metadata,
+        'custom.flac'
+      ).metaDataArgs.join(' ');
+      expect(joined).toContain('CUSTOM_FIELD=AB');
+      expect(console.error).toHaveBeenCalledWith(
+        expect.stringContaining('Replacement character found in metadata tag')
+      );
     });
   });
 });

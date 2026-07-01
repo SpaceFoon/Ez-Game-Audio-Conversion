@@ -20,13 +20,20 @@
     "clean": "rimraf dist/ release/",
     "install": "node scripts/install.js",
     "install:ffmpeg": "node scripts/install-ffmpeg.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand",
-    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --testPathIgnorePatterns=/integration/ --testPathIgnorePatterns=real_files.test.ts",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/\" \"src/__tests__/real_files.test.ts\"",
-    "test:pre-release": "npm run test:unit && npm run test:integration && npm run test:release && npm run test:smoke",
+    "test": "npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --testPathIgnorePatterns=/integration/ --testPathIgnorePatterns=/property/ --testPathIgnorePatterns=/fuzz/ --testPathIgnorePatterns=real_files.test.ts --testPathIgnorePatterns=workerProtocol.integration.test.ts",
+    "test:integration": "npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/\" \"src/__tests__/real_files.test.ts\" \"src/__tests__/workerProtocol.integration.test.ts\"",
+    "test:e2e": "npm run test:integration",
+    "test:property": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/property/\" --runInBand",
+    "test:fuzz": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/fuzz/\" --runInBand",
+    "test:mutation": "cross-env NODE_OPTIONS=--experimental-vm-modules stryker run stryker.conf.json",
+    "test:mutation:pure": "cross-env NODE_OPTIONS=\"--experimental-vm-modules --max-old-space-size=8192\" stryker run stryker.conf.pure.json",
+    "test:all": "npm test",
+    "coverage:gaps": "node scripts/coverage-gaps.mjs",
+    "test:pre-release": "npm run test:unit && npm run test:property && npm run test:integration && npm run test:smoke",
     "test:ci": "node --experimental-vm-modules node_modules/jest/bin/jest.js \"src/__tests__/\" --runInBand --detectOpenHandles",
     "test:release": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/metadataPreservation.test.ts\" \"src/__tests__/app.test.ts\"",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand",
+    "test:coverage": "npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand \"src/__tests__/\"",
     "smoke": "npm run package && node src/__tests__/smokeTest.mjs",
     "test:smoke": "node src/__tests__/smokeTest.mjs",
     "fix": "eslint . --ext .ts,.js --fix && prettier --write .",
@@ -55,14 +62,18 @@
   },
   "homepage": "https://github.com/SpaceFoon/Ez-Game-Audio-Conversion#readme",
   "devDependencies": {
+    "@stryker-mutator/core": "^9.6.1",
+    "@stryker-mutator/jest-runner": "^9.6.1",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.2",
     "@typescript-eslint/eslint-plugin": "^8.41.0",
     "@typescript-eslint/parser": "^8.41.0",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.27.1",
     "eslint": "^9.34.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
+    "fast-check": "^4.8.0",
     "globals": "^16.3.0",
     "husky": "^9.1.7",
     "jest": "^30.2.0",
@@ -83,6 +94,7 @@
     "testEnvironment": "node",
     "testPathIgnorePatterns": [
       "/node_modules/",
+      "/\\.stryker-tmp/",
       "/__tests__/test-utils/",
       "/src/__tests__/test-utils/",
       "/src/__tests__/utils\\.(js|ts)$",
@@ -93,7 +105,8 @@
     "modulePathIgnorePatterns": [
       "<rootDir>/dist/",
       "<rootDir>/build/",
-      "<rootDir>/release/"
+      "<rootDir>/release/",
+      "<rootDir>/.stryker-tmp/"
     ],
     "extensionsToTreatAsEsm": [
       ".ts"
@@ -126,14 +139,28 @@
       "!src/types/**",
       "!src/ico/**"
     ],
+    "coverageDirectory": "coverage",
     "coverageReporters": [
       "text",
       "lcov",
       "json-summary"
     ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/__tests__/"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 75,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    },
     "verbose": false,
     "forceExit": true,
-    "testTimeout": 30000
+    "testTimeout": 30000,
+    "workerIdleMemoryLimit": "512MB"
   },
   "lint-staged": {
     "*.{ts,js}": [
