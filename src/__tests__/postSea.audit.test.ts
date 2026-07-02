@@ -108,7 +108,7 @@ jest.unstable_mockModule('fs', () => ({
   readFileSync: jest.fn((target: string) => {
     const normalized = String(target).replace(/\\/g, '/');
     if (normalized.endsWith('/package.json')) {
-      return JSON.stringify({ version: '1.8.0' });
+      return JSON.stringify({ version: '1.7.1' });
     }
     if (normalized.endsWith('/README.md')) {
       return '# README';
