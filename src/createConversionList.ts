@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import {
   join,
   basename,
@@ -145,6 +145,41 @@ export const getRelativeOutputDir = (
   return relDir;
 };
 
+/** Normalized path key for O(1) output conflict lookups. */
+export const normalizeOutputPathKey = (filePath: string): string =>
+  resolve(filePath).toLowerCase();
+
+/** Walk root once and collect existing file paths (avoids per-output existsSync). */
+export const scanExistingFiles = (rootPath: string): Set<string> => {
+  const found = new Set<string>();
+
+  const walk = (dir: string): void => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir);
+    } catch {
+      return;
+    }
+
+    for (const name of entries) {
+      const fullPath = join(dir, name);
+      try {
+        const stats = statSync(fullPath);
+        if (stats.isDirectory()) {
+          walk(fullPath);
+        } else {
+          found.add(normalizeOutputPathKey(fullPath));
+        }
+      } catch {
+        // Unreadable entry — skip and continue the scan.
+      }
+    }
+  };
+
+  walk(rootPath);
+  return found;
+};
+
 //Create final list of output files to convert
 const createConversionList = async (
   files: string[]
@@ -218,6 +253,15 @@ const createConversionList = async (
     }
     logger.log(chalk.green('   ✅ Directories ready'));
   }
+
+  const conflictCheckRoot =
+    resolve(inputFilePath) === resolve(outputFilePath)
+      ? inputFilePath
+      : outputFilePath;
+  const existingOutputs = scanExistingFiles(conflictCheckRoot);
+  const skipConflictChecks = existingOutputs.size === 0;
+  const outputAlreadyExists = (outputFile: string): boolean =>
+    existingOutputs.has(normalizeOutputPathKey(outputFile));
 
   // Track progress for large batches
   const totalItems = files.length * outputFormats.length;
@@ -334,7 +378,7 @@ const createConversionList = async (
           response = null;
         },
         oa: async () => {
-          if (!existsSync(outputFile)) return;
+          if (!outputAlreadyExists(outputFile)) return;
           /* Nothing to do as default is overwrite */
           // ffmpeg will overwrite the file without asking if this is messed up.
         },
@@ -348,7 +392,7 @@ const createConversionList = async (
           response = null;
         },
         ra: async () => {
-          if (!existsSync(outputFile)) return;
+          if (!outputAlreadyExists(outputFile)) return;
           outputFile = await getOutputFileCopy(
             outputFile,
             outputFormat,
@@ -361,7 +405,7 @@ const createConversionList = async (
           response = null;
         },
         sa: async () => {
-          if (!existsSync(outputFile)) return;
+          if (!outputAlreadyExists(outputFile)) return;
           action = 'skip';
         },
       };
@@ -386,7 +430,7 @@ const createConversionList = async (
         default:
           while (true) {
             if (!response) {
-              if (existsSync(outputFile)) {
+              if (!skipConflictChecks && outputAlreadyExists(outputFile)) {
                 logger.log(
                   chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
                 );

@@ -213,6 +213,31 @@ describe('convertFiles', () => {
     expect(result.successfulFiles.length).toBeGreaterThan(0);
   }, 30000);
 
+  it('uses quiet progress logging for batches larger than 20 files', async () => {
+    workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
+    const writeSpy = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+
+    const result = await withTimeout(
+      convertFiles(createTestFiles(21)),
+      5000,
+      "Test 'uses quiet progress logging' timed out"
+    );
+
+    expect(result.successfulFiles).toHaveLength(21);
+    const logCalls = (console.log as jest.Mock).mock.calls
+      .flat()
+      .map((part) => String(part))
+      .join('\n');
+    expect(logCalls).toContain('Converting 21 files');
+    expect(logCalls).not.toContain('has started');
+    expect(writeSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Converting: 21/21 completed.')
+    );
+    writeSpy.mockRestore();
+  }, 30000);
+
   it('should use a single worker for a single file batch', async () => {
     workerMock.mockImplementation(() => createWorkerMock({ exitCode: 0 }));
 

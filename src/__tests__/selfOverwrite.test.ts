@@ -13,13 +13,11 @@ import {
   defaultCreateConversionListAnswer,
   mockDefaultCreateConversionListAnswers,
 } from './test-utils/createConversionListAnswers.js';
+import { createConversionListFsMock } from './test-utils/mockCreateConversionListFs.js';
 
 // ── ESM mocks (must be declared before dynamic imports) ──────────────────────
 
-jest.unstable_mockModule('fs', () => ({
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-}));
+jest.unstable_mockModule('fs', () => createConversionListFsMock());
 
 jest.unstable_mockModule('chalk', () => {
   const passthrough = jest.fn((...a: unknown[]) => a.join(' '));

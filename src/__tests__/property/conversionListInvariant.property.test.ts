@@ -2,6 +2,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import * as fc from 'fast-check';
 import { join } from 'path';
 import { mockDefaultCreateConversionListAnswers } from '../test-utils/createConversionListAnswers.js';
+import { createConversionListFsMock } from '../test-utils/mockCreateConversionListFs.js';
 
 /**
  * Property test for the conversion-list invariant that B1/KB-004 violated:
@@ -17,10 +18,7 @@ import { mockDefaultCreateConversionListAnswers } from '../test-utils/createConv
  * de-duplication logic — the exact bug class the manual tests missed.
  */
 
-jest.unstable_mockModule('fs', () => ({
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-}));
+jest.unstable_mockModule('fs', () => createConversionListFsMock());
 
 jest.unstable_mockModule('chalk', () => {
   const makeFn = () => {

@@ -1,11 +1,12 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { join } from 'path';
 import { mockDefaultCreateConversionListAnswers } from './test-utils/createConversionListAnswers.js';
+import {
+  createConversionListFsMock,
+  mockExistingFilesInDir,
+} from './test-utils/mockCreateConversionListFs.js';
 
-jest.unstable_mockModule('fs', () => ({
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-}));
+jest.unstable_mockModule('fs', () => createConversionListFsMock());
 
 jest.unstable_mockModule('chalk', () => {
   const makeFn = () => {
@@ -83,6 +84,12 @@ const existsSyncMock = fs.existsSync as unknown as jest.MockedFunction<
 const mkdirSyncMock = fs.mkdirSync as unknown as jest.MockedFunction<
   typeof fs.mkdirSync
 >;
+const readdirSyncMock = fs.readdirSync as unknown as jest.MockedFunction<
+  typeof fs.readdirSync
+>;
+const statSyncMock = fs.statSync as unknown as jest.MockedFunction<
+  typeof fs.statSync
+>;
 const getAnswerMock = getAnswer as unknown as jest.MockedFunction<
   typeof getAnswer
 >;
@@ -104,6 +111,8 @@ describe('createConversionList audit characterizations', () => {
     settings.singleFileMode = false;
     existsSyncMock.mockReturnValue(false);
     mkdirSyncMock.mockImplementation(() => undefined);
+    readdirSyncMock.mockReturnValue([]);
+    statSyncMock.mockReturnValue({ isDirectory: () => false } as never);
     mockDefaultCreateConversionListAnswers(getAnswerMock);
   });
 
@@ -169,6 +178,12 @@ describe('createConversionList audit characterizations', () => {
       .mockResolvedValueOnce('s')
       .mockResolvedValueOnce('yes');
 
+    mockExistingFilesInDir(
+      readdirSyncMock,
+      statSyncMock,
+      settings.outputFilePath,
+      ['song.mp3', 'song-copy(1).mp3']
+    );
     existsSyncMock.mockImplementation((targetPath) => {
       const pathStr = String(targetPath);
       if (pathStr.endsWith('song.mp3')) return true;

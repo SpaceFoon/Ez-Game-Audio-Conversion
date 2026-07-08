@@ -9,11 +9,9 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { join } from 'path';
 import { mockDefaultCreateConversionListAnswers } from './test-utils/createConversionListAnswers.js';
+import { createConversionListFsMock } from './test-utils/mockCreateConversionListFs.js';
 
-jest.unstable_mockModule('fs', () => ({
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-}));
+jest.unstable_mockModule('fs', () => createConversionListFsMock());
 
 jest.unstable_mockModule('chalk', () => {
   const makeFn = () => {

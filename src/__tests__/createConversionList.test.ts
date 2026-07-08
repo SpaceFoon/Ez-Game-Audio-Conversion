@@ -4,12 +4,13 @@ import {
   defaultCreateConversionListAnswer,
   mockDefaultCreateConversionListAnswers,
 } from './test-utils/createConversionListAnswers.js';
+import {
+  createConversionListFsMock,
+  mockExistingFilesInDir,
+} from './test-utils/mockCreateConversionListFs.js';
 
 // ESM mocks must be declared BEFORE dynamic imports
-jest.unstable_mockModule('fs', () => ({
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-}));
+jest.unstable_mockModule('fs', () => createConversionListFsMock());
 
 jest.unstable_mockModule('chalk', () => {
   const makeFn = () => {
@@ -91,6 +92,12 @@ const existsSyncMock = fs.existsSync as unknown as jest.MockedFunction<
 const mkdirSyncMock = fs.mkdirSync as unknown as jest.MockedFunction<
   typeof fs.mkdirSync
 >;
+const readdirSyncMock = fs.readdirSync as unknown as jest.MockedFunction<
+  typeof fs.readdirSync
+>;
+const statSyncMock = fs.statSync as unknown as jest.MockedFunction<
+  typeof fs.statSync
+>;
 const getAnswerMock = getAnswer as unknown as jest.MockedFunction<
   typeof getAnswer
 >;
@@ -108,6 +115,8 @@ describe('createConversionList', () => {
     settings.singleFileMode = false;
     existsSyncMock.mockReturnValue(false);
     mkdirSyncMock.mockImplementation(() => undefined);
+    readdirSyncMock.mockReturnValue([]);
+    statSyncMock.mockReturnValue({ isDirectory: () => false } as never);
     mockDefaultCreateConversionListAnswers(getAnswerMock);
   });
 
@@ -163,6 +172,12 @@ describe('createConversionList', () => {
 
   describe('file conflict handling', () => {
     it('applies overwrite-all (oa) to subsequent conflicts', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['a.mp3', 'b.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) =>
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
@@ -185,6 +200,12 @@ describe('createConversionList', () => {
     });
 
     it('renames output when user selects [r]ename for existing file', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3') // Only the original exists
       );
@@ -201,6 +222,12 @@ describe('createConversionList', () => {
     });
 
     it('skips file when user selects [s]kip for existing file', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
       );
@@ -218,6 +245,12 @@ describe('createConversionList', () => {
     });
 
     it('re-prompts on repeated invalid conflict responses before valid selection', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
       );
@@ -238,6 +271,12 @@ describe('createConversionList', () => {
     });
 
     it('re-prompts when the user submits an empty conflict response', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
       );
@@ -257,6 +296,12 @@ describe('createConversionList', () => {
     });
 
     it('increments -copy number when -copy(1) already exists (rename depth)', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3', 'song-copy(1).mp3']
+      );
       existsSyncMock.mockImplementation((path) => {
         const p = String(path);
         // Original output and copy(1) both exist; copy(2) does not
@@ -279,6 +324,12 @@ describe('createConversionList', () => {
     });
 
     it('recurses to the next copy slot when the preferred copy name already exists', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3', 'song-copy(1).mp3', 'song-copy(2).mp3']
+      );
       existsSyncMock.mockImplementation((path) => {
         const p = String(path);
         return (
@@ -301,6 +352,12 @@ describe('createConversionList', () => {
     });
 
     it('increments from existing -copy(n) basename when renaming conflicts', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song-copy(5).mp3']
+      );
       existsSyncMock.mockImplementation((path) => {
         const p = String(path);
         return p === join(settings.outputFilePath, 'song-copy(5).mp3');
@@ -319,6 +376,12 @@ describe('createConversionList', () => {
 
     it('applies rename-all (ra) to subsequent conflicts', async () => {
       settings.outputFormats = ['mp3'];
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['a.mp3', 'b.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) =>
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
@@ -341,6 +404,12 @@ describe('createConversionList', () => {
 
     it('applies mixed sticky overwrite then rename-all in one batch', async () => {
       settings.outputFormats = ['mp3'];
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['a.mp3', 'b.mp3', 'c.mp3']
+      );
       existsSyncMock.mockImplementation((path) => {
         const p = String(path);
         return (
@@ -368,6 +437,12 @@ describe('createConversionList', () => {
     });
 
     it('applies skip-all (sa) to subsequent conflicts', async () => {
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['a.mp3', 'b.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) =>
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
@@ -390,6 +465,12 @@ describe('createConversionList', () => {
 
     it('applies overwrite-all (oa) to subsequent conflicts without renaming', async () => {
       settings.outputFormats = ['mp3'];
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['a.mp3', 'b.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) =>
           String(path) === join(settings.outputFilePath, 'a.mp3') ||
@@ -635,6 +716,12 @@ describe('createConversionList', () => {
 
     it('keeps existing and non-conflicting outputs together in mixed-format batches', async () => {
       settings.outputFormats = ['mp3', 'ogg'];
+      mockExistingFilesInDir(
+        readdirSyncMock,
+        statSyncMock,
+        settings.outputFilePath,
+        ['song.mp3']
+      );
       existsSyncMock.mockImplementation(
         (path) => String(path) === join(settings.outputFilePath, 'song.mp3')
       );

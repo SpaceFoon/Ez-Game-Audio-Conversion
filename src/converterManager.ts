@@ -58,6 +58,10 @@ const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+/** Match createConversionList — per-file logs only for small batches. */
+const QUIET_BATCH_THRESHOLD = 20;
+const QUIET_PROGRESS_INTERVAL = 100;
+
 const convertFiles = async (
   files: ConversionItem[]
 ): Promise<ConversionJob> => {
@@ -79,6 +83,22 @@ const convertFiles = async (
   const successfulFiles: ConversionResult[] = [];
   const activeWorkers = new Set<Worker>();
   let abortRequested = false;
+  const showDetailedLogs = files.length <= QUIET_BATCH_THRESHOLD;
+  const totalFiles = files.length;
+  let completedCount = 0;
+
+  const recordCompletion = (): void => {
+    completedCount++;
+    if (
+      !showDetailedLogs &&
+      (completedCount % QUIET_PROGRESS_INTERVAL === 0 ||
+        completedCount === totalFiles)
+    ) {
+      process.stdout.write(
+        `\r   Converting: ${completedCount}/${totalFiles} completed...`
+      );
+    }
+  };
 
   /** De-duplicate and record a failed conversion, preserving the reason. */
   const recordFailure = (file: ConversionItem, error?: string) => {
@@ -93,6 +113,9 @@ const convertFiles = async (
   };
   logger.info('\n   Detected 🕵️‍♂️', cpuNumber, 'CPU Cores 🖥');
   logger.log('   Using', maxConcurrentWorkers, 'concurrent 🧵 threads');
+  if (!showDetailedLogs) {
+    logger.log(chalk.cyanBright(`\n🔄 Converting ${totalFiles} files...`));
+  }
 
   const processFile = async (
     file: ConversionItem,
@@ -101,11 +124,13 @@ const convertFiles = async (
     tasksLeft: number
   ): Promise<void> => {
     const workerStartTime = performance.now();
-    logger.log(
-      chalk.cyanBright(
-        `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left. Output file:\n   ${file.outputFile}📤`
-      )
-    );
+    if (showDetailedLogs) {
+      logger.log(
+        chalk.cyanBright(
+          `\n🛠️👷‍♂️ Worker ${workerCounter} has started 📋 task ${task} with ${tasksLeft} tasks left. Output file:\n   ${file.outputFile}📤`
+        )
+      );
+    }
 
     return new Promise((resolve) => {
       let settled = false;
@@ -136,6 +161,7 @@ const convertFiles = async (
           chalk.red(`\n❌ Error: ${file.outputFile}\n   ${displayMessage}`)
         );
         recordFailure(file, logData);
+        recordCompletion();
         resolveOnce();
       };
 
@@ -223,6 +249,7 @@ const convertFiles = async (
               void getAnswer('Press ENTER to return to the main menu...').then(
                 () => {
                   recordFailure(file, `${fatalMessage} ${stderrOutput.trim()}`);
+                  recordCompletion();
                   resolveOnce();
                 }
               );
@@ -256,17 +283,20 @@ const convertFiles = async (
                 inputFile: file.inputFile,
                 outputFile: file.outputFile,
               });
-              logger.log(
-                chalk.greenBright(
-                  `\n🛠️👷‍♂️ Worker`,
-                  workerCounter,
-                  `finished task`,
-                  task,
-                  `\n   Input: ${file.inputFile}\n   Output: ${
-                    file.outputFile
-                  } ✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
-                )
-              );
+              if (showDetailedLogs) {
+                logger.log(
+                  chalk.greenBright(
+                    `\n🛠️👷‍♂️ Worker`,
+                    workerCounter,
+                    `finished task`,
+                    task,
+                    `\n   Input: ${file.inputFile}\n   Output: ${
+                      file.outputFile
+                    } ✅\n   in ${workerCompTime.toFixed(0)} milliseconds🕖`
+                  )
+                );
+              }
+              recordCompletion();
               resolveOnce();
               // File Failure code - only log if not already logged via error message
             } else if (exitCode !== 0) {
@@ -317,6 +347,7 @@ const convertFiles = async (
           file
         );
         recordFailure(file, message);
+        recordCompletion();
         resolveOnce();
       }
     });
@@ -347,6 +378,13 @@ const convertFiles = async (
   }
 
   await Promise.all(workerPromises);
+
+  if (!showDetailedLogs && totalFiles > 0) {
+    process.stdout.write(
+      `\r   Converting: ${totalFiles}/${totalFiles} completed.\n`
+    );
+  }
+
   return { failedFiles, successfulFiles, jobStartTime: new Date(jobStartTime) };
 };
 

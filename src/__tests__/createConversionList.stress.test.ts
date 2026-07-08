@@ -5,11 +5,9 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 import { join } from 'path';
 import { mockDefaultCreateConversionListAnswers } from './test-utils/createConversionListAnswers.js';
+import { createConversionListFsMock } from './test-utils/mockCreateConversionListFs.js';
 
-jest.unstable_mockModule('fs', () => ({
-  existsSync: jest.fn(),
-  mkdirSync: jest.fn(),
-}));
+jest.unstable_mockModule('fs', () => createConversionListFsMock());
 
 jest.unstable_mockModule('chalk', () => {
   const passthrough = jest.fn((...args: string[]) => args.join(' '));
@@ -124,5 +122,18 @@ describe('createConversionList stress scenarios', () => {
     expect(logger.log).toHaveBeenCalledWith(
       expect.stringContaining('... and 181 more files')
     );
+  });
+
+  it('does not stat every planned output when the output tree is empty', async () => {
+    const files = Array.from({ length: 101 }, (_, index) =>
+      join(settings.inputFilePath, `track-${index}.wav`)
+    );
+
+    await createConversionList(files);
+
+    const outputFileStats = (fs.existsSync as jest.Mock).mock.calls.filter(
+      ([path]) => String(path).endsWith('.mp3')
+    );
+    expect(outputFileStats).toHaveLength(0);
   });
 });
