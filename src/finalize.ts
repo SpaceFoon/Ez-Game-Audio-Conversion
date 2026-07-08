@@ -6,6 +6,7 @@ import {
 } from './utils.js';
 import chalk from 'chalk';
 import logger from './logger.js';
+import { showPagedList } from './resultsPager.js';
 import type { ConversionResult } from './types/audio.js';
 
 const finalize = async (
@@ -35,20 +36,22 @@ const finalize = async (
   writeSummaryToLogs(totalFiles, successCount, failCount, totalTime);
 
   if (successfulFiles && successfulFiles.length > 0) {
-    logger.log(
-      'Successes:',
-      successfulFiles.length,
-      successfulFiles.map((file) => file.outputFile)
+    logger.log('Successes:', successfulFiles.length);
+    await showPagedList(
+      'Successful conversions',
+      successfulFiles.map((file) => file.outputFile),
+      'see logs.csv'
     );
   } else {
     logger.log('NO SUCCESSFUL CONVERSIONS.');
   }
 
   if (failedFiles && failedFiles.length > 0) {
-    logger.log(
-      'Failures:',
-      failedFiles.length,
-      failedFiles.map((file) => file.outputFile)
+    logger.log('Failures:', failedFiles.length);
+    await showPagedList(
+      'Failed conversions',
+      failedFiles.map((file) => file.outputFile),
+      'see error.csv'
     );
   } else {
     logger.log('No conversions failed.');
