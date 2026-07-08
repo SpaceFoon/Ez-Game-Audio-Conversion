@@ -212,18 +212,29 @@ Same content as the issue body plus the full URL on the last line. Users without
 
 ---
 
-## Prompt timing (options)
+## Prompt timing (decided: B)
 
-Pick one at implementation time; default recommendation is **B**.
+**Decision: mode B — prompt only on failures or search errors.** The happy path must stay
+byte-for-byte identical to today: a user converting 30k files successfully sees zero new
+prompts, zero extra keypresses, zero added seconds. Clean runs get only a printed
+one-liner (no input read) between the summary and the existing restart prompt:
 
-| Mode | Behavior |
-|------|----------|
-| **A. Always ask** | Maximum visibility; may annoy repeat users |
-| **B. Only on failures or search errors** | Higher signal, lower noise *(recommended)* |
-| **C. Only when `failCount > 0`** | Strictest; misses “wrong metadata but exit 0” reports |
-| **D. Env flag `EZGA_FEEDBACK=1`** | Power-user override for always-on in CI/debug |
+```
+Enjoying the app, or hit a problem? https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/issues
+```
 
-Also skip the prompt when stdin is not a TTY (piped/automation), same pattern as other interactive prompts.
+| Mode | Behavior | |
+|------|----------|---|
+| **A. Always ask** | Maximum visibility; may annoy repeat users | rejected — taxes the happy path |
+| **B. Only on failures or search errors** | Higher signal, lower noise | ✅ **decided** |
+| **C. Only when `failCount > 0`** | Misses "search errors but 0 failures" runs | rejected |
+| **D. Env flag `EZGA_FEEDBACK=1`** | Power-user override to force the prompt on clean runs | keep, in addition to B |
+
+Additional guards:
+
+- Skip the prompt when stdin is not a TTY (piped/automation), same pattern as other interactive prompts.
+- In a restart loop, ask **at most once per process launch** — if the user skipped feedback
+  after batch 1, don't ask again after batch 2, even if it also has failures.
 
 ---
 
@@ -263,6 +274,9 @@ Add `getAppVersion()` in `utils.ts` (read root `package.json` relative to runtim
 | Body includes version, counts, paths | Unit |
 | Skip on empty input | Unit |
 | Skip when `!process.stdin.isTTY` | Unit |
+| Clean run (no failures, no search errors): no prompt, printed link only, restart flow unchanged | Unit |
+| Restart loop: prompt at most once per process launch | Unit |
+| `EZGA_FEEDBACK=1` forces prompt on clean runs | Unit |
 | Browser open invoked with encoded URL (mock `spawn`) | Unit |
 | Errors auto-included when `failCount > 0` and message given | Unit |
 | Mask prompt skipped when `failCount === 0` | Unit |
@@ -299,8 +313,8 @@ When shipped, add one line to README under features or usage:
 ## Open questions
 
 1. Separate templates for bug vs general feedback?
-2. Ask only on failures (recommended) or always with easy skip?
-3. Show feedback prompt on **every** batch in a restart loop, or once per process launch?
+2. ~~Ask only on failures or always?~~ **Resolved: only on failures/search errors (mode B); clean runs get a printed link, no prompt.**
+3. ~~Every batch in a restart loop, or once per launch?~~ **Resolved: at most once per process launch.**
 4. Include a link to itch as alternative contact for users without GitHub?
 
 ---
