@@ -12,6 +12,7 @@ import finalize from './finalize.js';
 import ExitProgramError from './exitProgramError.js';
 import logger from './logger.js';
 import { renderSeaBanner } from './banner.js';
+import { checkForUpdates } from './updateCheck.js';
 // Ensure global type augmentation is loaded for ts-node/tsc
 import './types/global.js';
 
@@ -106,6 +107,11 @@ async function runApp(): Promise<void> {
   resizeTerminal();
 
   await renderBanner();
+
+  // Do not let network failures interfere with normal startup.
+  if (!process.env.JEST_WORKER_ID) {
+    await checkForUpdates();
+  }
 
   while (true) {
     try {
