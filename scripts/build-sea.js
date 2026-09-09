@@ -8,7 +8,7 @@
  */
 
 import { execSync } from 'child_process';
-import { writeFileSync, mkdirSync, existsSync, rmSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { platform } from 'os';
 
@@ -19,6 +19,14 @@ const BUNDLED_APP = join(RELEASE_DIR, 'app.bundle.cjs');
 const SEA_CONFIG_PATH = 'sea-config.json';
 const SEA_BLOB_PATH = join(RELEASE_DIR, 'sea-prep.blob');
 const OUTPUT_EXE = join(RELEASE_DIR, isWindows ? `${APP_NAME}.exe` : APP_NAME);
+const PACKAGE_VERSION = (() => {
+  try {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+})();
 
 function tryApplyWindowsIcon() {
   if (!isWindows) return;
@@ -64,7 +72,7 @@ try {
 console.log('[SEA] Bundling application with esbuild...');
 try {
   execSync(
-    `npx esbuild dist/app.js --bundle --platform=node --format=cjs --minify --tree-shaking=true --legal-comments=none --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --define:__SEA_BUILD__=true --log-override:empty-import-meta=silent`,
+    `npx esbuild dist/app.js --bundle --platform=node --format=cjs --minify --tree-shaking=true --legal-comments=none --outfile=${BUNDLED_APP} --external:worker_threads --external:cfonts --define:__SEA_BUILD__=true --define:__APP_VERSION__=${JSON.stringify(PACKAGE_VERSION)} --log-override:empty-import-meta=silent`,
     {
       stdio: 'inherit',
     }
