@@ -38,14 +38,21 @@ export const isNewerVersion = (latest: string, current: string): boolean => {
 };
 
 const openUrl = (url: string): void => {
-  const command =
-    process.platform === 'win32'
-      ? ['cmd', ['/c', 'start', '', url]]
-      : process.platform === 'darwin'
-        ? ['open', [url]]
-        : ['xdg-open', [url]];
+  let executable: string;
+  let args: string[];
 
-  const child = spawn(command[0], command[1], {
+  if (process.platform === 'win32') {
+    executable = 'cmd';
+    args = ['/c', 'start', '', url];
+  } else if (process.platform === 'darwin') {
+    executable = 'open';
+    args = [url];
+  } else {
+    executable = 'xdg-open';
+    args = [url];
+  }
+
+  const child = spawn(executable, args, {
     detached: true,
     stdio: 'ignore',
     shell: false,
@@ -78,9 +85,14 @@ export const checkForUpdates = async (): Promise<void> => {
         `\n⬆ Update available: EZ Game Audio ${latestVersion.replace(/^v/i, '')} (current ${APP_VERSION})`
       )
     );
-    const answer = await getAnswer('Open the GitHub release page to update? [Y/n] ');
+    const answer = await getAnswer(
+      'Open the GitHub release page to download the update? [Y/n] '
+    );
 
-    if (answer.trim().toLowerCase() === '' || answer.trim().toLowerCase() === 'y') {
+    if (
+      answer.trim().toLowerCase() === '' ||
+      answer.trim().toLowerCase() === 'y'
+    ) {
       openUrl(releaseUrl);
     }
   } catch {
