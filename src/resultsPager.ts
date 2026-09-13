@@ -15,7 +15,7 @@ export const moveOffset = (
   pageSize: number
 ): number => {
   const maxOffset = Math.max(0, total - pageSize);
-  let next = offset;
+  let next: number;
   switch (key) {
     case 'up':
       next = offset - 1;

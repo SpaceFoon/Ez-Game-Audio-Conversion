@@ -342,7 +342,6 @@ ensureFile(
 );
 const artifactPaths = [];
 const manifestArtifactPaths = [];
-let releaseReady = false;
 
 try {
   // Apply Windows icon/version metadata before copying into stage.
@@ -628,15 +627,11 @@ try {
   }
 
   writeUpdateManifest(manifestArtifactPaths);
-  releaseReady = true;
-} finally {
-  cleanupIntermediateArtifacts();
-}
-
-if (releaseReady) {
   console.log('\n[post-sea] Release artifacts ready:');
   artifactPaths.forEach((artifact) => console.log(`  - ${artifact}`));
   console.log(
     'Distribute the ZIP/7z contents just like the original build.bat output.'
   );
+} finally {
+  cleanupIntermediateArtifacts();
 }
