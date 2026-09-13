@@ -23,6 +23,8 @@
 
 EZ-Game-Audio-Converter is a fast batch audio converter built for game developers and anyone managing large audio libraries. It focuses on doing the job with minimal setup and minimal friction: point it at your files, choose an output format, and let it run without babysitting.
 
+**v1.8.0 (March 2026)** is a ground-up rewrite; bug and metadata issues from earlier versions are resolved.
+
 ## Features
 
 - 💻 **User-Friendly Interface:** Designed with simplicity as the main goal.
@@ -37,8 +39,23 @@ EZ-Game-Audio-Converter is a fast batch audio converter built for game developer
 - 🔒 **Fully Local Processing:** Runs entirely on your machine with no cloud uploads, no telemetry, no tracking, and no internet requirement.
 - 🎶 **High-Quality Output:** Uses FFmpeg for conversion quality, codec support, and speed.
 
+## FAQ
 
+### Can it handle large libraries?
 
+Yes. EZ Game Audio Conversion is built for unattended batch jobs:
+
+- Tested with **15,000 files** in a single run (~2 hours on an older i7; disk-bound for uncompressed output).
+- A user archiving a shut-down game converted **14,000 OGG files to WAV in about 20 minutes** after Audacity and MediaHuman failed on the same library.
+- Conversions run on a bounded multi-threaded worker pool — file count doesn't affect stability, only total runtime.
+
+### What happens if a file fails?
+
+Nothing fails silently. Every file's outcome is written to `logs.csv`, and any failure is logged to `error.csv` with the underlying FFmpeg error. Slightly corrupt input files are detected and reported rather than skipped.
+
+### Does it change my metadata?
+
+Metadata and loop tags are preserved through conversion. When the sample rate changes, loop timings are adjusted automatically to stay correct.
 
 ## Usage
 
