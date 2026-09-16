@@ -202,7 +202,7 @@ const createConversionList = async (
   let convertSelf: string | null = null;
   const conversionList: ConversionCandidate[] = [];
   let response: string | null = null;
-  let relativePath: string | null = null;
+  let relativePath: string;
 
   // Batch summary information
   logger.log(chalk.blueBright('\n📝 Conversion parameters:'));
