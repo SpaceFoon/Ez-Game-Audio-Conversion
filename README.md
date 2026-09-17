@@ -25,6 +25,8 @@ EZ-Game-Audio-Converter is a fast batch audio converter built for game developer
 
 **v1.8.0 (March 2026)** is a ground-up rewrite; bug and metadata issues from earlier versions are resolved.
 
+> Want a GUI version of this with more options? [Download and try now](https://ezconvertsuite.com).
+
 ## Features
 
 - 💻 **User-Friendly Interface:** Designed with simplicity as the main goal.

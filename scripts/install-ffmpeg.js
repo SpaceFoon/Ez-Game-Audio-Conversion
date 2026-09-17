@@ -57,16 +57,21 @@ const platformConfig = {
   },
   macos: {
     files: ['ffmpeg', 'ffprobe'],
-    downloads: [
-      {
-        url: 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
-        archiveName: 'ffmpeg-macos.zip',
-      },
-      {
-        url: 'https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip',
-        archiveName: 'ffprobe-macos.zip',
-      },
-    ],
+    // evermeet.cx ships Intel-only builds. Apple Silicon (arm64) uses Homebrew
+    // instead — see installMacosFromBrew() below.
+    downloads:
+      process.arch === 'arm64'
+        ? []
+        : [
+            {
+              url: 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
+              archiveName: 'ffmpeg-macos.zip',
+            },
+            {
+              url: 'https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip',
+              archiveName: 'ffprobe-macos.zip',
+            },
+          ],
     extract: extractZip,
   },
 };
@@ -96,27 +101,32 @@ if (!forceDownload && hasAllBinaries()) {
 }
 
 try {
-  rmSync(tempDir, { recursive: true, force: true });
-  mkdirSync(tempDir, { recursive: true });
   mkdirSync(destinationDir, { recursive: true });
 
-  for (const download of config.downloads) {
-    const archivePath = join(tempDir, download.archiveName);
-    log(`Downloading ${download.url}`);
-    await downloadFile(download.url, archivePath);
+  if (platformSlug === 'macos' && process.arch === 'arm64') {
+    installMacosFromBrew(destinationDir, config.files);
+  } else {
+    rmSync(tempDir, { recursive: true, force: true });
+    mkdirSync(tempDir, { recursive: true });
 
-    const extractDir = join(
-      tempDir,
-      download.archiveName.replace(/[^a-z0-9]/gi, '-')
-    );
-    mkdirSync(extractDir, { recursive: true });
-    config.extract(archivePath, extractDir);
-    copyBinaries(extractDir, destinationDir, config.files);
+    for (const download of config.downloads) {
+      const archivePath = join(tempDir, download.archiveName);
+      log(`Downloading ${download.url}`);
+      await downloadFile(download.url, archivePath);
+
+      const extractDir = join(
+        tempDir,
+        download.archiveName.replace(/[^a-z0-9]/gi, '-')
+      );
+      mkdirSync(extractDir, { recursive: true });
+      config.extract(archivePath, extractDir);
+      copyBinaries(extractDir, destinationDir, config.files);
+    }
   }
 
   if (!hasAllBinaries()) {
     throw new Error(
-      `Download completed, but expected binaries were not found in ffmpeg-bin/${platformSlug}: ${config.files.join(', ')}`
+      `Install completed, but expected binaries were not found in ffmpeg-bin/${platformSlug}: ${config.files.join(', ')}`
     );
   }
 
@@ -138,6 +148,45 @@ try {
   process.exit(1);
 } finally {
   rmSync(tempDir, { recursive: true, force: true });
+}
+
+/**
+ * evermeet.cx only publishes Intel macOS builds. On Apple Silicon, copy a
+ * native Homebrew ffmpeg/ffprobe into ffmpeg-bin/macos/.
+ */
+function installMacosFromBrew(destinationDir, fileNames) {
+  let brewPath;
+  try {
+    brewPath = execFileSync('which', ['brew'], { encoding: 'utf8' }).trim();
+  } catch {
+    throw new Error(
+      'Homebrew is required to install native arm64 FFmpeg (evermeet.cx is Intel-only). Install Homebrew from https://brew.sh then re-run, or copy arm64 ffmpeg/ffprobe into ffmpeg-bin/macos/ manually.'
+    );
+  }
+
+  log(`Using Homebrew at ${brewPath} for native arm64 FFmpeg.`);
+  try {
+    execFileSync('brew', ['list', '--versions', 'ffmpeg'], {
+      stdio: 'ignore',
+    });
+    log('Homebrew ffmpeg already installed.');
+  } catch {
+    log('Installing ffmpeg via Homebrew (this may take a few minutes)...');
+    execFileSync('brew', ['install', 'ffmpeg'], { stdio: 'inherit' });
+  }
+
+  const brewPrefix = execFileSync('brew', ['--prefix'], {
+    encoding: 'utf8',
+  }).trim();
+  const binDir = join(brewPrefix, 'bin');
+
+  for (const fileName of fileNames) {
+    const sourcePath = join(binDir, fileName);
+    if (!existsSync(sourcePath)) {
+      throw new Error(`Homebrew ffmpeg did not provide ${sourcePath}`);
+    }
+    copyFileSync(sourcePath, join(destinationDir, fileName));
+  }
 }
 
 function downloadFile(url, destination) {

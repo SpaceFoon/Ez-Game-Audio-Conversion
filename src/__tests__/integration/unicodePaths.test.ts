@@ -23,23 +23,13 @@ import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
-import { resolveE2eDescribe, resolveE2eIt } from '../test-utils/e2eDeps.js';
-
-const PLATFORM_SLUG =
-  process.platform === 'win32'
-    ? 'windows'
-    : process.platform === 'darwin'
-      ? 'macos'
-      : 'linux';
-const FFMPEG_EXE = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-const BUNDLED_FFMPEG = join(
-  process.cwd(),
-  'ffmpeg-bin',
-  PLATFORM_SLUG,
-  FFMPEG_EXE
-);
-// Only use bundled ffmpeg - no system PATH fallback
-const FFMPEG_CMD = BUNDLED_FFMPEG;
+import {
+  resolveE2eDescribe,
+  resolveE2eIt,
+  ffmpegAvailable,
+  ffmpegPath as FFMPEG_CMD,
+  integrationSkipReason,
+} from '../test-utils/e2eDeps.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,20 +38,6 @@ const __dirname = dirname(__filename);
 const TEST_DIR = join(__dirname, '..', 'test-unicode-paths');
 const INPUT_DIR = join(TEST_DIR, 'input');
 const OUTPUT_DIR = join(TEST_DIR, 'output');
-
-// Check if ffmpeg is available
-const checkFfmpegAvailable = (): boolean => {
-  try {
-    const result = spawnSync(FFMPEG_CMD, ['-version'], {
-      encoding: 'utf8',
-      timeout: 5000,
-      windowsHide: true,
-    });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-};
 
 // Generate a minimal valid WAV file (1 second of silence)
 const generateTestWav = (filePath: string): void => {
@@ -133,16 +109,15 @@ const testConversion = (
   };
 };
 
-const ffmpegAvailable = checkFfmpegAvailable();
 const describeUnicode = resolveE2eDescribe(
   ffmpegAvailable,
-  `bundled ffmpeg not found at ${FFMPEG_CMD}`
+  integrationSkipReason || `bundled ffmpeg not found at ${FFMPEG_CMD}`
 );
 
 describeUnicode('Unicode Path Support (Integration)', () => {
   const itWithFfmpeg = resolveE2eIt(
     ffmpegAvailable,
-    `bundled ffmpeg not found at ${FFMPEG_CMD}`
+    integrationSkipReason || `bundled ffmpeg not found at ${FFMPEG_CMD}`
   );
 
   beforeAll(() => {

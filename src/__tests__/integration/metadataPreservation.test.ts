@@ -10,35 +10,21 @@ import { existsSync, mkdirSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
-import { platform } from 'os';
-import { resolveE2eDescribe, resolveE2eIt } from '../test-utils/e2eDeps.js';
+import {
+  resolveE2eDescribe,
+  resolveE2eIt,
+  ffmpegAvailable,
+  ffmpegPath as FFMPEG_PATH,
+  ffprobePath as FFPROBE_PATH,
+  integrationSkipReason,
+} from '../test-utils/e2eDeps.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Project root and ffmpeg-bin location
-const PROJECT_ROOT = join(__dirname, '..', '..', '..');
 const TEST_DIR = join(__dirname, '..', 'test-metadata-preservation');
 const INPUT_DIR = join(TEST_DIR, 'input');
 const OUTPUT_DIR = join(TEST_DIR, 'output');
-
-// Get platform-specific ffmpeg binary paths
-const getPlatformSlug = (): string => {
-  const p = platform();
-  if (p === 'win32') return 'windows';
-  if (p === 'darwin') return 'macos';
-  return 'linux';
-};
-
-const FFMPEG_BIN_DIR = join(PROJECT_ROOT, 'ffmpeg-bin', getPlatformSlug());
-const FFMPEG_PATH = join(
-  FFMPEG_BIN_DIR,
-  platform() === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
-);
-const FFPROBE_PATH = join(
-  FFMPEG_BIN_DIR,
-  platform() === 'win32' ? 'ffprobe.exe' : 'ffprobe'
-);
 
 // Test metadata cases - each one tests a specific edge case
 const METADATA_TEST_CASES = [
@@ -146,24 +132,6 @@ const METADATA_TEST_CASES = [
 
 // Output formats to test
 const OUTPUT_FORMATS = ['wav', 'mp3', 'ogg', 'flac', 'm4a', 'aiff'];
-
-// Check if ffmpeg is available (use bundled binary)
-const checkFfmpeg = (): boolean => {
-  if (!existsSync(FFMPEG_PATH)) {
-    console.log(`ffmpeg not found at: ${FFMPEG_PATH}`);
-    return false;
-  }
-  try {
-    const result = spawnSync(FFMPEG_PATH, ['-version'], {
-      encoding: 'utf8',
-      stdio: 'pipe',
-      timeout: 5000,
-    });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-};
 
 // Generate a test WAV file with metadata
 const generateTestFile = (
@@ -350,16 +318,15 @@ const checkPhase = (
   }
 };
 
-const ffmpegAvailable = checkFfmpeg();
 const describeMetadata = resolveE2eDescribe(
   ffmpegAvailable,
-  `ffmpeg/ffprobe not found under ${FFMPEG_BIN_DIR}`
+  integrationSkipReason || `ffmpeg/ffprobe not found at ${FFMPEG_PATH}`
 );
 
 describeMetadata('Metadata Preservation E2E Tests', () => {
   const itWithFfmpeg = resolveE2eIt(
     ffmpegAvailable,
-    `ffmpeg/ffprobe not found under ${FFMPEG_BIN_DIR}`
+    integrationSkipReason || `ffmpeg/ffprobe not found at ${FFMPEG_PATH}`
   );
 
   beforeAll(() => {

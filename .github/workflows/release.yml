@@ -31,8 +31,6 @@ jobs:
           - os: macos-latest
             platform: macos
             artifact-name: EZ-Game-Audio-macOS
-            ffmpeg-url-1: https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
-            ffmpeg-url-2: https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
 
     steps:
       - name: Checkout code
@@ -46,9 +44,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Run unit tests
-        run: npm test
+        env:
+          EZ_AUDIO_SKIP_FFMPEG_DOWNLOAD: '1'
 
       # Windows ffmpeg download
       - name: Download ffmpeg (Windows)
@@ -74,18 +71,28 @@ jobs:
           rm -rf manpages model GPLv3.txt readme.txt qt-faststart
           chmod +x ffmpeg ffprobe
 
-      # macOS ffmpeg download
-      - name: Download ffmpeg (macOS)
+      # evermeet.cx is Intel-only; macos-latest is arm64. AnimMouse/setup-ffmpeg
+      # installs native static binaries (OSXExperts on arm64, evermeet on Intel).
+      - name: Setup FFmpeg (macOS)
+        if: matrix.platform == 'macos'
+        uses: AnimMouse/setup-ffmpeg@v1
+        with:
+          # OSXExperts arm64 version format: major+minor with no dots (9.0 → 90).
+          # Required because arm64 has no master/snapshot builds.
+          version: '90'
+
+      - name: Install ffmpeg into ffmpeg-bin (macOS)
         if: matrix.platform == 'macos'
         run: |
           mkdir -p ffmpeg-bin/macos
-          cd ffmpeg-bin/macos
-          curl -L "${{ matrix.ffmpeg-url-1 }}" -o ffmpeg.zip
-          curl -L "${{ matrix.ffmpeg-url-2 }}" -o ffprobe.zip
-          unzip -o ffmpeg.zip
-          unzip -o ffprobe.zip
-          rm ffmpeg.zip ffprobe.zip
-          chmod +x ffmpeg ffprobe
+          cp "$(which ffmpeg)" ffmpeg-bin/macos/ffmpeg
+          cp "$(which ffprobe)" ffmpeg-bin/macos/ffprobe
+          chmod +x ffmpeg-bin/macos/ffmpeg ffmpeg-bin/macos/ffprobe
+          file ffmpeg-bin/macos/ffmpeg
+          ffmpeg-bin/macos/ffmpeg -version | head -n 1
+
+      - name: Run unit tests
+        run: npm test
 
       # Build the application
       - name: Build release package

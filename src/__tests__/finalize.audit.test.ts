@@ -11,8 +11,12 @@ jest.unstable_mockModule('../utils.js', () => ({
 }));
 
 jest.unstable_mockModule('chalk', () => ({
-  default: { blue: jest.fn((text: string) => text) },
+  default: {
+    blue: jest.fn((text: string) => text),
+    cyan: jest.fn((text: string) => text),
+  },
   blue: jest.fn((text: string) => text),
+  cyan: jest.fn((text: string) => text),
 }));
 
 const { reportSearchErrors } = await import('../utils.js');

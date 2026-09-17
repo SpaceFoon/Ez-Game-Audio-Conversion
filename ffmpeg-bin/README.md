@@ -33,7 +33,8 @@ The binaries are placed in the matching platform folder:
 
 - Windows: `ffmpeg-bin/windows/`
 - Linux: `ffmpeg-bin/linux/`
-- macOS: `ffmpeg-bin/macos/`
+- macOS Intel: `ffmpeg-bin/macos/` (evermeet.cx)
+- macOS Apple Silicon: `ffmpeg-bin/macos/` (via Homebrew — evermeet.cx is Intel-only)
 
 If the expected binaries already exist, the installer leaves them alone. To
 force a fresh download, run:
@@ -64,16 +65,25 @@ the bundled binaries yourself.
 3. Place them in `ffmpeg-bin/linux/`
 
 ### macOS
+**Apple Silicon (arm64):** Homebrew is required (evermeet.cx is Intel-only):
+```bash
+brew install ffmpeg
+cp "$(brew --prefix)/bin/ffmpeg" ffmpeg-bin/macos/
+cp "$(brew --prefix)/bin/ffprobe" ffmpeg-bin/macos/
+chmod +x ffmpeg-bin/macos/ffmpeg ffmpeg-bin/macos/ffprobe
+```
+`npm run install:ffmpeg` does this automatically on arm64 Macs.
+
+**Intel (x64):**
 1. Download: https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
 2. Download: https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
 3. Extract and place in `ffmpeg-bin/macos/`
 
-**OR** use Homebrew:
+**OR** use Homebrew on either architecture:
 ```bash
 brew install ffmpeg
-# Then copy from /opt/homebrew/bin/ or /usr/local/bin/
-cp $(which ffmpeg) ffmpeg-bin/macos/
-cp $(which ffprobe) ffmpeg-bin/macos/
+cp "$(brew --prefix)/bin/ffmpeg" ffmpeg-bin/macos/
+cp "$(brew --prefix)/bin/ffprobe" ffmpeg-bin/macos/
 ```
 
 ## Notes

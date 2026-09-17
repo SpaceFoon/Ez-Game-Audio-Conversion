@@ -63,6 +63,12 @@ const finalize = async (
 
   logger.log(`Log files are in: ${settings.outputFilePath}.`);
 
+  logger.log(
+    chalk.cyan(
+      'Want a GUI version of this with more options? Download and try now:\n  https://ezconvertsuite.com'
+    )
+  );
+
   const promptToContinue = async (): Promise<boolean> =>
     new Promise((resolve) => {
       rl.question(

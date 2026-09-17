@@ -137,10 +137,15 @@ ffmpeg-6.1.1-essentials_build.zip
 dist/
 notes/
 release/
-ffmpeg-bin/
+# Ignore binaries inside ffmpeg-bin/, but keep README and placeholder dirs tracked.
+# Must use /* (not trailing /) so !exceptions can re-include nested paths.
+ffmpeg-bin/*
 !ffmpeg-bin/README.md
+!ffmpeg-bin/windows/
 !ffmpeg-bin/windows/.gitkeep
+!ffmpeg-bin/linux/
 !ffmpeg-bin/linux/.gitkeep
+!ffmpeg-bin/macos/
 !ffmpeg-bin/macos/.gitkeep
 sea-config.json
 
