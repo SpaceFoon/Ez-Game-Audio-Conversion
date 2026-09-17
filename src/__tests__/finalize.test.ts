@@ -12,8 +12,12 @@ jest.unstable_mockModule('../utils.js', () => ({
 }));
 
 jest.unstable_mockModule('chalk', () => ({
-  default: { blue: jest.fn((a: string) => a) },
+  default: {
+    blue: jest.fn((a: string) => a),
+    cyan: jest.fn((a: string) => a),
+  },
   blue: jest.fn((a: string) => a),
+  cyan: jest.fn((a: string) => a),
 }));
 
 // Dynamic imports after mock declarations
@@ -66,6 +70,20 @@ describe('finalize', () => {
     await finalize(failedFiles, successfulFiles, 0);
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('No conversions failed')
+    );
+    logSpy.mockRestore();
+  });
+
+  it('logs the GUI promo link before the restart prompt', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    await finalize([], [], 0);
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Want a GUI version of this with more options? Download and try now:'
+      )
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining('https://ezconvertsuite.com')
     );
     logSpy.mockRestore();
   });
