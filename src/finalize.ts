@@ -65,7 +65,7 @@ const finalize = async (
 
   logger.log(
     chalk.cyan(
-      'Want a GUI version of this with more options? Download and try now:\n  https://ezconvertsuite.com'
+      'Want a GUI version of this with more options? Download and try now:\n  https://ezaudioconverter.com'
     )
   );
 

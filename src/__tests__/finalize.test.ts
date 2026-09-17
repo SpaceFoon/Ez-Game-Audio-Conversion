@@ -83,7 +83,7 @@ describe('finalize', () => {
       )
     );
     expect(logSpy).toHaveBeenCalledWith(
-      expect.stringContaining('https://ezconvertsuite.com')
+      expect.stringContaining('https://ezaudioconverter.com')
     );
     logSpy.mockRestore();
   });
