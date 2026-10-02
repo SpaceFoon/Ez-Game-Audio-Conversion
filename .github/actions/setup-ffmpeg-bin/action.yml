@@ -1,0 +1,109 @@
+name: Setup ffmpeg-bin
+description: >
+  Download static ffmpeg + ffprobe for the runner's platform into ffmpeg-bin/<platform>/.
+  Each platform tries several mirrors in order, so one host being down (gyan.dev 503s,
+  OSXExperts not yet publishing a version) does not break CI or the release build.
+
+inputs:
+  platform:
+    description: windows | linux | macos
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download ffmpeg (Windows)
+      if: inputs.platform == 'windows'
+      shell: pwsh
+      run: |
+        $urls = @(
+          'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip',
+          'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip',
+          'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
+        )
+        New-Item -ItemType Directory -Force -Path ffmpeg-bin/windows | Out-Null
+        $ok = $false
+        foreach ($url in $urls) {
+          Write-Host "Trying $url"
+          try {
+            Invoke-WebRequest -Uri $url -OutFile ffmpeg.zip -MaximumRetryCount 3 -RetryIntervalSec 10
+            Expand-Archive -Path ffmpeg.zip -DestinationPath temp -Force
+            Copy-Item "temp/ffmpeg-*/bin/ffmpeg.exe" -Destination "ffmpeg-bin/windows/" -ErrorAction Stop
+            Copy-Item "temp/ffmpeg-*/bin/ffprobe.exe" -Destination "ffmpeg-bin/windows/" -ErrorAction Stop
+            $ok = (Test-Path ffmpeg-bin/windows/ffmpeg.exe) -and (Test-Path ffmpeg-bin/windows/ffprobe.exe)
+          } catch {
+            Write-Host "::warning::ffmpeg download failed from ${url}: $($_.Exception.Message)"
+          } finally {
+            Remove-Item -Recurse -Force temp, ffmpeg.zip -ErrorAction SilentlyContinue
+          }
+          if ($ok) { break }
+        }
+        if (-not $ok) { Write-Host '::error::Could not download ffmpeg for Windows from any mirror'; exit 1 }
+        & ffmpeg-bin/windows/ffmpeg.exe -version | Select-Object -First 1
+
+    - name: Download ffmpeg (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        set -u
+        urls=(
+          https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-gpl-8.1.tar.xz
+          https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+        )
+        mkdir -p ffmpeg-bin/linux
+        for url in "${urls[@]}"; do
+          echo "Trying $url"
+          rm -rf tmp-ffmpeg && mkdir tmp-ffmpeg
+          if curl -fsSL --retry 3 --retry-delay 10 --retry-all-errors "$url" -o ffmpeg.tar.xz \
+            && tar -xf ffmpeg.tar.xz -C tmp-ffmpeg; then
+            ff=$(find tmp-ffmpeg -type f -name ffmpeg | head -n 1)
+            fp=$(find tmp-ffmpeg -type f -name ffprobe | head -n 1)
+            if [ -n "$ff" ] && [ -n "$fp" ]; then
+              cp "$ff" "$fp" ffmpeg-bin/linux/
+              break
+            fi
+          fi
+          echo "::warning::ffmpeg download failed from $url"
+        done
+        rm -rf tmp-ffmpeg ffmpeg.tar.xz
+        if [ ! -f ffmpeg-bin/linux/ffmpeg ] || [ ! -f ffmpeg-bin/linux/ffprobe ]; then
+          echo "::error::Could not download ffmpeg for Linux from any mirror"; exit 1
+        fi
+        chmod +x ffmpeg-bin/linux/ffmpeg ffmpeg-bin/linux/ffprobe
+        ffmpeg-bin/linux/ffmpeg -version | head -n 1
+
+    # macos-latest is arm64 and evermeet.cx is Intel-only. OSXExperts publishes native
+    # arm64 static builds per release (ffmpegXYarm.zip); martin-riedl.de is the fallback.
+    - name: Download ffmpeg (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        set -u
+        fetch() { # fetch <ffmpeg-zip-url> <ffprobe-zip-url>
+          rm -rf tmp-ffmpeg && mkdir tmp-ffmpeg
+          curl -fsSL --retry 3 --retry-delay 10 --retry-all-errors "$1" -o tmp-ffmpeg/ffmpeg.zip &&
+          curl -fsSL --retry 3 --retry-delay 10 --retry-all-errors "$2" -o tmp-ffmpeg/ffprobe.zip &&
+          unzip -o -j -q tmp-ffmpeg/ffmpeg.zip -x '__MACOSX/*' -d tmp-ffmpeg/out &&
+          unzip -o -j -q tmp-ffmpeg/ffprobe.zip -x '__MACOSX/*' -d tmp-ffmpeg/out &&
+          [ -f tmp-ffmpeg/out/ffmpeg ] && [ -f tmp-ffmpeg/out/ffprobe ] &&
+          chmod +x tmp-ffmpeg/out/ffmpeg tmp-ffmpeg/out/ffprobe &&
+          tmp-ffmpeg/out/ffmpeg -version > /dev/null
+        }
+        mkdir -p ffmpeg-bin/macos
+        ok=0
+        for v in 90 81 80; do
+          echo "Trying OSXExperts $v"
+          if fetch "https://www.osxexperts.net/ffmpeg${v}arm.zip" "https://www.osxexperts.net/ffprobe${v}arm.zip"; then ok=1; break; fi
+          echo "::warning::OSXExperts $v not available"
+        done
+        if [ $ok = 0 ]; then
+          echo "Trying martin-riedl.de"
+          base=https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release
+          if fetch "$base/ffmpeg.zip" "$base/ffprobe.zip"; then ok=1; fi
+        fi
+        if [ $ok = 0 ]; then echo "::error::Could not download ffmpeg for macOS from any mirror"; exit 1; fi
+        cp tmp-ffmpeg/out/ffmpeg tmp-ffmpeg/out/ffprobe ffmpeg-bin/macos/
+        rm -rf tmp-ffmpeg
+        file ffmpeg-bin/macos/ffmpeg
+        ffmpeg-bin/macos/ffmpeg -version | head -n 1

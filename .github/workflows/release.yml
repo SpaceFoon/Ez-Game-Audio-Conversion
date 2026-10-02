@@ -16,17 +16,16 @@ jobs:
     name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
             platform: windows
             artifact-name: EZ-Game-Audio-Windows
-            ffmpeg-url: https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
 
           - os: ubuntu-latest
             platform: linux
             artifact-name: EZ-Game-Audio-Linux
-            ffmpeg-url: https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
 
           - os: macos-latest
             platform: macos
@@ -47,49 +46,11 @@ jobs:
         env:
           EZ_AUDIO_SKIP_FFMPEG_DOWNLOAD: '1'
 
-      # Windows ffmpeg download
-      - name: Download ffmpeg (Windows)
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path ffmpeg-bin/windows
-          Invoke-WebRequest -Uri "${{ matrix.ffmpeg-url }}" -OutFile ffmpeg.zip
-          Expand-Archive -Path ffmpeg.zip -DestinationPath temp
-          Copy-Item "temp/ffmpeg-*/bin/ffmpeg.exe" -Destination "ffmpeg-bin/windows/"
-          Copy-Item "temp/ffmpeg-*/bin/ffprobe.exe" -Destination "ffmpeg-bin/windows/"
-          Remove-Item -Recurse -Force temp, ffmpeg.zip
-
-      # Linux ffmpeg download
-      - name: Download ffmpeg (Linux)
-        if: matrix.platform == 'linux'
-        run: |
-          mkdir -p ffmpeg-bin/linux
-          cd ffmpeg-bin/linux
-          curl -L "${{ matrix.ffmpeg-url }}" -o ffmpeg.tar.xz
-          tar -xf ffmpeg.tar.xz --strip-components=1
-          rm ffmpeg.tar.xz
-          rm -rf manpages model GPLv3.txt readme.txt qt-faststart
-          chmod +x ffmpeg ffprobe
-
-      # evermeet.cx is Intel-only; macos-latest is arm64. AnimMouse/setup-ffmpeg
-      # installs native static binaries (OSXExperts on arm64, evermeet on Intel).
-      - name: Setup FFmpeg (macOS)
-        if: matrix.platform == 'macos'
-        uses: AnimMouse/setup-ffmpeg@v1
+      # Mirrors + retries live in the composite action; see its action.yml.
+      - name: Download ffmpeg
+        uses: ./.github/actions/setup-ffmpeg-bin
         with:
-          # OSXExperts arm64 version format: major+minor with no dots (9.0 → 90).
-          # Required because arm64 has no master/snapshot builds.
-          version: '90'
-
-      - name: Install ffmpeg into ffmpeg-bin (macOS)
-        if: matrix.platform == 'macos'
-        run: |
-          mkdir -p ffmpeg-bin/macos
-          cp "$(which ffmpeg)" ffmpeg-bin/macos/ffmpeg
-          cp "$(which ffprobe)" ffmpeg-bin/macos/ffprobe
-          chmod +x ffmpeg-bin/macos/ffmpeg ffmpeg-bin/macos/ffprobe
-          file ffmpeg-bin/macos/ffmpeg
-          ffmpeg-bin/macos/ffmpeg -version | head -n 1
+          platform: ${{ matrix.platform }}
 
       - name: Run unit tests
         run: npm test
@@ -153,7 +114,7 @@ jobs:
           path: artifacts
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           generate_release_notes: true
