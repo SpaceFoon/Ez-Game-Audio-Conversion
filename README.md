@@ -229,12 +229,14 @@ If you would like to use this software for commercial purposes, please contact m
 1. **Download** [Latest Release](https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases)
 2. **Choose** the archive for your platform:
   - Windows: `EZ-Game-Audio-Windows.zip` or `.7z`
-  - Linux: `EZ-Game-Audio-Linux.zip` (You build)
-  - macOS: `EZ-Game-Audio-macOS.zip` (You build)
+  - Linux: `EZ-Game-Audio-Linux.zip` (x64)
+  - macOS: `EZ-Game-Audio-macOS.zip` (Apple Silicon)
 3. **Extract** the archive
 4. **Run** the packaged executable:
   - Windows: `EZ-Game-Audio.exe`
   - Linux/macOS: `EZ-Game-Audio`
+
+On macOS the app isn't notarized, so Gatekeeper may block it the first time. Run `xattr -dr com.apple.quarantine <extracted-folder>` once, or right-click the executable and choose Open.
 
 ## Checksums (SHA-256)
 
