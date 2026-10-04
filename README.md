@@ -13,6 +13,9 @@
   <a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/">
     <img src="https://img.shields.io/badge/Download_Releases-181717?style=for-the-badge&logo=github&logoColor=white" alt="Download Releases">
   </a>
+  <a href="https://ezaudioconverter.com">
+    <img src="https://img.shields.io/badge/Get_the_GUI_Version-ezaudioconverter.com-ff0080?style=for-the-badge" alt="Get the GUI version at ezaudioconverter.com">
+  </a>
 </p>
 
 <!-- Pre-Headline -->
@@ -25,7 +28,7 @@ EZ-Game-Audio-Converter is a fast batch audio converter built for game developer
 
 **v1.8.0 (March 2026)** is a ground-up rewrite; bug and metadata issues from earlier versions are resolved.
 
-> Want a GUI version of this with more options? [Download and try now](https://ezaudioconverter.com).
+> 🎛️ **Want a GUI version with more options?** Get it at **[ezaudioconverter.com](https://ezaudioconverter.com)**.
 
 ## Features
 
