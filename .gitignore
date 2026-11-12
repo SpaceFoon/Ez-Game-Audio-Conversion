@@ -164,3 +164,5 @@ sea-config.json
 .jest_run*
 log**
 error**
+# Local test output and captures
+/test-results/
