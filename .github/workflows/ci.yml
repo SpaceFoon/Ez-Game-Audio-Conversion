@@ -115,9 +115,11 @@ jobs:
         if: matrix.platform == 'macos'
         uses: AnimMouse/setup-ffmpeg@v1
         with:
-          # OSXExperts arm64 version format: major+minor with no dots (9.0 → 90).
-          # Required because arm64 has no master/snapshot builds.
-          version: '90'
+          # OSXExperts arm64 version format: major+minor with no dots (9.1 → 91).
+          # OSXExperts dropped the 9.0 arm64 build (ffmpeg90arm.zip now 404s);
+          # 9.1 is the only 9.x arm64 build it lists. Required because arm64 has
+          # no master/snapshot builds.
+          version: '91'
 
       - name: Install ffmpeg into ffmpeg-bin (macOS)
         if: matrix.platform == 'macos'
