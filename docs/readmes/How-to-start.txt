@@ -6,3 +6,5 @@
 
 Your comments and likes are appreciated for support!
 https://spacefoon.itch.io/ez-game-audio-format-conversion
+
+Want a GUI version with more options? https://ezaudioconverter.com

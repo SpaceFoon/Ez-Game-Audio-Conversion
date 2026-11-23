@@ -165,6 +165,11 @@ try {
   if (existsSync(SEA_CONFIG_PATH)) {
     rmSync(SEA_CONFIG_PATH);
   }
+  // Bundle is only needed to generate the SEA blob; remove it so partial
+  // `build:sea` runs don't leave leftovers that fail seaBuild cleanup tests.
+  if (existsSync(BUNDLED_APP)) {
+    rmSync(BUNDLED_APP);
+  }
 } catch {
   console.warn('[SEA] Warning: Could not clean up some temporary files');
 }
