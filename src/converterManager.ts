@@ -83,6 +83,8 @@ const convertFiles = async (
   const successfulFiles: ConversionResult[] = [];
   const activeWorkers = new Set<Worker>();
   let abortRequested = false;
+  // Shared across workers so concurrent fatal errors prompt the user only once.
+  let fatalPrompt: Promise<unknown> | null = null;
   const showDetailedLogs = files.length <= QUIET_BATCH_THRESHOLD;
   const totalFiles = files.length;
   let completedCount = 0;
@@ -246,13 +248,14 @@ const convertFiles = async (
                 );
               }
 
-              void getAnswer('Press ENTER to return to the main menu...').then(
-                () => {
-                  recordFailure(file, `${fatalMessage} ${stderrOutput.trim()}`);
-                  recordCompletion();
-                  resolveOnce();
-                }
+              fatalPrompt ??= getAnswer(
+                'Press ENTER to return to the main menu...'
               );
+              void fatalPrompt.then(() => {
+                recordFailure(file, `${fatalMessage} ${stderrOutput.trim()}`);
+                recordCompletion();
+                resolveOnce();
+              });
               return;
             }
             return;
@@ -378,6 +381,16 @@ const convertFiles = async (
   }
 
   await Promise.all(workerPromises);
+
+  // Files never started because a fatal error stopped the batch still need to
+  // show up in the results, otherwise the summary undercounts the batch.
+  if (abortRequested) {
+    for (const file of queue.splice(0)) {
+      const message = 'Skipped: batch aborted after fatal ffmpeg error.';
+      addToLog({ type: 'error' as const, data: message }, file);
+      recordFailure(file, message);
+    }
+  }
 
   if (!showDetailedLogs && totalFiles > 0) {
     process.stdout.write(

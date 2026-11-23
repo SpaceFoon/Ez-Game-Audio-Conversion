@@ -64,11 +64,13 @@ export const pathsResolveToSameFile = (
 ): boolean =>
   resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase();
 
-// Get a unique output file name
+// Get a unique output file name. `isReserved` reports names already planned
+// in this batch (not yet on disk) so two outputs never get the same copy name.
 const getOutputFileCopy = async (
   inputFile: string,
   outputFormat: AudioFormat,
   outputFolder: string,
+  isReserved: (filePath: string) => boolean = () => false,
   copyNumber: number = 1
 ): Promise<string> => {
   const parsed = parseCopyFilename(inputFile);
@@ -80,11 +82,12 @@ const getOutputFileCopy = async (
     outputFolder,
     `${baseNameCopy}-copy(${copyNumber})`
   )}.${outputFormat}`;
-  if (existsSync(outputFileCopy)) {
+  if (existsSync(outputFileCopy) || isReserved(outputFileCopy)) {
     outputFileCopy = await getOutputFileCopy(
       outputFileCopy,
       outputFormat,
       outputFolder,
+      isReserved,
       copyNumber + 1
     );
   }
@@ -260,6 +263,9 @@ const createConversionList = async (
       : outputFilePath;
   const existingOutputs = scanExistingFiles(conflictCheckRoot);
   const skipConflictChecks = existingOutputs.size === 0;
+  const plannedOutputs = new Set<string>();
+  const isPlannedOutput = (outputFile: string): boolean =>
+    plannedOutputs.has(normalizeOutputPathKey(outputFile));
   const outputAlreadyExists = (outputFile: string): boolean =>
     existingOutputs.has(normalizeOutputPathKey(outputFile));
 
@@ -354,7 +360,8 @@ const createConversionList = async (
             outputFile = await getOutputFileCopy(
               inputFile,
               outputFormat,
-              outputFolder || dirname(inputFile)
+              outputFolder || dirname(inputFile),
+              isPlannedOutput
             );
             break;
           }
@@ -386,7 +393,8 @@ const createConversionList = async (
           outputFile = await getOutputFileCopy(
             inputFile,
             outputFormat,
-            outputFolder || dirname(inputFile)
+            outputFolder || dirname(inputFile),
+            isPlannedOutput
           );
           action = 'convert';
           response = null;
@@ -396,7 +404,8 @@ const createConversionList = async (
           outputFile = await getOutputFileCopy(
             outputFile,
             outputFormat,
-            outputFolder || dirname(outputFile)
+            outputFolder || dirname(outputFile),
+            isPlannedOutput
           );
           action = 'convert';
         },
@@ -410,50 +419,58 @@ const createConversionList = async (
         },
       };
 
-      // Handle file exists responses
-      switch (response) {
-        case '':
-          logger.error('response was empty:', response);
-          break;
-        case 'ra':
-          await responseActions['ra']?.();
-          break;
-        case 'sa':
-          await responseActions['sa']?.();
-          break;
-        case 'oa':
-          logger.log(
-            chalk.red('🔺🚩OVERWRITE FILE🚩'),
-            chalk.yellow(outputFile, ' 🔺')
-          );
-          break;
-        default:
-          while (true) {
-            if (!response) {
-              if (!skipConflictChecks && outputAlreadyExists(outputFile)) {
-                logger.log(
-                  chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
-                );
+      // Handle file exists responses. Skip entirely when this item is already
+      // skipped (e.g. user declined same-type conversion) — otherwise a rename
+      // answer here or a prior "ra" would flip it back to 'convert'.
+      if (action !== 'skip') {
+        switch (response) {
+          case '':
+            logger.error('response was empty:', response);
+            break;
+          case 'ra':
+            await responseActions['ra']?.();
+            break;
+          case 'sa':
+            await responseActions['sa']?.();
+            break;
+          case 'oa':
+            logger.log(
+              chalk.red('🔺🚩OVERWRITE FILE🚩'),
+              chalk.yellow(outputFile, ' 🔺')
+            );
+            break;
+          default:
+            while (true) {
+              if (!response) {
+                if (!skipConflictChecks && outputAlreadyExists(outputFile)) {
+                  logger.log(
+                    chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
+                  );
 
-                response = await getAnswer(
-                  chalk.blue.bold(
-                    `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
-                  )
-                );
-                response = response ? response.trim().toLowerCase() : '';
+                  response = await getAnswer(
+                    chalk.blue.bold(
+                      `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
+                    )
+                  );
+                  response = response ? response.trim().toLowerCase() : '';
 
-                if (response && responseActions[response]) {
-                  await responseActions[response]?.();
-                  break;
+                  if (response && responseActions[response]) {
+                    await responseActions[response]?.();
+                    break;
+                  } else {
+                    response = null;
+                    logger.warn('\n⚠️ Invalid selection! Try again ⚠️');
+                  }
                 } else {
-                  response = null;
-                  logger.warn('\n⚠️ Invalid selection! Try again ⚠️');
+                  break;
                 }
-              } else {
-                break;
               }
             }
-          }
+        }
+      }
+
+      if (action === 'convert') {
+        plannedOutputs.add(normalizeOutputPathKey(outputFile));
       }
 
       // Add to conversion list

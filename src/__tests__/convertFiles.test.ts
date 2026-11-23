@@ -428,7 +428,7 @@ describe('convertFiles', () => {
     );
   }, 30000);
 
-  it('should prompt multiple times when concurrent workers hit fatal errors together', async () => {
+  it('should prompt once when concurrent workers hit fatal errors together', async () => {
     cpusMock.mockReturnValueOnce([{}, {}]);
 
     const queuedWorkers: Array<{
@@ -480,16 +480,11 @@ describe('convertFiles', () => {
     const result = await withTimeout(
       convertFiles(createTestFiles(2)),
       5000,
-      "Test 'should prompt multiple times when concurrent workers hit fatal errors together' timed out"
+      "Test 'should prompt once when concurrent workers hit fatal errors together' timed out"
     );
 
-    expect(getAnswerMock).toHaveBeenCalledTimes(2);
-    expect(getAnswerMock).toHaveBeenNthCalledWith(
-      1,
-      'Press ENTER to return to the main menu...'
-    );
-    expect(getAnswerMock).toHaveBeenNthCalledWith(
-      2,
+    expect(getAnswerMock).toHaveBeenCalledTimes(1);
+    expect(getAnswerMock).toHaveBeenCalledWith(
       'Press ENTER to return to the main menu...'
     );
     expect(result.failedFiles).toHaveLength(2);
