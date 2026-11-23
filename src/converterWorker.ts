@@ -14,16 +14,24 @@ import { platformSlug, getErrorMessage, findBinary } from './utils.js';
 import logger from './logger.js';
 import type { LoopDataMode } from './types/settings.js';
 
-/** Returns true when output path contains characters unsafe for ffmpeg spawn args. */
-export const outputPathHasInvalidCharacters = (outputFile: string): boolean => {
-  if (outputFile.includes('"')) return true;
-  if (outputFile.includes('\n') || outputFile.includes('\r')) return true;
+/**
+ * Returns true when the output path can't be used as a filename.
+ * Control characters are rejected everywhere. The Windows-reserved characters
+ * (<>:"|?*) are only rejected on Windows — they are legal on Linux and macOS,
+ * so names like "Track 01: Intro" must still convert there.
+ */
+export const outputPathHasInvalidCharacters = (
+  outputFile: string,
+  platform: string = platformSlug
+): boolean => {
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1F]/.test(outputFile)) return true;
+  if (platform !== 'windows') return false;
 
   const pathToCheck = /^[A-Za-z]:/.test(outputFile)
     ? outputFile.slice(2)
     : outputFile;
-  // eslint-disable-next-line no-control-regex
-  return /[\x00-\x1F<>:|?*]/.test(pathToCheck);
+  return /[<>:"|?*]/.test(pathToCheck);
 };
 
 type WorkerFileContext = {
@@ -93,7 +101,7 @@ const converterWorker = async ({
   }
 
   // Validate output file path
-  if (outputFile.includes('"')) {
+  if (platformSlug === 'windows' && outputFile.includes('"')) {
     return failWorker(
       `Output file path contains quotes which will cause problems: ${outputFile}`
     );
@@ -105,7 +113,7 @@ const converterWorker = async ({
 
   if (outputPathHasInvalidCharacters(outputFile)) {
     return failWorker(
-      `Output file path contains invalid characters (control chars or <>:|?*): ${outputFile}`
+      `Output file path contains invalid characters (control chars${platformSlug === 'windows' ? ' or <>:|?*' : ''}): ${outputFile}`
     );
   }
 

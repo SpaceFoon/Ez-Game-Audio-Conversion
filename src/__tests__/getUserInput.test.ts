@@ -443,4 +443,40 @@ describe('getUserInput', () => {
       ExitProgramError
     );
   });
+
+  it('ignores the CLI path when useCliArg is false (later runs)', async () => {
+    const cliPath = resolve('/cli/folder');
+    const typedPath = resolve('/typed/folder');
+    process.argv = [process.argv[0], process.argv[1], cliPath];
+    existsSyncMock.mockReturnValue(true);
+    statSyncMock.mockReturnValue(directoryStats);
+
+    getAnswerMock
+      .mockResolvedValueOnce(typedPath)
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('wav')
+      .mockResolvedValueOnce('mp3');
+
+    const result = await getUserInput(settings, { useCliArg: false });
+
+    expect(result.inputFilePath).toBe(typedPath);
+  });
+
+  it('re-prompts instead of using the working directory when the input path is blank', async () => {
+    existsSyncMock.mockReturnValue(true);
+    statSyncMock.mockReturnValue(directoryStats);
+
+    getAnswerMock
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('   ')
+      .mockResolvedValueOnce('/valid/input')
+      .mockResolvedValueOnce('')
+      .mockResolvedValueOnce('wav')
+      .mockResolvedValueOnce('mp3');
+
+    const result = await getUserInput(settings);
+
+    expect(result.inputFilePath).toBe(resolve('/valid/input'));
+    expect(getAnswerMock).toHaveBeenCalledTimes(6);
+  });
 });

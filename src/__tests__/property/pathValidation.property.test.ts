@@ -3,11 +3,11 @@ import * as fc from 'fast-check';
 import { outputPathHasInvalidCharacters } from '../../converterWorker.js';
 
 describe('property: path validation (outputPathHasInvalidCharacters)', () => {
-  it('rejects paths containing double quotes', () => {
+  it('rejects paths containing double quotes on Windows', () => {
     fc.assert(
       fc.property(fc.string(), fc.string(), (prefix, suffix) => {
         const path = `${prefix}"${suffix}`;
-        expect(outputPathHasInvalidCharacters(path)).toBe(true);
+        expect(outputPathHasInvalidCharacters(path, 'windows')).toBe(true);
       }),
       { numRuns: 50 }
     );
@@ -44,11 +44,14 @@ describe('property: path validation (outputPathHasInvalidCharacters)', () => {
     );
   });
 
-  it('rejects paths with shell-unsafe characters in the path body', () => {
+  it('rejects Windows-reserved characters in the path body on Windows', () => {
     fc.assert(
       fc.property(fc.constantFrom('<', '>', ':', '|', '?', '*'), (badChar) => {
         expect(
-          outputPathHasInvalidCharacters(`/music/bad${badChar}file.mp3`)
+          outputPathHasInvalidCharacters(
+            `/music/bad${badChar}file.mp3`,
+            'windows'
+          )
         ).toBe(true);
       }),
       { numRuns: 20 }

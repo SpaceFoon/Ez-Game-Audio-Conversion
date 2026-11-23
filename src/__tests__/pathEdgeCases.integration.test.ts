@@ -278,7 +278,9 @@ describe('Filename sanitization edge cases', () => {
   // The app blocks these in converterWorker, but let's test the detection
   describe('dangerous character detection', () => {
     it('should detect quotes', () => {
-      expect(outputPathHasInvalidCharacters('/path/"file".mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/"file".mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect newlines', () => {
@@ -296,23 +298,33 @@ describe('Filename sanitization edge cases', () => {
     });
 
     it('should detect Windows < character', () => {
-      expect(outputPathHasInvalidCharacters('/path/file<name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file<name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows > character', () => {
-      expect(outputPathHasInvalidCharacters('/path/file>name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file>name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows pipe character', () => {
-      expect(outputPathHasInvalidCharacters('/path/file|name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file|name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows question mark', () => {
-      expect(outputPathHasInvalidCharacters('/path/file?name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file?name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows asterisk', () => {
-      expect(outputPathHasInvalidCharacters('/path/file*name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file*name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should allow Windows drive letter colon', () => {
@@ -320,7 +332,17 @@ describe('Filename sanitization edge cases', () => {
     });
 
     it('should detect colon NOT in drive letter position', () => {
-      expect(outputPathHasInvalidCharacters('/path/file:name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file:name.mp3', 'windows')
+      ).toBe(true);
+    });
+
+    it('allows Windows-reserved characters on Linux and macOS', () => {
+      for (const platform of ['linux', 'macos']) {
+        expect(
+          outputPathHasInvalidCharacters('/path/file:name?.mp3', platform)
+        ).toBe(false);
+      }
     });
 
     it('should allow normal paths', () => {

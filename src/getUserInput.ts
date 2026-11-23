@@ -109,11 +109,16 @@ const promptOutputFormats = async (): Promise<AudioFormat[]> => {
 };
 
 // Entire input loop to get settings before converting.
-const getUserInput = async (settings: Settings): Promise<Settings> => {
+// `useCliArg` is true only on the first run: a folder/file passed on the
+// command line seeds that run, and later runs ask for a new input path.
+const getUserInput = async (
+  settings: Settings,
+  { useCliArg = true }: { useCliArg?: boolean } = {}
+): Promise<Settings> => {
   // Ogg Vorbis/Opus is chosen per batch in createConversionList; never reuse a prior run.
   settings.oggCodec = null;
 
-  const argPath = process.argv[2]?.trim();
+  const argPath = useCliArg ? process.argv[2]?.trim() : undefined;
 
   if (argPath) {
     const resolvedArgPath = resolve(argPath);
@@ -183,6 +188,12 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
         '\n ✏️  Input Folder Path: '
       )
     );
+
+    // resolve('') is the working directory; never pick that silently.
+    if (inputFilePath.trim() === '') {
+      logger.warn('\n⚠️  Please enter a folder path.');
+      continue;
+    }
 
     const resolvedInputPath = resolve(inputFilePath);
 

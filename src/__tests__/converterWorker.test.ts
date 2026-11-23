@@ -20,7 +20,7 @@ let findBinaryMock = jest.fn(() => '/mock/base/ffmpeg.exe');
 jest.unstable_mockModule('../utils.js', () => ({
   runtimeBaseDir: '/mock/base',
   isPackagedRuntime: false,
-  platformSlug: 'win32-x64',
+  platformSlug: 'windows',
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
   findBinary: (...args: unknown[]) => findBinaryMock(...args),

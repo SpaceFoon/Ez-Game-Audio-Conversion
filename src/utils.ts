@@ -156,18 +156,36 @@ if (process.env.JEST_WORKER_ID) {
   }) as unknown as ReadLineLike;
 }
 
-export const getAnswer = (question: string | string[]): Promise<string> =>
-  new Promise((resolve) => {
-    // Handle array of strings (from chalk)
-    const formattedQuestion = Array.isArray(question)
-      ? question.join(' ')
-      : question;
-    // Always echo the question so Windows PowerShell/cmd users see it even if ANSI is suppressed
-    logger.log(formattedQuestion);
-    rl.question('', (answer: string) => {
-      resolve(answer);
-    });
-  });
+/**
+ * Build a prompt function that asks one question at a time. Node's readline
+ * silently ignores rl.question() while another question is pending, so a
+ * second concurrent prompt (e.g. a locked-log-file prompt racing the fatal
+ * "Press ENTER" prompt) would never resolve and hang the batch. Queue instead.
+ */
+export const createSerialAsker = (getRl: () => ReadLineLike) => {
+  let queue: Promise<unknown> = Promise.resolve();
+
+  return (question: string | string[]): Promise<string> => {
+    const ask = (): Promise<string> =>
+      new Promise((resolve) => {
+        // Handle array of strings (from chalk)
+        const formattedQuestion = Array.isArray(question)
+          ? question.join(' ')
+          : question;
+        // Always echo the question so Windows PowerShell/cmd users see it even if ANSI is suppressed
+        logger.log(formattedQuestion);
+        getRl().question('', (answer: string) => {
+          resolve(answer);
+        });
+      });
+
+    const answer = queue.then(ask);
+    queue = answer.catch(() => {});
+    return answer;
+  };
+};
+
+export const getAnswer = createSerialAsker(() => rl);
 
 // If a file fails to read or write, check if it is busy.
 // Returns true if the file is still locked, false if it is free to use.

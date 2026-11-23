@@ -88,8 +88,8 @@ const renderBanner = async (): Promise<void> => {
   }
 };
 
-const runConversionPipeline = async (): Promise<boolean> => {
-  const userSettings = await getUserInput(settings);
+const runConversionPipeline = async (useCliArg: boolean): Promise<boolean> => {
+  const userSettings = await getUserInput(settings, { useCliArg });
   const files = await searchFiles(userSettings);
   const conversionItems = await createConversionList(files);
   const { failedFiles, successfulFiles, jobStartTime } =
@@ -107,9 +107,14 @@ async function runApp(): Promise<void> {
 
   await renderBanner();
 
+  let isFirstRun = true;
   while (true) {
     try {
-      const shouldContinue = await runConversionPipeline();
+      // A command-line path only seeds the first run; afterwards (another
+      // conversion, or a cancelled one) the user picks a new input path.
+      const useCliArg = isFirstRun;
+      isFirstRun = false;
+      const shouldContinue = await runConversionPipeline(useCliArg);
       if (!shouldContinue) {
         return;
       }
