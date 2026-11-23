@@ -140,6 +140,8 @@ release/
 # Ignore binaries inside ffmpeg-bin/, but keep README and placeholder dirs tracked.
 # Must use /* (not trailing /) so !exceptions can re-include nested paths.
 ffmpeg-bin/*
+# ffmpeg-bin/* only matches direct children; the platform folders' contents need their own rule.
+ffmpeg-bin/*/*
 !ffmpeg-bin/README.md
 !ffmpeg-bin/windows/
 !ffmpeg-bin/windows/.gitkeep

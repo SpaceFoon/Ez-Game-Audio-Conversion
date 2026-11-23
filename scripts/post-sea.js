@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import {
   copyFileSync,
   existsSync,
@@ -199,7 +199,7 @@ function tryApplyWindowsIcon({ exePath }) {
 
   console.log('[post-sea] Applying Windows icon + version info...');
   try {
-    execSync(`node "${iconScript}" "${exePath}"`, {
+    execFileSync(process.execPath, [iconScript, exePath], {
       cwd: rootDir,
       stdio: 'inherit',
     });
@@ -434,7 +434,7 @@ try {
         return candidate;
       }
       try {
-        execSync(`"${candidate}" -V`, { stdio: 'ignore' });
+        execFileSync(candidate, ['-V'], { stdio: 'ignore' });
         return candidate;
       } catch {
         continue;
@@ -506,8 +506,15 @@ try {
         const pdfDest = join(readmesDir, 'README.pdf');
         // wkhtmltopdf does not understand Markdown directly. Render the generated
         // README.html instead, and allow local file access for any assets.
-        execSync(
-          `"${wkhtml}" --enable-local-file-access --load-error-handling ignore "${htmlSource}" "${pdfDest}"`,
+        execFileSync(
+          wkhtml,
+          [
+            '--enable-local-file-access',
+            '--load-error-handling',
+            'ignore',
+            htmlSource,
+            pdfDest,
+          ],
           { cwd: rootDir, stdio: 'inherit' }
         );
       } catch (error) {
@@ -533,14 +540,29 @@ try {
   safeRemove(zipPath);
   console.log('[post-sea] Creating ZIP archive...');
   if (isTargetWindows || isHostWindows) {
-    execSync(
-      `powershell -Command "Compress-Archive -Path '${stageDir}\\*' -DestinationPath '${zipPath}' -Force -CompressionLevel Optimal"`,
-      { stdio: 'inherit' }
+    // Paths go through env vars so they are never parsed as PowerShell code.
+    execFileSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-Command',
+        "Compress-Archive -Path (Join-Path $env:POST_SEA_STAGE_DIR '*') -DestinationPath $env:POST_SEA_ZIP_PATH -Force -CompressionLevel Optimal",
+      ],
+      {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          POST_SEA_STAGE_DIR: stageDir,
+          POST_SEA_ZIP_PATH: zipPath,
+        },
+      }
     );
   } else {
-    execSync(`cd "${stageDir}" && zip -qr "${zipPath}" *`, {
+    // Run zip directly in the stage dir; '.' archives its contents without a
+    // shell glob (zip strips the leading './' from entry names).
+    execFileSync('zip', ['-qr', zipPath, '.'], {
+      cwd: stageDir,
       stdio: 'inherit',
-      shell: '/bin/bash',
     });
   }
 
@@ -591,8 +613,19 @@ try {
       );
       safeRemove(tempSeven);
       console.log('[post-sea] Creating 7z archive...');
-      execSync(
-        `"${sevenZip}" a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on "${tempSeven}" "${stageDir}\\*"`,
+      execFileSync(
+        sevenZip,
+        [
+          'a',
+          '-t7z',
+          '-m0=lzma2',
+          '-mx=9',
+          '-mfb=64',
+          '-md=32m',
+          '-ms=on',
+          tempSeven,
+          join(stageDir, '*'),
+        ],
         { stdio: 'inherit' }
       );
 

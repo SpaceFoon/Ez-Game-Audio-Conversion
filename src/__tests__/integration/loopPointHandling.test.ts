@@ -3,7 +3,7 @@ import { resolveE2eDescribe } from '../test-utils/e2eDeps.js';
 
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, basename } from 'path';
-import { execSync, spawnSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import { platform } from 'os';
 
 const PLATFORM_SLUG =
@@ -26,7 +26,6 @@ const FFPROBE_PATH = join(
   PLATFORM_SLUG,
   FFPROBE_EXE
 );
-const quote = (value: string) => `"${value.replace(/"/g, '\\"')}"`;
 
 // Constants
 const TEST_DIR = join(
@@ -175,8 +174,7 @@ function generateTestFiles() {
   const baseWavPath = join(INPUT_DIR, 'base-sine.wav');
 
   // Generate a sine wave base file with no metadata
-  const baseCmd = [
-    quote(FFMPEG_PATH),
+  const baseArgs = [
     '-y',
     '-f',
     'lavfi',
@@ -186,11 +184,11 @@ function generateTestFiles() {
     'pcm_s16le',
     '-ar',
     String(SAMPLE_RATE),
-    quote(baseWavPath),
+    baseWavPath,
   ];
 
   try {
-    execSync(baseCmd.join(' '), { stdio: 'inherit' });
+    execFileSync(FFMPEG_PATH, baseArgs, { stdio: 'inherit' });
     console.log(`✅ Generated base file: ${baseWavPath}`);
     return baseWavPath;
   } catch (error) {
@@ -202,8 +200,17 @@ function generateTestFiles() {
 // Extract metadata using ffprobe
 function getMetadata(filePath: string) {
   try {
-    const output = execSync(
-      `${quote(FFPROBE_PATH)} -v quiet -print_format json -show_format -show_streams ${quote(filePath)}`,
+    const output = execFileSync(
+      FFPROBE_PATH,
+      [
+        '-v',
+        'quiet',
+        '-print_format',
+        'json',
+        '-show_format',
+        '-show_streams',
+        filePath,
+      ],
       { encoding: 'utf8' }
     );
 
@@ -297,20 +304,19 @@ function runTests(baseFilePath: string, formatFilter?: string) {
         const metadataFlags = approach.generator(LOOP_START, LOOP_LENGTH);
 
         // Build ffmpeg command
-        const cmd = [
-          quote(FFMPEG_PATH),
+        const args = [
           '-y',
           '-i',
-          quote(baseFilePath),
+          baseFilePath,
           '-c:a',
           format.codec,
           ...format.quality,
           ...metadataFlags,
-          quote(outputFilePath),
+          outputFilePath,
         ];
 
-        // Execute ffmpeg
-        execSync(cmd.join(' '), { stdio: 'pipe' });
+        // Execute ffmpeg (no shell, so paths need no quoting)
+        execFileSync(FFMPEG_PATH, args, { stdio: 'pipe' });
 
         // Check if file was created
         if (existsSync(outputFilePath)) {

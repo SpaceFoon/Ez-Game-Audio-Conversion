@@ -26,6 +26,7 @@ jest.unstable_mockModule('os', () => ({
 
 jest.unstable_mockModule('child_process', () => ({
   execSync: jest.fn(() => ''),
+  execFileSync: jest.fn(() => ''),
 }));
 
 jest.unstable_mockModule('fs', () => ({
