@@ -1,5 +1,5 @@
 import { readdirSync, statSync, realpathSync } from 'fs';
-import { join, extname } from 'path';
+import { join, extname, resolve } from 'path';
 import chalk from 'chalk';
 import logger from './logger.js';
 import { recordSearchError, clearSearchErrors } from './utils.js';
@@ -59,6 +59,15 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
     }
   };
 
+  // When the output folder sits inside the input folder, don't search it:
+  // a re-run would otherwise pick up previous output as new input and nest
+  // another copy of the tree each time.
+  const excludedDir =
+    settings.outputFilePath &&
+    resolve(settings.outputFilePath) !== resolve(searchPath)
+      ? canonical(resolve(settings.outputFilePath))
+      : null;
+
   // A single unreadable file or folder (permissions, broken symlink, cloud
   // placeholder, locked file, etc.) must never abort the whole search. We record
   // it, keep going, and report everything at the end of the batch.
@@ -72,6 +81,7 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
     }
 
     const realDir = canonical(dir);
+    if (depth > 0 && excludedDir && realDir === excludedDir) return;
     if (visitedDirs.has(realDir)) return;
     visitedDirs.add(realDir);
 

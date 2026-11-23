@@ -55,6 +55,16 @@ const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
   return null;
 };
 
+/**
+ * Remove this job's own file paths from ffmpeg's stderr before looking for
+ * fatal conditions, so a folder named e.g. "Permission denied" can't abort
+ * the whole batch. A real error still matches on the text around the path.
+ */
+export const stripJobPaths = (text: string, paths: string[]): string =>
+  paths
+    .filter(Boolean)
+    .reduce((acc, path) => acc.split(path).join('<path>'), text);
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -67,6 +77,16 @@ const convertFiles = async (
 ): Promise<ConversionJob> => {
   initializeFileNames();
   const jobStartTime = Date.now();
+  // CSV writes are async; keep them so we can wait for every row to land
+  // before returning (finalize writes the SUMMARY row right after).
+  const pendingLogs: Promise<unknown>[] = [];
+  const log = (...args: Parameters<typeof addToLog>): void => {
+    try {
+      pendingLogs.push(Promise.resolve(addToLog(...args)).catch(() => {}));
+    } catch {
+      // addToLog reports its own failures; never let logging break a batch
+    }
+  };
   let cpuNumber;
   try {
     cpuNumber = cpus().length;
@@ -152,7 +172,7 @@ const convertFiles = async (
       ) => {
         if (errorLogged) return;
         errorLogged = true;
-        addToLog(
+        log(
           {
             type: 'error' as const,
             data: logData,
@@ -210,7 +230,9 @@ const convertFiles = async (
               file.outputFile
             );
 
-            const fatalKind = detectFatalFfmpegError(stderrOutput);
+            const fatalKind = detectFatalFfmpegError(
+              stripJobPaths(stderrOutput, [file.inputFile, file.outputFile])
+            );
             if (fatalKind && !fatalExitRequested) {
               fatalExitRequested = true;
               abortRequested = true;
@@ -230,7 +252,7 @@ const convertFiles = async (
                 fatalKind === 'disk-space'
                   ? 'Fatal ffmpeg error: insufficient disk space.'
                   : 'Fatal ffmpeg error: permission/access denied.';
-              addToLog(
+              log(
                 {
                   type: 'error' as const,
                   data: `${fatalMessage} ${stderrOutput.trim()}`,
@@ -280,7 +302,7 @@ const convertFiles = async (
 
             if (exitCode === 0) {
               // Success
-              addToLog({ type: 'code', data: exitCode }, file);
+              log({ type: 'code', data: exitCode }, file);
               successfulFiles.push({
                 success: true,
                 inputFile: file.inputFile,
@@ -342,7 +364,7 @@ const convertFiles = async (
           error instanceof Error ? error.message : error
         )}`;
         logger.error(message);
-        addToLog(
+        log(
           {
             type: 'error' as const,
             data: message,
@@ -387,10 +409,12 @@ const convertFiles = async (
   if (abortRequested) {
     for (const file of queue.splice(0)) {
       const message = 'Skipped: batch aborted after fatal ffmpeg error.';
-      addToLog({ type: 'error' as const, data: message }, file);
+      log({ type: 'error' as const, data: message }, file);
       recordFailure(file, message);
     }
   }
+
+  await Promise.all(pendingLogs);
 
   if (!showDetailedLogs && totalFiles > 0) {
     process.stdout.write(

@@ -7,7 +7,7 @@ import getUserInput from './getUserInput.js';
 import searchFiles from './searchFiles.js';
 import createConversionList from './createConversionList.js';
 import { convertFiles } from './converterManager.js';
-import { settings, isSeaRuntime } from './utils.js';
+import { settings, isSeaRuntime, rl } from './utils.js';
 import finalize from './finalize.js';
 import ExitProgramError from './exitProgramError.js';
 import logger from './logger.js';
@@ -123,6 +123,9 @@ async function runApp(): Promise<void> {
         continue;
       }
       logger.error('Fatal Error', error);
+      // Release stdin so the process can exit, and report the failure.
+      rl.close();
+      process.exitCode = 1;
       return;
     }
   }
@@ -149,6 +152,8 @@ const isMainModule = (() => {
 if (isMainModule) {
   void runApp().catch((error: unknown) => {
     logger.error('Fatal startup error', error);
+    rl.close();
+    process.exitCode = 1;
   });
 }
 

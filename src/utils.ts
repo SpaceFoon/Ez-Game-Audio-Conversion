@@ -329,7 +329,10 @@ const ensureCsvHeader = async (
   if (existsSync(filePath)) return true;
 
   try {
-    await isFileBusy(filePath);
+    if (await isFileBusy(filePath)) {
+      onError(new Error(`${filePath} is locked by another program`));
+      return false;
+    }
     writeFileSync(filePath, '\uFEFF' + header + '\n', {
       encoding: 'utf8',
     });
@@ -348,7 +351,10 @@ const appendCsvRow = async (
   if (!filePath) return false;
 
   try {
-    await isFileBusy(filePath);
+    if (await isFileBusy(filePath)) {
+      onError(new Error(`${filePath} is locked by another program`));
+      return false;
+    }
     appendFileSync(filePath, row);
     return true;
   } catch (error) {

@@ -264,6 +264,9 @@ const createConversionList = async (
   const existingOutputs = scanExistingFiles(conflictCheckRoot);
   const skipConflictChecks = existingOutputs.size === 0;
   const plannedOutputs = new Set<string>();
+  // Every input in this batch: an existing output that is also an input must
+  // never be overwritten, even after "o"/"oa" (it may not be converted yet).
+  const inputKeys = new Set(files.map(normalizeOutputPathKey));
   const isPlannedOutput = (outputFile: string): boolean =>
     plannedOutputs.has(normalizeOutputPathKey(outputFile));
   const outputAlreadyExists = (outputFile: string): boolean =>
@@ -365,11 +368,15 @@ const createConversionList = async (
             );
             break;
           }
-          convertSelf = await getAnswer(
-            chalk.blueBright(
-              '\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file(1).ogg).\n\n Type "yes" or "no": '
+          convertSelf = (
+            await getAnswer(
+              chalk.blueBright(
+                '\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file(1).ogg).\n\n Type "yes" or "no": '
+              )
             )
-          );
+          )
+            .trim()
+            .toLowerCase();
           if (
             convertSelf !== '' &&
             convertSelf !== 'yes' &&
@@ -434,10 +441,12 @@ const createConversionList = async (
             await responseActions['sa']?.();
             break;
           case 'oa':
-            logger.log(
-              chalk.red('🔺🚩OVERWRITE FILE🚩'),
-              chalk.yellow(outputFile, ' 🔺')
-            );
+            if (outputAlreadyExists(outputFile)) {
+              logger.log(
+                chalk.red('🔺🚩OVERWRITE FILE🚩'),
+                chalk.yellow(outputFile, ' 🔺')
+              );
+            }
             break;
           default:
             while (true) {
@@ -467,6 +476,23 @@ const createConversionList = async (
               }
             }
         }
+      }
+
+      if (
+        action === 'convert' &&
+        inputKeys.has(normalizeOutputPathKey(outputFile))
+      ) {
+        logger.warn(
+          chalk.yellow(
+            `⚠️  ${outputFile} is one of your input files — renaming the output instead of overwriting it.`
+          )
+        );
+        outputFile = await getOutputFileCopy(
+          outputFile,
+          outputFormat,
+          outputFolder || dirname(outputFile),
+          isPlannedOutput
+        );
       }
 
       if (action === 'convert') {

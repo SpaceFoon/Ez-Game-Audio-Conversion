@@ -322,4 +322,27 @@ describe('searchFiles', () => {
       )
     ).toBe(true);
   });
+
+  it('does not search an output folder that sits inside the input folder', async () => {
+    const tree: Record<string, string[]> = {
+      '/in': ['a.wav', 'out'],
+      [join('/in', 'out')]: ['a.mp3'],
+    };
+    _readdirSync.mockImplementation((dir: string) => tree[String(dir)] ?? []);
+    _statSync.mockImplementation((p: string) => ({
+      isDirectory: () => String(p) in tree,
+    }));
+
+    const result = await searchFiles({
+      inputFilePath: '/in',
+      outputFilePath: join('/in', 'out'),
+      inputFormats: ['wav', 'mp3'],
+      outputFormats: ['mp3'],
+      oggCodec: null,
+      singleFileMode: false,
+      singleFilePath: '',
+    });
+
+    expect(result).toEqual([join('/in', 'a.wav')]);
+  });
 });

@@ -28,12 +28,22 @@ export const parseFormats = (
   ];
 };
 
+/**
+ * Clean a pasted path: trim whitespace and drop one pair of matching
+ * surrounding quotes (Windows "Copy as path" and drag-and-drop add them).
+ */
+export const cleanPathInput = (raw: string): string => {
+  const trimmed = raw.trim();
+  const match = /^(["'])(.*)\1$/.exec(trimmed);
+  return (match ? match[2]! : trimmed).trim();
+};
+
 const promptOutputPath = async (
   inputFilePath: string,
   promptText: string
 ): Promise<string> => {
   while (true) {
-    const answer = await getAnswer(chalk.blue.bold(promptText));
+    const answer = cleanPathInput(await getAnswer(chalk.blue.bold(promptText)));
     const outputFilePath = answer === '' ? inputFilePath : resolve(answer);
 
     if (!existsSync(outputFilePath)) {
@@ -180,7 +190,7 @@ const getUserInput = async (
 
   // No valid command-line argument — interactive mode
   while (true) {
-    const inputFilePath = await getAnswer(
+    const rawInputPath = await getAnswer(
       chalk.blue.bold(
         '\n 📁 Choose the folder to search for files to convert. ',
         '\n 🔍 This will recursively search, ie: all subfolders ',
@@ -189,8 +199,10 @@ const getUserInput = async (
       )
     );
 
+    const inputFilePath = cleanPathInput(rawInputPath);
+
     // resolve('') is the working directory; never pick that silently.
-    if (inputFilePath.trim() === '') {
+    if (inputFilePath === '') {
       logger.warn('\n⚠️  Please enter a folder path.');
       continue;
     }

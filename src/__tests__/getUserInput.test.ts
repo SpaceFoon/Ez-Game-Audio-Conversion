@@ -479,4 +479,20 @@ describe('getUserInput', () => {
     expect(result.inputFilePath).toBe(resolve('/valid/input'));
     expect(getAnswerMock).toHaveBeenCalledTimes(6);
   });
+
+  it('strips surrounding spaces and quotes from pasted paths', async () => {
+    existsSyncMock.mockReturnValue(true);
+    statSyncMock.mockReturnValue(directoryStats);
+
+    getAnswerMock
+      .mockResolvedValueOnce('  "/typed/in folder"  ')
+      .mockResolvedValueOnce(" '/typed/out' ")
+      .mockResolvedValueOnce('wav')
+      .mockResolvedValueOnce('mp3');
+
+    const result = await getUserInput(settings);
+
+    expect(result.inputFilePath).toBe(resolve('/typed/in folder'));
+    expect(result.outputFilePath).toBe(resolve('/typed/out'));
+  });
 });
