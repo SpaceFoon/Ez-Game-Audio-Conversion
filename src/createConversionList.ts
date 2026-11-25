@@ -160,7 +160,7 @@ let pathKey = createPathKeyer();
 /**
  * Normalized path key for O(1) output conflict lookups. Resolves symlinked or
  * aliased folders (so an output folder that is really the input folder can't
- * overwrite inputs) and folds case only on case-insensitive file systems.
+ * overwrite inputs) and always folds case (see pathKey.ts for why).
  */
 export const normalizeOutputPathKey = (filePath: string): string =>
   pathKey(filePath);
