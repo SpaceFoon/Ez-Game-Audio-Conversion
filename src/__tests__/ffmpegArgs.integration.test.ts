@@ -323,7 +323,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
       expect(args[mapMetadataIndex + 1]).toBe('-1');
     });
 
-    it('should include channel specification (-ac)', async () => {
+    it('does not force a channel count for stereo MP3 (no -ac)', async () => {
       await converterWorker({
         file: {
           inputFile: '/input/test.wav',
@@ -333,12 +333,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
         settings: { oggCodec: 'vorbis' },
       });
 
-      const args = capturedSpawnArgs[0].args;
-
-      expect(args).toContain('-ac');
-      // Should be followed by a number
-      const acIndex = args.indexOf('-ac');
-      expect(args[acIndex + 1]).toMatch(/^\d+$/);
+      expect(capturedSpawnArgs[0].args).not.toContain('-ac');
     });
   });
 
@@ -627,9 +622,36 @@ describe('source loop tags and channel handling', () => {
     expect(args).not.toContain('-mapping_family');
   });
 
-  it('keeps surround channel count for formats that support it', async () => {
-    probeStreamOverride = { channels: 6 };
-    const args = await run('flac', {});
-    expect(args[args.indexOf('-ac') + 1]).toBe('6');
+  it('keeps surround sources as they are for formats that support them (B45)', async () => {
+    // -ac would remix quad, 5.1(side), ... into the default layout.
+    probeStreamOverride = { channels: 4, channel_layout: 'quad' };
+    for (const fmt of ['flac', 'wav', 'm4a', 'aiff']) {
+      const args = await run(fmt, {});
+      expect(args).not.toContain('-ac');
+      expect(args).not.toContain('-af');
+    }
   });
+
+  it.each([
+    ['4.0', 4, 'quad'],
+    ['2.1', 3, '3.0'],
+    ['6.1(back)', 7, '6.1'],
+    ['hexagonal', 6, '5.1'],
+  ])(
+    'remixes %s to the Vorbis layout %s (B42)',
+    async (layout, channels, target) => {
+      probeStreamOverride = { channels, channel_layout: layout };
+      const args = await run('ogg', { oggCodec: 'vorbis' });
+      expect(args.join(' ')).toContain(`-af aformat=channel_layouts=${target}`);
+    }
+  );
+
+  it.each(['quad', '5.1(side)', 'stereo', '6 channels'])(
+    'leaves Vorbis-compatible or unnamed layout %s alone',
+    async (layout) => {
+      probeStreamOverride = { channels: 6, channel_layout: layout };
+      const args = await run('ogg', { oggCodec: 'vorbis' });
+      expect(args).not.toContain('-af');
+    }
+  );
 });

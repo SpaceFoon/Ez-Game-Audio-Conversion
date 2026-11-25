@@ -254,7 +254,7 @@ All tests run sequentially (`--runInBand`) to prevent file system race condition
 
 CI downloads ffmpeg and runs the full suite including integration tests. See `ci.integration.guard.test.ts`.
 
-**Test count:** 889 tests across 72 test files.
+**Test count:** 897 tests across 72 test files.
 
 **Scripts:**
 - `npm run test:unit` - Fast loop (no ffmpeg integration)
@@ -314,7 +314,7 @@ The project uses GitHub Actions to automatically build releases for all platform
 Runs on every push/PR to `dev` or `main`:
 - Linting and formatting
 - TypeScript compilation
-- Tests with coverage (889 tests; ffmpeg installed in CI)
+- Tests with coverage (897 tests; ffmpeg installed in CI)
 - Build verification
 
 ### Creating a Release

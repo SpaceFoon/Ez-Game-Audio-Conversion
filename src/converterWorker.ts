@@ -39,6 +39,49 @@ export const outputPathHasInvalidCharacters = (
   return /[<>:"|?*]/.test(pathToCheck);
 };
 
+/** Layouts libvorbis stores as-is. */
+const VORBIS_LAYOUTS = new Set([
+  'mono',
+  'stereo',
+  '3.0',
+  'quad',
+  'quad(side)',
+  '5.0',
+  '5.0(side)',
+  '5.1',
+  '5.1(side)',
+  '6.1',
+  '7.1',
+  'downmix',
+]);
+/** The Vorbis layout for each channel count. */
+const VORBIS_LAYOUT_FOR_CHANNELS = [
+  '',
+  'mono',
+  'stereo',
+  '3.0',
+  'quad',
+  '5.0',
+  '5.1',
+  '6.1',
+  '7.1',
+];
+
+/**
+ * Layout to remix to before Vorbis encoding, or null when the source layout
+ * is already a Vorbis one (or unknown, so there's nothing to remap).
+ */
+export const vorbisRemixLayout = (
+  stream: { channels?: number; channel_layout?: string } | undefined
+): string | null => {
+  const layout = stream?.channel_layout;
+  const channels = Number(stream?.channels);
+  if (!layout || VORBIS_LAYOUTS.has(layout)) return null;
+  // "6 channels"-style names carry no speaker positions.
+  if (/channels?$/.test(layout)) return null;
+  return VORBIS_LAYOUT_FOR_CHANNELS[channels] || null;
+};
+
 type WorkerFileContext = {
   inputFile?: string;
   outputFile?: string;
@@ -289,11 +332,14 @@ const converterWorker = async ({
 
   // Build the command arguments array
   // -xerror: stop at the first decode error, so a corrupt or truncated input
-  // fails instead of "succeeding" with missing audio.
+  // fails instead of "succeeding" with missing audio. -abort_on: an input
+  // with no samples fails instead of producing an output with no audio.
   const ffmpegArgs: string[] = [
     '-loglevel',
     'error',
     '-xerror',
+    '-abort_on',
+    'empty_output_stream',
     '-i',
     inputFile,
   ];
@@ -347,14 +393,15 @@ const converterWorker = async ({
     ffmpegArgs.push(...loopDataArgs);
   }
 
-  // Add channels args. MP3 (LAME) only encodes mono/stereo, so a surround
-  // source must be downmixed rather than forcing its channel count.
+  // MP3 (LAME) only encodes mono/stereo, so a surround source is downmixed.
   if (channelsArgs && channelsArgs.length) {
     const channelCount = Number(channelsArgs[channelsArgs.indexOf('-ac') + 1]);
     if (outputFormat === 'mp3' && channelCount > 2) {
       ffmpegArgs.push('-ac', '2');
     } else {
-      ffmpegArgs.push(...channelsArgs);
+      // No -ac otherwise: ffmpeg keeps the channel count by itself, and -ac
+      // would remix any non-default layout (quad, 5.1(side), ...) into the
+      // default one for that count, moving sound to other speakers.
       // libopus's default surround mapping rejects every 3- and 4-channel
       // layout (and anything over 8). Mapping family 255 stores the channels
       // as-is, so the conversion succeeds instead of failing.
@@ -366,6 +413,14 @@ const converterWorker = async ({
         ffmpegArgs.push('-mapping_family', '255');
       }
     }
+  }
+
+  // Vorbis has one fixed speaker layout per channel count. Other layouts
+  // (2.1, 4.0, 6.1(back), ...) would only be relabelled, so channels play from
+  // the wrong speakers; remix them to the Vorbis layout instead.
+  if (outputFormat === 'ogg' && oggCodec === 'vorbis') {
+    const remix = vorbisRemixLayout(getAudioStream(metadata));
+    if (remix) ffmpegArgs.push('-af', `aformat=channel_layouts=${remix}`);
   }
 
   // Add output file name

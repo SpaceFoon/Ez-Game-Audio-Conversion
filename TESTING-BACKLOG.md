@@ -6,8 +6,6 @@ For the mutation-hardening roadmap and progress log, see [TESTING-HARDENING-PLAN
 
 | ID | Finding | Status | Reproducing test |
 |----|---------|--------|------------------|
-| B42 | Vorbis has no 4.0/3-channel mapping either: a 4.0 WAV → Vorbis succeeds, but ffmpeg warns the output channel layout is wrong (players may route channels to the wrong speakers). Opus was fixed (B15); Vorbis would need a remap or downmix decision. | **Open** — low | — |
-| B43 | A WAV with a header but zero samples still "converts" to an output with no audio stream: ffmpeg exits 0 and ffprobe reports no duration to check against. Harmless (empty in, empty out). | **Open** — nit | — |
 | B44 | Embedded cover art is dropped from every output (`-vn`). Probably right for game audio; a product decision. | **Open** — by design? | — |
 
 ### Checked in the final pass and found OK
@@ -62,6 +60,9 @@ All run end to end with the bundled ffmpeg on Linux (Node 26):
 | B39 | `npm.cmd` spawned without a shell on Windows | npm run through `node $npm_execpath`. **Not run on Windows yet** |
 | B40 | Opus loop units for sources under 32 kHz | Opus is always encoded at 48 kHz, so loop tags are in the units players decode at |
 | B41 | Nits | (a) FLAC keeps the source bit depth (16-bit for lossy/≤16-bit sources); (b) ffmpeg/ffprobe checked before any prompt; (c) pager hints name the real log files; (e) `winston` removed; (f) dotenv runs quietly; (h) BOM removed from `banner.ts`; (i) `capture.mjs` removes its temp folder on failure. (d) cover art → B44; (g) see `CLAUDE.md` |
+| B42 | Vorbis relabelled 2.1, 3.0(back), 4.0, 6.1(back), hexagonal, … as its own layout, so channels played from the wrong speakers | Those layouts are remixed to the Vorbis layout for the same channel count (`aformat`), e.g. 4.0 front-centre → front-left + front-right. Verified by per-channel level |
+| B43 | A WAV with zero samples "converted" to an output with no audio | ffmpeg runs with `-abort_on empty_output_stream`; the job fails and the empty output is removed. FLAC output still exits 0 (ffmpeg writes a header-only FLAC) — harmless |
+| B45 | `-ac <count>` on every job remixed non-default layouts: a quad source came out as 4.0 with both rear channels folded into back-centre, in every format | `-ac` is only passed for the MP3 stereo downmix; quad, 5.1(side), etc. are kept as they are. FLAC keeps non-standard layouts via `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` (its warning is cosmetic) |
 | B1 | Two inputs mapping to the same output path: second silently dropped | Duplicate outputs are dropped with a "Skipping duplicate output" warning naming both inputs |
 | B2 | `isFileBusy` returned `false` after the EBUSY prompt without re-checking | Re-opens the file after the prompt (up to 10 attempts); returns `true` if still locked |
 | B3 | Worker `exit(0)` without a prior `code` message was treated as success | Success requires the worker's `code` message; an unconfirmed exit is recorded as a failure |
