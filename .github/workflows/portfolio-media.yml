@@ -1,0 +1,64 @@
+# Renders the portfolio screenshot (ez-game-audio-readme.png) of the real
+# terminal UI converting a small fictional game-audio library, and uploads it
+# as the `portfolio-media` artifact. A puller on the portfolio machine imports
+# it automatically, so the screen must never show private data.
+# Local equivalent: npm run portfolio:media  (see scripts/portfolio-media/README.md)
+name: Portfolio media
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'scripts/portfolio-media/**'
+      - '.github/workflows/portfolio-media.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'scripts/portfolio-media/**'
+      - '.github/workflows/portfolio-media.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: portfolio-media
+
+jobs:
+  capture:
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install app dependencies and ffmpeg
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install capture tools
+        run: npm run portfolio:media:setup
+
+      - name: Render screenshot
+        run: node scripts/portfolio-media/capture.mjs portfolio-media
+
+      - name: Upload portfolio media
+        uses: actions/upload-artifact@v4
+        with:
+          name: portfolio-media
+          path: portfolio-media/ez-game-audio-readme.png
+          if-no-files-found: error
+          retention-days: 14

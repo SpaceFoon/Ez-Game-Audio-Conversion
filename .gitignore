@@ -168,3 +168,5 @@ log**
 error**
 # Local test output and captures
 /test-results/
+# Portfolio screenshot output (scripts/portfolio-media)
+/portfolio-media/

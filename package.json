@@ -35,6 +35,8 @@
     "test:release": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand \"src/__tests__/integration/metadataPreservation.test.ts\" \"src/__tests__/app.test.ts\"",
     "test:coverage": "npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --runInBand \"src/__tests__/\"",
     "smoke": "npm run package && node src/__tests__/smokeTest.mjs",
+    "portfolio:media:setup": "npm ci --prefix scripts/portfolio-media && npm exec --prefix scripts/portfolio-media -- playwright install chromium",
+    "portfolio:media": "npm run build && node scripts/portfolio-media/capture.mjs",
     "test:smoke": "node src/__tests__/smokeTest.mjs",
     "fix": "eslint . --fix && prettier --write .",
     "prepare": "husky"
