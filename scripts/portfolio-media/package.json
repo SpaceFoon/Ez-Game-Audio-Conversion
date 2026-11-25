@@ -1,0 +1,13 @@
+{
+  "name": "ez-game-audio-portfolio-media",
+  "private": true,
+  "type": "module",
+  "description": "Renders the portfolio screenshot of the real terminal UI. Not part of the app.",
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@xterm/addon-unicode11": "0.9.0",
+    "@xterm/xterm": "6.0.0",
+    "noto-color-emoji": "1.0.1",
+    "playwright": "1.65.1"
+  }
+}
