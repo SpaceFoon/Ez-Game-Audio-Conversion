@@ -21,7 +21,19 @@ export const realPathOr = (p: string): string => {
  */
 export const pathKey = (filePath: string): string => {
   const abs = resolve(filePath);
-  return join(realPathOr(dirname(abs)), basename(abs)).toLowerCase();
+  return join(realFolder(dirname(abs)), basename(abs)).toLowerCase();
+};
+
+// Batches can hold 250k+ files in a few folders, so remember each folder's
+// real path. Folders that don't exist yet aren't cached (they may be created).
+const folderCache = new Map<string, string>();
+const realFolder = (dir: string): string => {
+  let real = folderCache.get(dir);
+  if (real === undefined) {
+    real = realPathOr(dir);
+    if (fs.existsSync?.(dir)) folderCache.set(dir, real);
+  }
+  return real;
 };
 
 export const isSamePath = (a: string, b: string): boolean =>
