@@ -135,11 +135,12 @@ log(`Generated fixture library in ${libraryDir}`);
 // ---------------------------------------------------------------------------
 const answers = [
   // [text that must appear on screen, what to type]
-  ['Input Folder Path:', libraryDir],
+  ['Input Folder Path', libraryDir],
   ['Enter the output folder', exportDir],
   ['Enter the file extensions to look for', ''],
   ['Enter the output formats', 'ogg, mp3'],
   ['Vorbis or Opus?', ''],
+  ['Loop tags: ', ''], // fixtures carry loop tags: keep them
   ['Start now?', 'yes'],
   ['Press ENTER to run another conversion', null], // end of the run
 ];
