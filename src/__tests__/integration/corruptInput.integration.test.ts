@@ -77,4 +77,36 @@ describeWithDeps('corrupt input integration', () => {
     expect(result.failedFiles.length).toBeGreaterThanOrEqual(1);
     expect(existsSync(ffmpegPath)).toBe(true);
   }, 120000);
+
+  it('fails a valid WAV with no samples for every format and leaves no file', async () => {
+    // 44-byte PCM WAV header with an empty data chunk.
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0);
+    header.writeUInt32LE(36, 4);
+    header.write('WAVEfmt ', 8);
+    header.writeUInt32LE(16, 16);
+    header.writeUInt16LE(1, 20); // PCM
+    header.writeUInt16LE(2, 22); // stereo
+    header.writeUInt32LE(44100, 24);
+    header.writeUInt32LE(44100 * 4, 28);
+    header.writeUInt16LE(4, 32);
+    header.writeUInt16LE(16, 34);
+    header.write('data', 36);
+    header.writeUInt32LE(0, 40);
+    const input = join(INPUT_DIR, 'no-samples.wav');
+    writeFileSync(input, header);
+
+    const formats = ['mp3', 'ogg', 'flac', 'm4a', 'aiff', 'wav'] as const;
+    const cases: ConversionItem[] = formats.map((outputFormat) => ({
+      inputFile: input,
+      outputFile: join(OUTPUT_DIR, `no-samples-out.${outputFormat}`),
+      outputFormat,
+    }));
+
+    const result = await convertFiles(cases);
+
+    expect(result.successfulFiles).toHaveLength(0);
+    expect(result.failedFiles).toHaveLength(formats.length);
+    for (const c of cases) expect(existsSync(c.outputFile)).toBe(false);
+  }, 120000);
 });

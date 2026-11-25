@@ -11,10 +11,13 @@ on:
         required: false
         default: 'no'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build ${{ matrix.platform }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && fromJSON('["self-hosted","Linux"]') || matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -72,12 +75,17 @@ jobs:
           }
           if (Test-Path "release/EZ-Game-Audio-Conversion.zip.sha256") {
             Rename-Item "release/EZ-Game-Audio-Conversion.zip.sha256" "${{ matrix.artifact-name }}.zip.sha256"
+            # The checksum line names the file; point it at the renamed archive.
+            $f = "release/${{ matrix.artifact-name }}.zip.sha256"
+            (Get-Content $f -Raw).Replace('EZ-Game-Audio-Conversion.zip', '${{ matrix.artifact-name }}.zip') | Set-Content $f -NoNewline
           }
           if (Test-Path "release/EZ-Game-Audio-Conversion.7z") {
             Rename-Item "release/EZ-Game-Audio-Conversion.7z" "${{ matrix.artifact-name }}.7z"
           }
           if (Test-Path "release/EZ-Game-Audio-Conversion.7z.sha256") {
             Rename-Item "release/EZ-Game-Audio-Conversion.7z.sha256" "${{ matrix.artifact-name }}.7z.sha256"
+            $f = "release/${{ matrix.artifact-name }}.7z.sha256"
+            (Get-Content $f -Raw).Replace('EZ-Game-Audio-Conversion.7z', '${{ matrix.artifact-name }}.7z') | Set-Content $f -NoNewline
           }
 
       - name: Rename archives (Unix)
@@ -88,6 +96,9 @@ jobs:
           fi
           if [ -f "release/EZ-Game-Audio-Conversion.zip.sha256" ]; then
             mv "release/EZ-Game-Audio-Conversion.zip.sha256" "release/${{ matrix.artifact-name }}.zip.sha256"
+            # The checksum line names the file; point it at the renamed archive.
+            perl -pi -e 's/EZ-Game-Audio-Conversion\.zip/${{ matrix.artifact-name }}.zip/' "release/${{ matrix.artifact-name }}.zip.sha256"
+            (cd release && sha256sum -c "${{ matrix.artifact-name }}.zip.sha256" 2>/dev/null || shasum -a 256 -c "${{ matrix.artifact-name }}.zip.sha256")
           fi
 
       # Upload artifacts
@@ -104,11 +115,10 @@ jobs:
   release:
     name: Create GitHub Release
     needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'yes'
-    # The default GITHUB_TOKEN is read-only; creating a release needs contents: write.
+    runs-on: [self-hosted, Linux]
     permissions:
-      contents: write
+      contents: write # create the draft GitHub Release and upload assets
+    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'yes'
 
     steps:
       - name: Download all artifacts

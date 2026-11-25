@@ -138,9 +138,13 @@ function run() {
     if (res.error) {
       console.error('Smoke test failed to run binary:', res.error);
       exitCode = 1;
+    } else if (res.signal) {
+      // Killed or crashed (e.g. SIGKILL from a bad signature, SIGSEGV).
+      console.error('Smoke test: binary was terminated by signal', res.signal);
+      exitCode = 1;
     } else if (res.status !== 0) {
       console.warn(
-        'Binary exited non-zero (expected for early exit / prompts). Code:',
+        'Binary exited non-zero (expected: stdin ends at the first prompt). Code:',
         res.status
       );
     }
@@ -151,10 +155,12 @@ function run() {
       !out.includes('Processing single file') &&
       !out.includes('Conversion parameters')
     ) {
-      console.warn(
-        'Smoke test: did not see expected startup text; stdout length:',
+      console.error(
+        'Smoke test FAILED: did not see expected startup text; stdout length:',
         out.length
       );
+      console.error((res.stderr || '').slice(-2000));
+      exitCode = 1;
     } else {
       console.log(
         'Smoke test passed: binary produced expected output fragment.'

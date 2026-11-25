@@ -45,8 +45,7 @@
     "cfonts": "^3.2.0",
     "chalk": "^6.0.0",
     "dotenv": "^17.2.3",
-    "moment": "^2.31.0",
-    "winston": "^3.14.2"
+    "moment": "^2.31.0"
   },
   "repository": {
     "type": "git",
@@ -99,6 +98,7 @@
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/\\.stryker-tmp/",
+      "<rootDir>/\\.claude/",
       "/__tests__/test-utils/",
       "/src/__tests__/test-utils/",
       "/src/__tests__/utils\\.(js|ts)$",
@@ -110,7 +110,8 @@
       "<rootDir>/dist/",
       "<rootDir>/build/",
       "<rootDir>/release/",
-      "<rootDir>/.stryker-tmp/"
+      "<rootDir>/.stryker-tmp/",
+      "<rootDir>/.claude/"
     ],
     "extensionsToTreatAsEsm": [
       ".ts"
@@ -174,5 +175,10 @@
     "*.{json,md}": [
       "prettier --write"
     ]
+  },
+  "allowScripts": {
+    "puppeteer@25.18.1": true,
+    "esbuild@0.28.2": true,
+    "@parcel/watcher@2.6.0": true
   }
 }

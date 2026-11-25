@@ -52,19 +52,24 @@ describe('searchFiles', () => {
     // Mock file stats
     _statSync
       .mockImplementationOnce((_path) => ({
-        isDirectory: () => false, // file1.mp3
+        isDirectory: () => false,
+        isFile: () => true, // file1.mp3
       }))
       .mockImplementationOnce((_path) => ({
-        isDirectory: () => false, // file2.txt
+        isDirectory: () => false,
+        isFile: () => true, // file2.txt
       }))
       .mockImplementationOnce((_path) => ({
-        isDirectory: () => true, // subdir
+        isDirectory: () => true,
+        isFile: () => false, // subdir
       }))
       .mockImplementationOnce((_path) => ({
-        isDirectory: () => false, // file3.wav
+        isDirectory: () => false,
+        isFile: () => true, // file3.wav
       }))
       .mockImplementationOnce((_path) => ({
-        isDirectory: () => false, // file4.jpg
+        isDirectory: () => false,
+        isFile: () => true, // file4.jpg
       }));
 
     const settings = {
@@ -93,6 +98,7 @@ describe('searchFiles', () => {
     // Mock stats
     _statSync.mockImplementation((_path) => ({
       isDirectory: () => false,
+      isFile: () => true,
     }));
 
     const settings = {
@@ -127,11 +133,13 @@ describe('searchFiles', () => {
       .mockReturnValueOnce(['level3', 'deep.mp3'])
       .mockReturnValueOnce(['final.flac']);
 
+    const isDir = (targetPath: unknown) =>
+      String(targetPath).endsWith('level1') ||
+      String(targetPath).endsWith('level2') ||
+      String(targetPath).endsWith('level3');
     _statSync.mockImplementation((targetPath) => ({
-      isDirectory: () =>
-        String(targetPath).endsWith('level1') ||
-        String(targetPath).endsWith('level2') ||
-        String(targetPath).endsWith('level3'),
+      isDirectory: () => isDir(targetPath),
+      isFile: () => !isDir(targetPath),
     }));
 
     const result = await searchFiles({
@@ -148,7 +156,10 @@ describe('searchFiles', () => {
 
   it('matches mixed-case file extensions', async () => {
     _readdirSync.mockReturnValueOnce(['Song.WAV', 'theme.Mp3', 'notes.txt']);
-    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+    _statSync.mockImplementation(() => ({
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
 
     const result = await searchFiles({
       inputFilePath: '/test/case',
@@ -167,7 +178,10 @@ describe('searchFiles', () => {
       'voice.temp.mp3',
       'archive.wav.zip',
     ]);
-    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+    _statSync.mockImplementation(() => ({
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
 
     const result = await searchFiles({
       inputFilePath: '/test/double-ext',
@@ -182,7 +196,10 @@ describe('searchFiles', () => {
 
   it('skips files without an extension', async () => {
     _readdirSync.mockReturnValueOnce(['README', 'LICENSE', 'theme.ogg']);
-    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+    _statSync.mockImplementation(() => ({
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
 
     const result = await searchFiles({
       inputFilePath: '/test/no-ext',
@@ -194,7 +211,10 @@ describe('searchFiles', () => {
 
   it('does not match MIDI files when searching for standard audio formats', async () => {
     _readdirSync.mockReturnValueOnce(['theme.mid', 'theme.midi', 'song.mp3']);
-    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+    _statSync.mockImplementation(() => ({
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
 
     const result = await searchFiles({
       inputFilePath: '/test/midi',
@@ -211,7 +231,10 @@ describe('searchFiles', () => {
       (_, index) => `track-${index}.mp3`
     );
     _readdirSync.mockReturnValueOnce(files);
-    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+    _statSync.mockImplementation(() => ({
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
 
     const result = await searchFiles({
       inputFilePath: '/test/huge',
@@ -231,7 +254,10 @@ describe('searchFiles', () => {
       (_, index) => `track-${index}.mp3`
     );
     _readdirSync.mockReturnValueOnce(files);
-    _statSync.mockImplementation(() => ({ isDirectory: () => false }));
+    _statSync.mockImplementation(() => ({
+      isDirectory: () => false,
+      isFile: () => true,
+    }));
 
     const result = await searchFiles({
       inputFilePath: '/test/large',
@@ -263,6 +289,7 @@ describe('searchFiles', () => {
       });
     _statSync.mockImplementation((targetPath) => ({
       isDirectory: () => String(targetPath).endsWith('locked-subdir'),
+      isFile: () => !String(targetPath).endsWith('locked-subdir'),
     }));
 
     const result = await searchFiles({
@@ -285,7 +312,7 @@ describe('searchFiles', () => {
       if (String(targetPath).endsWith('broken.wav')) {
         throw new Error('EBUSY: resource busy');
       }
-      return { isDirectory: () => false };
+      return { isDirectory: () => false, isFile: () => true };
     });
 
     const result = await searchFiles({
@@ -306,6 +333,7 @@ describe('searchFiles', () => {
     _readdirSync.mockReturnValue(['child'] as never);
     _statSync.mockReturnValue({
       isDirectory: () => true,
+      isFile: () => false,
     } as ReturnType<typeof _statSync>);
 
     await searchFiles({
@@ -321,5 +349,29 @@ describe('searchFiles', () => {
         error.message.includes(String(MAX_WALK_DEPTH))
       )
     ).toBe(true);
+  });
+
+  it('does not search an output folder that sits inside the input folder', async () => {
+    const tree: Record<string, string[]> = {
+      '/in': ['a.wav', 'out'],
+      [join('/in', 'out')]: ['a.mp3'],
+    };
+    _readdirSync.mockImplementation((dir: string) => tree[String(dir)] ?? []);
+    _statSync.mockImplementation((p: string) => ({
+      isDirectory: () => String(p) in tree,
+      isFile: () => !(String(p) in tree),
+    }));
+
+    const result = await searchFiles({
+      inputFilePath: '/in',
+      outputFilePath: join('/in', 'out'),
+      inputFormats: ['wav', 'mp3'],
+      outputFormats: ['mp3'],
+      oggCodec: null,
+      singleFileMode: false,
+      singleFilePath: '',
+    });
+
+    expect(result).toEqual([join('/in', 'a.wav')]);
   });
 });

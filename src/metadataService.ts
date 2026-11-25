@@ -1,7 +1,12 @@
 //metaDataService.ts
 import type { AudioMetadata } from './types/metadata.js';
+import { getAudioStream } from './audioStream.js';
+import { readWavSmplLoop } from './wavLoops.js';
+
+export { getAudioStream };
 
 import { spawnSync } from 'child_process';
+import * as workerThreads from 'worker_threads';
 import { platformSlug, findBinary, addToLog } from './utils.js';
 import logger from './logger.js';
 
@@ -37,7 +42,6 @@ const CANONICAL_FIELDS = [
   'rating',
   'isrc',
   'iswc',
-  'encoder',
   'encoded_by',
   'publisher',
   'copyright',
@@ -72,7 +76,6 @@ const CANONICAL_FIELDS = [
   'itunescopyright',
   'ituneskeywords',
   'itunesu',
-  'itunessmpb',
   'itunnorm',
 
   // Podcast-specific
@@ -158,7 +161,6 @@ const EXTRA_ALIASES: Record<string, string> = {
   year: 'date',
   originaldate: 'original_date',
   releasedate: 'release_date',
-  itunessmpb: 'itunessmpb',
   itunnorm: 'itunnorm',
   musicbrainztrackid: 'musicbrainz_trackid',
   musicbrainzrecordingid: 'musicbrainz_recordingid',
@@ -187,14 +189,56 @@ const resolveCanonicalKey = (key: string): string | undefined => {
 
 const isSafeMetaKey = (key: string): boolean => /^[A-Za-z0-9_.:-]+$/.test(key);
 
+/**
+ * Tags never copied from the source:
+ * - container housekeeping that ffmpeg reports as tags (MP4 brands, handler
+ *   names, vendor ids, creation time) and the source encoder name;
+ * - iTunes gapless info (iTunSMPB): it describes the source encoder's
+ *   priming/padding, so on a re-encoded file players would trim the wrong
+ *   samples.
+ */
+const NEVER_COPIED_TAG_KEYS = new Set([
+  'majorbrand',
+  'minorversion',
+  'compatiblebrands',
+  'handlername',
+  'vendorid',
+  'creationtime',
+  'encoder',
+  'encoderoptions',
+  'itunsmpb',
+  'itunessmpb',
+]);
+const isNeverCopiedTagKey = (key: string): boolean =>
+  NEVER_COPIED_TAG_KEYS.has(normalizeTagKey(key));
+
+/** Formats whose tags are Vorbis comments (track total is its own field). */
+const VORBIS_COMMENT_FORMATS = new Set(['ogg', 'flac']);
+
+// Loop tags are never copied from the source: the worker writes them itself
+// (converted for sample-rate changes, or omitted for 'skip'/unsupported
+// formats). Passing the originals through would leave stale values behind,
+// e.g. an unconverted LOOP_START next to the resampled loopstart for Opus.
+const SOURCE_LOOP_TAG_KEYS = new Set([
+  'loopstart',
+  'looplength',
+  'loopend',
+  'itunesloopstart',
+  'ituneslooplength',
+  'itunesloopend',
+]);
+export const isLoopTagKey = (key: string): boolean =>
+  SOURCE_LOOP_TAG_KEYS.has(normalizeTagKey(key));
+
+// Line breaks are kept (normalised to \n): ffmpeg runs without a shell, so
+// each value reaches it as one argument, and multi-line comments and lyrics
+// are written correctly to every output format.
 export const sanitizeMetaValueForArgs = (raw: string): string =>
   String(raw)
     .split('\u0000')
     .join('')
     .replace(/\uFFFD/g, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/\n/g, ' ')
+    .replace(/\r\n?/g, '\n')
     .trim();
 
 const parseNumberAndTotal = (
@@ -218,6 +262,16 @@ const logMetadataCleanupWarning = (
   inputFile?: string
 ): void => {
   logger.error(message);
+  // Worker threads have their own copy of utils' module state (no output
+  // path, no chosen log file), so writing from here would spawn stray
+  // logs(N).csv/error(N).csv files in the cwd. Hand the warning to the parent,
+  // which owns the run's log files.
+  const port =
+    workerThreads.isMainThread === false ? workerThreads.parentPort : null;
+  if (port) {
+    port.postMessage({ type: 'warning', data: message });
+    return;
+  }
   void addToLog(
     { type: 'error', data: message },
     inputFile ? { inputFile, outputFile: '[metadata-cleanup]' } : undefined
@@ -264,6 +318,11 @@ const collectNormalizedTags = (
       if (value === undefined || value === null) continue;
       const rawValue = String(value);
       if (!rawValue && rawValue !== '0') continue;
+      if (isNeverCopiedTagKey(key)) continue;
+      // "und" (undetermined) is ffmpeg's placeholder, not a real language.
+      if (normalizeTagKey(key) === 'language' && rawValue.trim() === 'und') {
+        continue;
+      }
 
       const canonicalKey = resolveCanonicalKey(key);
       if (canonicalKey) {
@@ -315,6 +374,31 @@ const collectNormalizedTags = (
   return { canonical, passthrough };
 };
 
+/** ffprobe should answer in seconds; a FIFO or stalled network file would hang forever. */
+const FFPROBE_TIMEOUT_MS = 60_000;
+const FFPROBE_MAX_BUFFER = 64 * 1024 * 1024;
+
+/**
+ * WAV loops usually live in the RIFF "smpl" chunk, which ffprobe ignores.
+ * If a WAV has no loop tags, read that chunk and expose it as LOOPSTART /
+ * LOOPLENGTH so the rest of the pipeline treats it like any other loop.
+ */
+const addWavSmplLoop = (metaData: AudioMetadata, inputFile: string): void => {
+  if (!/\bwav\b/.test(String(metaData.format?.format_name ?? ''))) return;
+  const hasLoopTag = [getAudioStream(metaData)?.tags, metaData.format?.tags]
+    .flatMap((tags) => Object.keys(tags || {}))
+    .some(isLoopTagKey);
+  if (hasLoopTag) return;
+  const loop = readWavSmplLoop(inputFile);
+  if (!loop) return;
+  if (!metaData.format) return;
+  metaData.format.tags = {
+    ...(metaData.format.tags || {}),
+    LOOPSTART: String(loop.loopStart),
+    LOOPLENGTH: String(loop.loopLength),
+  };
+};
+
 // Get metaData from a file using ffprobe
 const getMetaData = async (
   inputFile: string
@@ -344,7 +428,11 @@ const getMetaData = async (
         '-show_streams',
         inputFile,
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        timeout: FFPROBE_TIMEOUT_MS,
+        maxBuffer: FFPROBE_MAX_BUFFER,
+      }
     );
     if (output.error) {
       throw output.error;
@@ -358,6 +446,7 @@ const getMetaData = async (
       throw new Error('ffprobe returned no output');
     }
     const metaData: AudioMetadata = JSON.parse(output.stdout);
+    addWavSmplLoop(metaData, inputFile);
     return metaData;
   } catch (error: unknown) {
     logger.error(
@@ -371,14 +460,16 @@ const getMetaData = async (
 // Build metadata/channel args as arrays to avoid shell splitting issues
 export const formatMetaDataArgs = (
   metaData: AudioMetadata | null,
-  inputFile?: string
+  inputFile?: string,
+  outputFormat?: string
 ): { metaDataArgs: string[]; channelsArgs: string[] } => {
   if (!metaData || !metaData.streams) {
     if (inputFile) logger.warn(`\n No metadata found in ${inputFile}`);
     return { metaDataArgs: [], channelsArgs: ['-ac', '2'] };
   }
 
-  const streamTags = metaData.streams[0]?.tags;
+  const audioStream = getAudioStream(metaData);
+  const streamTags = audioStream?.tags;
   const formatTags = metaData.format?.tags;
 
   const { canonical, passthrough } = collectNormalizedTags(
@@ -386,7 +477,34 @@ export const formatMetaDataArgs = (
     formatTags
   );
 
+  // Track/disc totals. ffmpeg has no output mapping for "track_total", so it
+  // would be written as a stray custom tag. Vorbis comments (OGG/FLAC) have
+  // their own TRACKTOTAL/DISCTOTAL fields; ID3 and MP4 store "3/12" in the
+  // track field itself.
+  const totalKeys: Record<string, string> = {};
+  if (outputFormat) {
+    const vorbis = VORBIS_COMMENT_FORMATS.has(outputFormat);
+    for (const [field, totalField, vorbisKey] of [
+      ['track', 'track_total', 'TRACKTOTAL'],
+      ['disc', 'disc_total', 'DISCTOTAL'],
+    ] as const) {
+      const total = canonical.get(totalField);
+      if (total === undefined) continue;
+      canonical.delete(totalField);
+      const number = canonical.get(field);
+      if (vorbis) {
+        totalKeys[vorbisKey] = total;
+      } else if (number !== undefined) {
+        canonical.set(field, `${number}/${total}`);
+      }
+    }
+  }
+
   const metaDataArgs: string[] = [];
+  for (const [key, value] of Object.entries(totalKeys)) {
+    const clean = sanitizeMetaValueForArgs(value);
+    if (clean) metaDataArgs.push('-metadata', `${key}=${clean}`);
+  }
   for (const field of CANONICAL_FIELDS) {
     const raw = canonical.get(field);
     if (!raw && raw !== '0') continue;
@@ -409,7 +527,7 @@ export const formatMetaDataArgs = (
   }
 
   for (const [key, value] of passthrough.entries()) {
-    if (!isSafeMetaKey(key)) continue;
+    if (!isSafeMetaKey(key) || isLoopTagKey(key)) continue;
     const rawString = String(value);
     const clean = sanitizeMetaValueForArgs(rawString);
     if (rawString.includes('\uFFFD')) {
@@ -428,67 +546,118 @@ export const formatMetaDataArgs = (
     metaDataArgs.push('-metadata', `${key}=${clean}`);
   }
 
-  const ch = metaData.streams[0]?.channels
-    ? String(metaData.streams[0].channels)
-    : '2';
+  const ch = audioStream?.channels ? String(audioStream.channels) : '2';
   const channelsArgs = ['-ac', ch];
   return { metaDataArgs, channelsArgs };
 };
 
-// Get loop points from metaData
-export const getLoopPoints = (metaData: AudioMetadata | null | undefined) => {
+type LoopPoints = {
+  loopStart: number;
+  loopLength: number;
+  /** The source described its loop with LOOPEND, so write one back too. */
+  hasLoopEnd?: boolean;
+};
+
+/** A loop value: a whole, non-negative sample count ("100.9" reads as 100). */
+const parseLoopValue = (raw: unknown): number => {
+  const text = String(raw ?? '').trim();
+  if (!/^\d+(\.\d+)?$/.test(text)) return NaN;
+  const value = Math.floor(Number(text));
+  return Number.isSafeInteger(value) ? value : NaN;
+};
+
+// Get loop points from metaData. Tag names are matched ignoring case and
+// separators (LOOPSTART, LoopStart, LOOP_START, loop-start, iTunes_LOOPSTART),
+// stream tags first, then format tags.
+export const getLoopPoints = (
+  metaData: AudioMetadata | null | undefined,
+  inputFile?: string
+): LoopPoints => {
   if (!metaData) return { loopStart: NaN, loopLength: NaN };
 
-  // Helper function to check multiple tag variants
-  const getTagValue = (tagName: string) => {
-    const variants = [
-      tagName, // LOOPSTART
-      tagName.toLowerCase(), // loopstart
-      `LOOP_${tagName.replace('LOOP', '')}`, // LOOP_START
-      `loop_${tagName.replace(/^LOOP/i, '').toLowerCase()}`, // loop_start
-      `iTunes_${tagName}`, // iTunes_LOOPSTART
-      `itunes_${tagName.toLowerCase()}`, // itunes_loopstart
-    ];
-
-    for (const variant of variants) {
-      // Check stream tags
-      if (
-        metaData.streams &&
-        metaData.streams[0]?.tags &&
-        metaData.streams[0].tags[variant] !== undefined
-      ) {
-        return metaData.streams[0].tags[variant];
-      }
-
-      // Check format tags
-      if (
-        metaData.format &&
-        metaData.format.tags &&
-        metaData.format.tags[variant] !== undefined
-      ) {
-        return metaData.format.tags[variant];
+  const found = new Map<string, string>();
+  for (const tags of [getAudioStream(metaData)?.tags, metaData.format?.tags]) {
+    for (const [key, value] of Object.entries(tags || {})) {
+      const normalized = normalizeTagKey(key).replace(/^itunes/, '');
+      if (!found.has(normalized) && value !== undefined && value !== null) {
+        found.set(normalized, String(value));
       }
     }
+  }
 
-    return null;
+  const read = (name: string): number => {
+    const raw = found.get(name);
+    if (raw === undefined) return NaN;
+    const value = parseLoopValue(raw);
+    if (Number.isNaN(value)) {
+      logMetadataCleanupWarning(
+        `Ignored invalid loop tag ${name.toUpperCase()}="${raw}"${inputFile ? ` in ${inputFile}` : ''} (expected a whole, non-negative sample number).`,
+        inputFile
+      );
+    }
+    return value;
   };
 
-  const loopStartRaw = getTagValue('LOOPSTART');
-  const loopLengthRaw = getTagValue('LOOPLENGTH');
+  const loopStart = read('loopstart');
+  let loopLength = read('looplength');
+  const loopEnd = read('loopend');
+  const hasLoopEnd = !Number.isNaN(loopEnd);
 
-  const loopStart = loopStartRaw ? parseInt(loopStartRaw, 10) : NaN;
-  const loopLength = loopLengthRaw ? parseInt(loopLengthRaw, 10) : NaN;
+  // LOOPEND (exclusive end sample) instead of LOOPLENGTH.
+  if (Number.isNaN(loopLength) && hasLoopEnd && !Number.isNaN(loopStart)) {
+    loopLength = loopEnd > loopStart ? loopEnd - loopStart : NaN;
+  }
 
-  return { loopStart, loopLength };
+  return hasLoopEnd
+    ? { loopStart, loopLength, hasLoopEnd }
+    : { loopStart, loopLength };
+};
+
+/** Sample rates each encoder can write; anything else is resampled by ffmpeg. */
+const MP3_RATES = [
+  8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000,
+];
+const AAC_RATES = [
+  7350, 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 64000,
+  88200, 96000,
+];
+
+/** Closest rate an encoder supports: the input rate if allowed, else the next one up, else its maximum. */
+const pickSupportedRate = (inputRate: number, rates: number[]): number => {
+  if (rates.includes(inputRate)) return inputRate;
+  return rates.find((rate) => rate >= inputRate) ?? rates[rates.length - 1]!;
+};
+
+/**
+ * The sample rate the output will be written at. Opus always decodes at
+ * 48 kHz, so it is always encoded at 48 kHz too — that way loop tags are in
+ * the same units a player sees. MP3 and AAC have fixed rate lists.
+ */
+export const outputSampleRateFor = (
+  inputRate: number,
+  outputFormat: string,
+  oggCodec: string
+): number => {
+  if (outputFormat === 'ogg' && oggCodec === 'opus') return 48000;
+  if (outputFormat === 'mp3') return pickSupportedRate(inputRate, MP3_RATES);
+  if (outputFormat === 'm4a') return pickSupportedRate(inputRate, AAC_RATES);
+  return inputRate;
 };
 
 // Convert loop points for different sample rates
 export const convertLoopPoints = (
   metaData: AudioMetadata | null,
   outputFormat: string,
-  oggCodec: string
-) => {
-  if (!metaData || !metaData.streams || !metaData.streams[0]) {
+  oggCodec: string,
+  inputFile?: string
+): {
+  newSampleRate: number | null;
+  loopStart: number;
+  loopLength: number;
+  hasLoopEnd?: boolean;
+} => {
+  const audioStream = getAudioStream(metaData);
+  if (!metaData || !audioStream) {
     return {
       newSampleRate: null,
       loopStart: NaN,
@@ -496,83 +665,82 @@ export const convertLoopPoints = (
     };
   }
 
-  // Get original values
-  const sampleRate = metaData.streams[0].sample_rate;
-  const { loopStart, loopLength } = getLoopPoints(metaData);
+  const loops = getLoopPoints(metaData, inputFile);
+  const extra = loops.hasLoopEnd ? { hasLoopEnd: true } : {};
 
+  const sampleRate = audioStream.sample_rate;
   const inputSampleRate = sampleRate
     ? Number.parseInt(String(sampleRate), 10)
     : NaN;
   if (!Number.isFinite(inputSampleRate) || inputSampleRate <= 0) {
     return {
-      newSampleRate: null,
-      loopStart,
-      loopLength,
+      newSampleRate:
+        outputFormat === 'ogg' && oggCodec === 'opus' ? 48000 : null,
+      loopStart: loops.loopStart,
+      loopLength: loops.loopLength,
+      ...extra,
     };
   }
 
-  // If no valid loop points, return early
-  if (isNaN(loopStart) || isNaN(loopLength)) {
-    return {
-      newSampleRate: null,
-      loopStart,
-      loopLength,
-    };
-  }
+  const outputSampleRate = outputSampleRateFor(
+    inputSampleRate,
+    outputFormat,
+    oggCodec
+  );
+  const isOpusConversion = outputFormat === 'ogg' && oggCodec === 'opus';
 
-  // Determine output sample rate based on format requirements
-  let outputSampleRate = inputSampleRate; // Default: preserve input rate
-  let isOpusConversion = false;
-
-  // Opus requires specific sample rates, so we must convert
-  if (outputFormat === 'ogg' && oggCodec === 'opus') {
-    isOpusConversion = true;
-    if (inputSampleRate >= 32000) {
-      outputSampleRate = 48000;
-    } else if (inputSampleRate > 16000) {
-      outputSampleRate = 24000;
-    } else if (inputSampleRate > 12000) {
-      outputSampleRate = 16000;
-    } else if (inputSampleRate > 8000) {
-      outputSampleRate = 12000;
-    } else {
-      outputSampleRate = 8000;
-    }
-  }
-  // Other formats: add explicit sample rate handling here if needed in future
-
-  // Calculate ratio and adjust loop points if sample rate differs
+  // Scale loop points to the output rate (NaN stays NaN).
   const ratio = outputSampleRate / inputSampleRate;
-  const convertedLoopStart = Math.round(loopStart * ratio);
-  const convertedLoopLength = Math.round(loopLength * ratio);
-
-  // For Opus, always return the sample rate (ffmpeg needs explicit -ar flag)
-  // For other formats, only return it if it actually changed
-  const shouldReturnSampleRate =
-    isOpusConversion || outputSampleRate !== inputSampleRate;
+  const scale = (value: number) =>
+    Number.isNaN(value) ? NaN : Math.round(value * ratio);
 
   return {
-    newSampleRate: shouldReturnSampleRate ? outputSampleRate : null,
-    loopStart: convertedLoopStart,
-    loopLength: convertedLoopLength,
+    // Opus always gets an explicit -ar; other formats only when the rate changes.
+    newSampleRate:
+      isOpusConversion || outputSampleRate !== inputSampleRate
+        ? outputSampleRate
+        : null,
+    loopStart: scale(loops.loopStart),
+    loopLength: scale(loops.loopLength),
+    ...extra,
   };
 };
 
-// Format loop data for ffmpeg command
-export const formatLoopData = (loopStart: number, loopLength: number) => {
-  if (Number.isNaN(loopStart) || Number.isNaN(loopLength)) return [];
+/**
+ * ffmpeg args for loop tags. Written once each, in upper case: ffmpeg's tag
+ * dictionary ignores case, so writing LOOPSTART and loopstart would leave
+ * only the last spelling. LOOPSTART alone (no length) is kept as-is.
+ */
+export const formatLoopData = (
+  loopStart: number,
+  loopLength: number,
+  includeLoopEnd = false
+): string[] => {
+  if (Number.isNaN(loopStart)) return [];
+  const args = ['-metadata', `LOOPSTART=${loopStart}`];
+  if (!Number.isNaN(loopLength)) {
+    args.push('-metadata', `LOOPLENGTH=${loopLength}`);
+    if (includeLoopEnd) {
+      args.push('-metadata', `LOOPEND=${loopStart + loopLength}`);
+    }
+  }
+  return args;
+};
 
-  // Only include the standard variants that are most widely supported.
-  return [
-    '-metadata',
-    `LOOPSTART=${loopStart}`,
-    '-metadata',
-    `LOOPLENGTH=${loopLength}`,
-    '-metadata',
-    `loopstart=${loopStart}`,
-    '-metadata',
-    `looplength=${loopLength}`,
-  ];
+/**
+ * ffmpeg args that delete every loop tag found in the source. Needed when the
+ * output keeps source metadata (AIFF) but loop data must be dropped ('skip').
+ */
+export const clearSourceLoopTagArgs = (
+  metaData: AudioMetadata | null
+): string[] => {
+  const keys = new Set<string>();
+  for (const tags of [getAudioStream(metaData)?.tags, metaData?.format?.tags]) {
+    for (const key of Object.keys(tags || {})) {
+      if (isLoopTagKey(key) && isSafeMetaKey(key)) keys.add(key);
+    }
+  }
+  return [...keys].flatMap((key) => ['-metadata', `${key}=`]);
 };
 
 export { getMetaData };

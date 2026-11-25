@@ -14,6 +14,8 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 // But we DON'T mock metadataService - we want to test real formatting logic
 
 let capturedSpawnArgs: { command: string; args: string[] }[] = [];
+// Per-test override for the ffprobe stream (channels, tags, sample rate).
+let probeStreamOverride: Record<string, unknown> | null = null;
 
 jest.unstable_mockModule('fs', () => ({
   existsSync: jest.fn((path: string) => {
@@ -61,6 +63,7 @@ jest.unstable_mockModule('child_process', () => ({
           channels: 2,
           sample_rate: '44100',
           tags: {},
+          ...probeStreamOverride,
         },
       ],
       format: {
@@ -95,6 +98,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedSpawnArgs = [];
+    probeStreamOverride = null;
   });
 
   describe('basic format conversions', () => {
@@ -300,7 +304,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
       expect(args).toContain('-1');
     });
 
-    it('should NOT strip metadata for AIFF (preserveMetadata=true)', async () => {
+    it('should rebuild metadata for AIFF like other formats (-map_metadata -1)', async () => {
       await converterWorker({
         file: {
           inputFile: '/input/test.mp3',
@@ -312,16 +316,15 @@ describe('ffmpeg argument building - Integration Tests', () => {
 
       const args = capturedSpawnArgs[0].args;
 
-      // For AIFF, should NOT have -map_metadata -1
+      // AIFF tags are rebuilt from the probed metadata: copying them through
+      // loses OGG/Opus tags, which ffmpeg keeps per stream.
       const mapMetadataIndex = args.indexOf('-map_metadata');
-
-      // Either not present at all, or not followed by -1
-      if (mapMetadataIndex !== -1) {
-        expect(args[mapMetadataIndex + 1]).not.toBe('-1');
-      }
+      expect(mapMetadataIndex).not.toBe(-1);
+      expect(args[mapMetadataIndex + 1]).toBe('-1');
     });
 
-    it('should include channel specification (-ac)', async () => {
+    it('does not force a channel count for a named stereo layout (no -ac)', async () => {
+      probeStreamOverride = { channel_layout: 'stereo' };
       await converterWorker({
         file: {
           inputFile: '/input/test.wav',
@@ -331,12 +334,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
         settings: { oggCodec: 'vorbis' },
       });
 
-      const args = capturedSpawnArgs[0].args;
-
-      expect(args).toContain('-ac');
-      // Should be followed by a number
-      const acIndex = args.indexOf('-ac');
-      expect(args[acIndex + 1]).toMatch(/^\d+$/);
+      expect(capturedSpawnArgs[0].args).not.toContain('-ac');
     });
   });
 
@@ -553,4 +551,118 @@ describe('codec selection validation', () => {
     expect(codecIndex).not.toBe(-1);
     expect(args[codecIndex + 1]).toBe('libopus');
   });
+});
+
+describe('source loop tags and channel handling', () => {
+  beforeEach(() => {
+    capturedSpawnArgs = [];
+    probeStreamOverride = null;
+  });
+
+  const run = async (
+    outputFormat: string,
+    settings: Record<string, string>
+  ) => {
+    await converterWorker({
+      file: {
+        inputFile: '/input/loop.flac',
+        outputFile: `/output/loop.${outputFormat}`,
+        outputFormat,
+      },
+      settings: { oggCodec: 'vorbis', ...settings },
+    });
+    return capturedSpawnArgs[0].args;
+  };
+
+  const metadataValues = (args: string[]) =>
+    args.filter((_, i) => args[i - 1] === '-metadata');
+
+  it('does not copy source loop tags when loop mode is "skip"', async () => {
+    probeStreamOverride = {
+      tags: { title: 'T', LOOPSTART: '22050', LOOPLENGTH: '22050' },
+    };
+    const values = metadataValues(await run('ogg', { loopDataMode: 'skip' }));
+    expect(values).toContain('title=T');
+    expect(values.some((v) => /^loop/i.test(v))).toBe(false);
+  });
+
+  it('drops unconverted LOOP_START variants when Opus resamples', async () => {
+    probeStreamOverride = {
+      tags: { LOOP_START: '22050', LOOP_LENGTH: '22050' },
+    };
+    const values = metadataValues(await run('ogg', { oggCodec: 'opus' }));
+    expect(values).toContain('LOOPSTART=24000');
+    expect(values).not.toContain('LOOP_START=22050');
+    expect(values).not.toContain('LOOP_LENGTH=22050');
+  });
+
+  it('drops source loop tags on AIFF in "skip" mode', async () => {
+    probeStreamOverride = {
+      tags: { LOOPSTART: '22050', LOOPLENGTH: '22050' },
+    };
+    const args = await run('aiff', { loopDataMode: 'skip' });
+    expect(args.join(' ')).toContain('-map_metadata -1');
+    expect(metadataValues(args).some((v) => /^loop/i.test(v))).toBe(false);
+  });
+
+  it('downmixes surround sources to stereo for MP3', async () => {
+    probeStreamOverride = { channels: 6 };
+    const args = await run('mp3', {});
+    expect(args[args.indexOf('-ac') + 1]).toBe('2');
+  });
+
+  it('uses Opus mapping family 255 for 4-channel sources (the default mapping rejects them)', async () => {
+    probeStreamOverride = { channels: 4 };
+    const args = await run('ogg', { oggCodec: 'opus' });
+    expect(args.join(' ')).toContain('-mapping_family 255');
+  });
+
+  it('keeps the default Opus mapping for 5.1', async () => {
+    probeStreamOverride = { channels: 6 };
+    const args = await run('ogg', { oggCodec: 'opus' });
+    expect(args).not.toContain('-mapping_family');
+  });
+
+  it('keeps surround sources as they are for formats that support them (B45)', async () => {
+    // -ac would remix quad, 5.1(side), ... into the default layout.
+    probeStreamOverride = { channels: 4, channel_layout: 'quad' };
+    for (const fmt of ['flac', 'wav', 'm4a', 'aiff']) {
+      const args = await run(fmt, {});
+      expect(args).not.toContain('-ac');
+      expect(args).not.toContain('-af');
+    }
+  });
+
+  it.each([undefined, 'unknown', '6 channels'])(
+    'labels sources with no named layout (%s) with -ac, which AAC needs',
+    async (layout) => {
+      probeStreamOverride = { channels: 6, channel_layout: layout };
+      const args = await run('m4a', {});
+      expect(args[args.indexOf('-ac') + 1]).toBe('6');
+      expect(args).not.toContain('-af');
+    }
+  );
+
+  it.each([
+    ['4.0', 4, 'quad'],
+    ['2.1', 3, '3.0'],
+    ['6.1(back)', 7, '6.1'],
+    ['hexagonal', 6, '5.1'],
+  ])(
+    'remixes %s to the Vorbis layout %s (B42)',
+    async (layout, channels, target) => {
+      probeStreamOverride = { channels, channel_layout: layout };
+      const args = await run('ogg', { oggCodec: 'vorbis' });
+      expect(args.join(' ')).toContain(`-af aformat=channel_layouts=${target}`);
+    }
+  );
+
+  it.each(['quad', '5.1(side)', 'stereo', '6 channels'])(
+    'leaves Vorbis-compatible or unnamed layout %s alone',
+    async (layout) => {
+      probeStreamOverride = { channels: 6, channel_layout: layout };
+      const args = await run('ogg', { oggCodec: 'vorbis' });
+      expect(args).not.toContain('-af');
+    }
+  );
 });

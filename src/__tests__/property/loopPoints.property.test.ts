@@ -21,12 +21,13 @@ describe('convertLoopPoints property tests', () => {
   it('preserves loop points when sample rate is unchanged (non-opus)', () => {
     fc.assert(
       fc.property(
-        fc.integer({ min: 8000, max: 96000 }),
+        fc.integer({ min: 8000, max: 192000 }),
         fc.integer({ min: 0, max: 500000 }),
         fc.integer({ min: 1, max: 500000 }),
-        (sampleRate, loopStart, loopLength) => {
+        fc.constantFrom('flac', 'wav', 'aiff'),
+        (sampleRate, loopStart, loopLength, format) => {
           const meta = makeMeta(sampleRate, loopStart, loopLength);
-          const result = convertLoopPoints(meta, 'mp3', 'vorbis');
+          const result = convertLoopPoints(meta, format, 'vorbis');
           expect(result.loopStart).toBe(loopStart);
           expect(result.loopLength).toBe(loopLength);
           expect(result.newSampleRate).toBeNull();
@@ -77,7 +78,28 @@ describe('convertLoopPoints property tests', () => {
     );
   });
 
-  it('never rescales when either loop point is missing (opus path)', () => {
+  it('mp3 keeps rates LAME supports and rescales the rest to a supported rate', () => {
+    const lame = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 8000, max: 192000 }),
+        fc.integer({ min: 0, max: 200000 }),
+        fc.integer({ min: 1, max: 200000 }),
+        (sampleRate, loopStart, loopLength) => {
+          const meta = makeMeta(sampleRate, loopStart, loopLength);
+          const result = convertLoopPoints(meta, 'mp3', 'vorbis');
+          const outRate = result.newSampleRate ?? sampleRate;
+          expect(lame).toContain(outRate);
+          const ratio = outRate / sampleRate;
+          expect(result.loopStart).toBe(Math.round(loopStart * ratio));
+          expect(result.loopLength).toBe(Math.round(loopLength * ratio));
+        }
+      ),
+      { numRuns: 80 }
+    );
+  });
+
+  it('opus always encodes at 48 kHz; a missing loop value stays missing', () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 8000, max: 96000 }),
@@ -92,7 +114,9 @@ describe('convertLoopPoints property tests', () => {
             format: { tags: {} },
           };
           const result = convertLoopPoints(meta, 'ogg', 'opus');
-          expect(result.newSampleRate).toBeNull();
+          expect(result.newSampleRate).toBe(48000);
+          if (missing === 'loopStart') expect(result.loopStart).toBeNaN();
+          else expect(result.loopLength).toBeNaN();
         }
       ),
       { numRuns: 40 }

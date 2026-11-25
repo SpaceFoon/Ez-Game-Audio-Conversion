@@ -36,6 +36,7 @@ jest.unstable_mockModule('../utils.js', () => ({
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
+  clearSourceLoopTagArgs: jest.fn(() => []),
   getMetaData: jest.fn().mockResolvedValue({
     streams: [
       {
@@ -105,7 +106,7 @@ describe('loopDataMode audit (KB-003 fixed)', () => {
     expect(formatLoopDataMock).not.toHaveBeenCalled();
   });
 
-  it('force mode writes loop metadata even on unsupported WAV output', async () => {
+  it('force mode on WAV writes a smpl chunk instead of tags ffmpeg would drop', async () => {
     const forceMode: LoopDataMode = 'force';
 
     await converterWorker({
@@ -119,9 +120,25 @@ describe('loopDataMode audit (KB-003 fixed)', () => {
 
     const args = spawnMock.mock.calls[0]?.[1] as string[] | undefined;
     expect(args).toBeDefined();
+    expect(args).not.toContain('LOOPSTART=100');
+    // The smpl chunk is written after ffmpeg (covered in wavLoops.test.ts).
+    expect(formatLoopDataMock).not.toHaveBeenCalled();
+  });
+
+  it('force mode on M4A writes loop tags and keeps them with use_metadata_tags', async () => {
+    await converterWorker({
+      file: {
+        inputFile: 'in.mp3',
+        outputFile: 'out.m4a',
+        outputFormat: 'm4a',
+      },
+      settings: { oggCodec: 'vorbis', loopDataMode: 'force' },
+    });
+
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
     expect(args).toEqual(
       expect.arrayContaining(['-metadata', 'LOOPSTART=100'])
     );
-    expect(formatLoopDataMock).toHaveBeenCalled();
+    expect(args.join(' ')).toContain('-movflags use_metadata_tags');
   });
 });

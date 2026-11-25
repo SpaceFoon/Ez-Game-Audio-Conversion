@@ -41,8 +41,8 @@ describe('metadataService pure logic (mutation hardening)', () => {
   });
 
   describe('sanitizeMetaValueForArgs', () => {
-    it('collapses CRLF and lone CR into spaces', () => {
-      expect(sanitizeMetaValueForArgs('a\r\nb\rc')).toBe('a b c');
+    it('normalises CRLF and lone CR to \\n', () => {
+      expect(sanitizeMetaValueForArgs('a\r\nb\rc\nd')).toBe('a\nb\nc\nd');
     });
   });
 
@@ -81,7 +81,7 @@ describe('metadataService pure logic (mutation hardening)', () => {
   });
 
   describe('convertLoopPoints edge branches', () => {
-    it('returns early when only loopStart is missing', () => {
+    it('keeps 48 kHz and scales the length when only loopStart is missing', () => {
       const metadata = asMeta({
         streams: [
           {
@@ -92,12 +92,12 @@ describe('metadataService pure logic (mutation hardening)', () => {
       });
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
-      expect(result.newSampleRate).toBeNull();
+      expect(result.newSampleRate).toBe(48000);
       expect(result.loopStart).toBeNaN();
-      expect(result.loopLength).toBe(5000);
+      expect(result.loopLength).toBe(Math.round(5000 * (48000 / 44100)));
     });
 
-    it('returns early when only loopLength is missing', () => {
+    it('keeps 48 kHz and scales the start when only loopLength is missing', () => {
       const metadata = asMeta({
         streams: [
           {
@@ -108,8 +108,8 @@ describe('metadataService pure logic (mutation hardening)', () => {
       });
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
-      expect(result.newSampleRate).toBeNull();
-      expect(result.loopStart).toBe(1000);
+      expect(result.newSampleRate).toBe(48000);
+      expect(result.loopStart).toBe(Math.round(1000 * (48000 / 44100)));
       expect(result.loopLength).toBeNaN();
     });
 
@@ -120,7 +120,7 @@ describe('metadataService pure logic (mutation hardening)', () => {
       expect(result.loopLength).toBeNaN();
     });
 
-    it('does not rescale loops for mp3 even at high sample rates', () => {
+    it('rescales mp3 loops to 48 kHz when the source is above what LAME supports', () => {
       const metadata = asMeta({
         streams: [
           {
@@ -131,9 +131,9 @@ describe('metadataService pure logic (mutation hardening)', () => {
       });
 
       const result = convertLoopPoints(metadata, 'mp3', 'vorbis');
-      expect(result.newSampleRate).toBeNull();
-      expect(result.loopStart).toBe(1000);
-      expect(result.loopLength).toBe(4000);
+      expect(result.newSampleRate).toBe(48000);
+      expect(result.loopStart).toBe(500);
+      expect(result.loopLength).toBe(2000);
     });
 
     it('returns opus target sample rate even when input is already 48kHz', () => {

@@ -5,6 +5,18 @@ import {
   sanitizeMetaValueForArgs,
 } from '../../metadataService.js';
 
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as joinPath } from 'path';
+import { __setLogFileStateForTests } from '../../utils.js';
+
+// formatMetaDataArgs logs cleanup warnings to CSV; keep them out of the repo.
+const logDir = mkdtempSync(joinPath(tmpdir(), 'ezga-meta-logs-'));
+__setLogFileStateForTests(
+  joinPath(logDir, 'logs.csv'),
+  joinPath(logDir, 'error.csv')
+);
+
 const adversarialString = fc.oneof(
   fc.string({ minLength: 0, maxLength: 500 }),
   fc.constantFrom(
@@ -33,7 +45,7 @@ describe('metadata fuzz (adversarial inputs)', () => {
     );
   });
 
-  it('formatMetaDataArgs never throws and argv has no raw newline injection', () => {
+  it('formatMetaDataArgs never throws and argv has no carriage returns', () => {
     fc.assert(
       fc.property(
         fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_]{0,20}$/),
@@ -46,7 +58,8 @@ describe('metadata fuzz (adversarial inputs)', () => {
             streams: [{ tags: {} }],
           });
           for (const arg of metaDataArgs) {
-            expect(arg).not.toMatch(/\n|\r/);
+            expect(arg).not.toContain('\r');
+            expect(arg).not.toContain('\u0000');
           }
         }
       ),

@@ -1,5 +1,5 @@
 import { readdirSync, statSync, realpathSync } from 'fs';
-import { join, extname } from 'path';
+import { join, extname, resolve } from 'path';
 import chalk from 'chalk';
 import logger from './logger.js';
 import { recordSearchError, clearSearchErrors } from './utils.js';
@@ -9,11 +9,31 @@ import type { Settings } from './types/settings.js';
 // resolution is unavailable. Real loops are caught earlier by the visited set.
 export const MAX_WALK_DEPTH = 512;
 
+/**
+ * File extensions that belong to an input format: AIFF is also saved as
+ * .aif, and Ogg Opus files usually use .opus.
+ */
+export const extensionsForFormat = (format: string): string[] =>
+  format === 'aiff'
+    ? ['.aiff', '.aif']
+    : format === 'ogg'
+      ? ['.ogg', '.opus']
+      : [`.${format}`];
+
+/**
+ * macOS writes "._name" metadata stubs next to real files on FAT/exFAT/network
+ * drives. They share the audio extension but aren't audio, so ffmpeg fails.
+ */
+export const isAppleDoubleFile = (fileName: string): boolean =>
+  fileName.startsWith('._');
+
 //Searches for files that meet criteria
 const searchFiles = (settings: Settings): Promise<string[]> => {
   // Fresh error list for this run; reported at the end of the batch.
   clearSearchErrors();
-  const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
+  const fileExtensions = settings.inputFormats.flatMap((format) =>
+    extensionsForFormat(format)
+  );
   const searchPath = settings.inputFilePath;
 
   const allFiles: string[] = [];
@@ -59,6 +79,15 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
     }
   };
 
+  // When the output folder sits inside the input folder, don't search it:
+  // a re-run would otherwise pick up previous output as new input and nest
+  // another copy of the tree each time.
+  const excludedDir =
+    settings.outputFilePath &&
+    resolve(settings.outputFilePath) !== resolve(searchPath)
+      ? canonical(resolve(settings.outputFilePath))
+      : null;
+
   // A single unreadable file or folder (permissions, broken symlink, cloud
   // placeholder, locked file, etc.) must never abort the whole search. We record
   // it, keep going, and report everything at the end of the batch.
@@ -72,6 +101,7 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
     }
 
     const realDir = canonical(dir);
+    if (depth > 0 && excludedDir && realDir === excludedDir) return;
     if (visitedDirs.has(realDir)) return;
     visitedDirs.add(realDir);
 
@@ -97,10 +127,14 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
       if (stats.isDirectory()) {
         // Recursively walk into subdirectories
         walk(inputFilePath, depth + 1);
-      } else {
+      } else if (stats.isFile()) {
+        // Regular files only: a FIFO or device named *.wav would hang ffprobe.
         // Check if the file has a matching extension
         const fileExtension = extname(file).toLowerCase();
-        if (fileExtensions.includes(fileExtension)) {
+        if (
+          fileExtensions.includes(fileExtension) &&
+          !isAppleDoubleFile(file)
+        ) {
           allFiles.push(inputFilePath);
         }
       }

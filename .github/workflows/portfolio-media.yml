@@ -32,6 +32,9 @@ concurrency: portfolio-media
 
 jobs:
   capture:
+    # Never run pull requests from forks on the self-hosted runner: they would
+    # execute their own code there and produce the published artifact.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux]
     timeout-minutes: 20
     steps:

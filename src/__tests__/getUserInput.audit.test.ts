@@ -94,24 +94,23 @@ describe('getUserInput audit characterizations', () => {
     );
   });
 
-  it('treats a blank interactive input path as the current working directory', async () => {
+  it('re-prompts on a blank interactive input path instead of using the working directory', async () => {
     const cwdPath = resolve('');
+    const typedPath = resolve('/typed/input');
 
-    existsSyncMock.mockImplementation(
-      (targetPath: Parameters<typeof fs.existsSync>[0]) =>
-        String(targetPath) === cwdPath
-    );
+    existsSyncMock.mockReturnValue(true);
     statSyncMock.mockReturnValue(directoryStats as never);
     getAnswerMock
       .mockResolvedValueOnce('')
+      .mockResolvedValueOnce(typedPath)
       .mockResolvedValueOnce('')
       .mockResolvedValueOnce('wav')
       .mockResolvedValueOnce('mp3');
 
     const result = await getUserInput({} as never);
 
-    expect(result.inputFilePath).toBe(cwdPath);
-    expect(result.outputFilePath).toBe(cwdPath);
+    expect(result.inputFilePath).toBe(typedPath);
+    expect(result.inputFilePath).not.toBe(cwdPath);
   });
 
   it('rejects when statSync fails after the path existence check passes', async () => {

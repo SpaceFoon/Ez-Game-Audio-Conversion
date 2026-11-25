@@ -11,10 +11,10 @@
 
 <p align="center">
   <a href="https://github.com/SpaceFoon/Ez-Game-Audio-Conversion/releases/">
-    <img src="https://img.shields.io/badge/Download_Releases-181717?style=for-the-badge&logo=github&logoColor=white" alt="Download Releases">
+    <img src="https://img.shields.io/badge/Download-Releases-2ea44f?style=for-the-badge&labelColor=2b2b2b&logo=github&logoColor=white" alt="Download the latest release">
   </a>
   <a href="https://ezaudioconverter.com">
-    <img src="https://img.shields.io/badge/Get_the_GUI_Version-ezaudioconverter.com-ff0080?style=for-the-badge" alt="Get the GUI version at ezaudioconverter.com">
+    <img src="https://img.shields.io/badge/GUI_Version-ezaudioconverter.com-ff0080?style=for-the-badge&labelColor=2b2b2b&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0yIDEwaDIuNXY0SDJ6bTQuNC00aDIuNXYxMkg2LjR6bTQuMzUtNGgyLjV2MjBoLTIuNXptNC4zNSA0aDIuNXYxMmgtMi41em00LjQgNEgyMnY0aC0yLjV6Ii8%2BPC9zdmc%2B" alt="Get the GUI version at ezaudioconverter.com">
   </a>
 </p>
 
@@ -38,8 +38,8 @@ EZ-Game-Audio-Converter is a fast batch audio converter built for game developer
 - 🎵 **Automatic Bitrate and Codec Selection:** Chooses the output codec and a sensible variable bit rate target automatically, aiming for a strong balance between sound quality and file size.
 - 🤖 **Smart File Handling:** Prevents the same output filename from being queued more than once.
 - 📁 **Comprehensive Format Support:** Converts between WAV, MP3, OGG, FLAC, AIFF, and M4A AAC.
-- 📝 **Metadata Support:** Preserves standard tags automatically, including title, artist, album, track and disc data, ReplayGain, many iTunes and podcast fields, and other safe metadata when supported by the target format.
-- 🔁 **Loop Tag Support:** Reads loop points from supported input files and writes them to OGG, FLAC, MP3, and AIFF outputs. If the sample rate changes during conversion, loop timings are adjusted automatically. Loop points can be read from M4A and WAV, but cannot be written to those formats.
+- 📝 **Metadata Support:** Preserves standard tags automatically, including title, artist, album, track and disc data, ReplayGain, many iTunes and podcast fields, and other safe metadata when supported by the target format. Embedded cover art (album art) is not kept.
+- 🔁 **Loop Tag Support:** Reads loop points from every input format (including the WAV `smpl` loop chunk) and writes them to OGG, FLAC, MP3, and AIFF outputs. If the sample rate changes during conversion, loop timings are adjusted automatically. When your files have loop points, the app asks whether to keep them, skip them, or force them into WAV and M4A outputs too.
 - 🎼 **Opus and Vorbis Support for OGG:** Supports both Ogg Opus for efficiency and Ogg Vorbis for compatibility.
 - 🔒 **Fully Local Processing:** Runs entirely on your machine with no cloud uploads, no telemetry, no tracking, and no internet requirement.
 - 🎶 **High-Quality Output:** Uses FFmpeg for conversion quality, codec support, and speed.
@@ -61,6 +61,8 @@ Nothing fails silently. Every file's outcome is written to `logs.csv`, and any f
 ### Does it change my metadata?
 
 Metadata and loop tags are preserved through conversion. When the sample rate changes, loop timings are adjusted automatically to stay correct.
+
+The one exception is **cover art**: embedded album art is dropped from every output, including same-format conversions (MP3 to MP3). Game engines don't use it, and on short sound effects it can be bigger than the audio. If you need the art in your outputs, for example for a soundtrack release, add it back afterwards with a tagging tool such as [Mp3tag](https://www.mp3tag.de/en/) or [MusicBrainz Picard](https://picard.musicbrainz.org/).
 
 ## Usage
 
@@ -119,9 +121,10 @@ To change codec or bitrate defaults, look in `src/converterWorker.ts`.
 - Lossy formats utilize Variable Bit Rate (VBR) for increased compression.
 - Loop tags handling in this app:
   - **Read**: Can read loop points from any format (WAV, MP3, OGG, FLAC, AIFF, M4A)
-  - **Write**: Can only write loop points to certain formats (OGG, FLAC, MP3, AIFF)
+  - **Write**: Writes loop points to OGG, FLAC, MP3 and AIFF; with `force`, also to WAV and M4A
   - **Recommended**: For best loop point compatibility, use OGG or FLAC formats
-- FLAC is minimaly compressed. Saves a lot of space while still being nearly lossless.
+- FLAC is lossless and uses minimal compression for speed. It still saves a lot of space over WAV.
+- Embedded cover art (album art) is not copied to any output.
 
 ### Loop Point Support in This App
 
@@ -131,8 +134,8 @@ To change codec or bitrate defaults, look in `src/converterWorker.ts`.
 | FLAC   | ✅ Yes               | ✅ Yes                | Excellent lossless option                     |
 | MP3    | ✅ Yes               | ✅ Yes                | Good compatibility                            |
 | AIFF   | ✅ Yes               | ✅ Yes                | Limited player support                        |
-| M4A    | ✅ Yes               | ❌ No                 | Loop points not supported in this application |
-| WAV    | ✅ Yes               | ❌ No                 | Loop points not supported in this application |
+| M4A    | ✅ Yes               | ⚠️ With `force`       | Stored as custom tags; few players read them  |
+| WAV    | ✅ Yes               | ⚠️ With `force`       | Written as a `smpl` loop chunk                |
 
 For best results with loop points, use OGG or FLAC formats.
 

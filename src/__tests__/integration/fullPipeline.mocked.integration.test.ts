@@ -38,11 +38,13 @@ jest.unstable_mockModule('../../utils.js', () => ({
   addToLog: jest.fn(async () => true),
   isFileBusy: jest.fn(async () => false),
   writeSummaryToLogs: jest.fn(),
+  getLogFileNames: () => ({ log: 'logs.csv', error: 'error.csv' }),
   recordSearchError: jest.fn(),
   getSearchErrors: jest.fn(() => []),
   clearSearchErrors: jest.fn(),
   reportSearchErrors: jest.fn(async () => {}),
   findBinary: jest.fn(() => '/mock/base/converterWorker.js'),
+  platformSlug: 'linux',
   getErrorMessage: (error: unknown) =>
     error instanceof Error ? error.message : String(error || 'Unknown error'),
   handleExit: jest.fn((code: number = 0) => {

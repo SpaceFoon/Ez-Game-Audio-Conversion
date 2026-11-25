@@ -61,6 +61,7 @@ const { convertFiles } = await import('../converterManager.js');
 const { default: finalize } = await import('../finalize.js');
 const { default: ExitProgramError } = await import('../exitProgramError.js');
 const { default: runApp } = await import('../app.js');
+const { rl } = await import('../utils.js');
 
 describe('app.js', () => {
   let originalEnv: typeof globalThis.env | undefined;
@@ -123,6 +124,39 @@ describe('app.js', () => {
     expect(convertFiles).toHaveBeenCalledTimes(1);
     expect(finalize).toHaveBeenCalledTimes(1);
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses the command-line path only on the first run', async () => {
+    (finalize as unknown as Mock<() => Promise<boolean>>)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    (
+      getUserInput as unknown as Mock<() => Promise<object>>
+    ).mockRejectedValueOnce(new ExitProgramError('EXIT_PROGRAM:0'));
+
+    await runApp();
+
+    const calls = (getUserInput as unknown as Mock<() => Promise<object>>).mock
+      .calls as unknown[][];
+    expect(calls).toHaveLength(3);
+    expect(calls[0]?.[1]).toEqual({ useCliArg: true });
+    expect(calls[1]?.[1]).toEqual({ useCliArg: false });
+    expect(calls[2]?.[1]).toEqual({ useCliArg: false });
+  });
+
+  it('closes the prompt and sets a failing exit code after a fatal error', async () => {
+    const closeSpy = jest.spyOn(rl, 'close');
+    const previousExitCode = process.exitCode;
+    (searchFiles as unknown as Mock<() => Promise<never>>).mockRejectedValue(
+      new Error('boom')
+    );
+
+    await runApp();
+
+    expect(closeSpy).toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = previousExitCode;
+    closeSpy.mockRestore();
   });
 
   it('repeats the pipeline while finalize returns true', async () => {

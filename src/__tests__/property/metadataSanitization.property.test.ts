@@ -5,6 +5,18 @@ import {
   formatMetaDataArgs,
 } from '../../metadataService.js';
 
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as joinPath } from 'path';
+import { __setLogFileStateForTests } from '../../utils.js';
+
+// formatMetaDataArgs logs cleanup warnings to CSV; keep them out of the repo.
+const logDir = mkdtempSync(joinPath(tmpdir(), 'ezga-meta-logs-'));
+__setLogFileStateForTests(
+  joinPath(logDir, 'logs.csv'),
+  joinPath(logDir, 'error.csv')
+);
+
 const adversarialValue = fc.oneof(
   fc.string({ minLength: 0, maxLength: 300 }),
   fc.constantFrom(
@@ -53,13 +65,13 @@ describe('property: metadata sanitization', () => {
     );
   });
 
-  it('AUDIT: embedded newlines are not passed through to ffmpeg metadata args', () => {
+  it('keeps embedded line breaks as \\n (no carriage returns)', () => {
     const { metaDataArgs } = formatMetaDataArgs({
       format: { tags: { title: 'hello\r\nworld' } },
       streams: [{ tags: {} }],
     });
 
-    expect(metaDataArgs.some((arg) => arg.includes('\n'))).toBe(false);
-    expect(metaDataArgs.some((arg) => arg.includes('hello'))).toBe(true);
+    expect(metaDataArgs).toContain('title=hello\nworld');
+    expect(metaDataArgs.some((arg) => arg.includes('\r'))).toBe(false);
   });
 });

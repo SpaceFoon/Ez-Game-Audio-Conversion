@@ -6,9 +6,12 @@ on:
   pull_request:
     branches: [dev, main]
 
+permissions:
+  contents: read
+
 jobs:
   lint-build-unit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Linux"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,8 +28,9 @@ jobs:
       - name: Download ffmpeg binaries
         run: npm run install:ffmpeg
 
+      # Check only: `npm run fix` rewrites files, so bad formatting never failed CI.
       - name: Lint and format
-        run: npm run fix
+        run: npx eslint . && npx prettier --check .
 
       - name: Type check and build
         run: npm run build
@@ -56,7 +60,7 @@ jobs:
 
   e2e-real-ffmpeg:
     name: E2E (${{ matrix.platform }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os != 'ubuntu-latest' && matrix.os || github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Linux"]') }}
     strategy:
       fail-fast: false
       matrix:

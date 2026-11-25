@@ -92,7 +92,9 @@ runs:
         }
         mkdir -p ffmpeg-bin/macos
         ok=0
-        for v in 90 81 80; do
+        # Format is major+minor with no dots (9.1 -> 91). The 9.0 arm64 build
+        # (ffmpeg90arm.zip) now 404s; 9.1 is the current 9.x arm64 build.
+        for v in 91 90 81 80; do
           echo "Trying OSXExperts $v"
           if fetch "https://www.osxexperts.net/ffmpeg${v}arm.zip" "https://www.osxexperts.net/ffprobe${v}arm.zip"; then ok=1; break; fi
           echo "::warning::OSXExperts $v not available"

@@ -180,12 +180,12 @@ describe('metadataService', () => {
   });
 
   describe('sanitizeMetaValueForArgs', () => {
-    it('removes null bytes and replacement chars, normalizes line endings to spaces, and trims whitespace', () => {
+    it('removes null bytes and replacement chars, normalizes line endings to \\n, and trims whitespace', () => {
       const result = sanitizeMetaValueForArgs(
         '  A\u0000B\uFFFDC\r\nD\rE\u0000  '
       );
 
-      expect(result).toBe('ABC D E');
+      expect(result).toBe('ABC\nD\nE');
     });
   });
 
@@ -333,34 +333,21 @@ describe('metadataService', () => {
 
     it('should handle different sample rates correctly', () => {
       // Test different sample rate bands - following the exact ranges in metadataService.ts
+      // Opus always decodes at 48 kHz, so every source is encoded at 48 kHz.
       const testCases = [
-        // if (sampleRateNumber < 8000)
-        { rate: '7000', expected: 8000 },
-
-        // else if (sampleRateNumber <= 8000) - 8000 is a valid Opus rate
-        { rate: '8000', expected: 8000 },
-
-        // else if (sampleRateNumber > 8000)
-        { rate: '9000', expected: 12000 },
-        { rate: '10000', expected: 12000 },
-
-        // else if (sampleRateNumber > 12000)
-        { rate: '12500', expected: 16000 },
-        { rate: '16000', expected: 16000 },
-
-        // else if (sampleRateNumber > 16000)
-        { rate: '20000', expected: 24000 },
-
-        // else if (sampleRateNumber >= 22050)
-        { rate: '22050', expected: 24000 },
-        { rate: '24000', expected: 24000 },
-
-        // if (sampleRateNumber >= 32000)
-        { rate: '32000', expected: 48000 },
-        { rate: '44100', expected: 48000 },
-        { rate: '48000', expected: 48000 },
-        { rate: '96000', expected: 48000 },
-      ];
+        '7000',
+        '8000',
+        '9000',
+        '12500',
+        '16000',
+        '20000',
+        '22050',
+        '24000',
+        '32000',
+        '44100',
+        '48000',
+        '96000',
+      ].map((rate) => ({ rate, expected: 48000 }));
 
       testCases.forEach(({ rate, expected }) => {
         const metadata = asMeta({
@@ -395,7 +382,8 @@ describe('metadataService', () => {
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
-      expect(result.newSampleRate).toBeNull();
+      // Unknown input rate: loops can't be scaled, but Opus still gets 48 kHz.
+      expect(result.newSampleRate).toBe(48000);
       expect(result.loopStart).toBe(1000);
       expect(result.loopLength).toBe(5000);
     });
@@ -415,7 +403,7 @@ describe('metadataService', () => {
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
-      expect(result.newSampleRate).toBeNull();
+      expect(result.newSampleRate).toBe(48000);
       expect(result.loopStart).toBe(1000);
       expect(result.loopLength).toBe(5000);
     });
@@ -431,10 +419,6 @@ describe('metadataService', () => {
         'LOOPSTART=1000',
         '-metadata',
         'LOOPLENGTH=5000',
-        '-metadata',
-        'loopstart=1000',
-        '-metadata',
-        'looplength=5000',
       ]);
 
       // Should not contain alternative/underscore formats we no longer use
@@ -455,10 +439,6 @@ describe('metadataService', () => {
         'LOOPSTART=1000',
         '-metadata',
         'LOOPLENGTH=5000',
-        '-metadata',
-        'loopstart=1000',
-        '-metadata',
-        'looplength=5000',
       ]);
 
       // Should not contain alternative/underscore formats we no longer use
@@ -472,8 +452,12 @@ describe('metadataService', () => {
 
     it('should return empty array for invalid loop points', () => {
       expect(formatLoopData(NaN, 5000)).toEqual([]);
-      expect(formatLoopData(1000, NaN)).toEqual([]);
       expect(formatLoopData(NaN, NaN)).toEqual([]);
+      // A lone loop start is still a valid loop (loop to the end of the file).
+      expect(formatLoopData(1000, NaN)).toEqual([
+        '-metadata',
+        'LOOPSTART=1000',
+      ]);
     });
   });
 

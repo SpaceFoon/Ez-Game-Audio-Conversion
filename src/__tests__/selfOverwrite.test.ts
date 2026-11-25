@@ -7,7 +7,14 @@
  * the original is destroyed.  These tests make sure that can never happen.
  */
 
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import {
+  jest,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from '@jest/globals';
 import { join } from 'path';
 import {
   defaultCreateConversionListAnswer,
@@ -56,6 +63,7 @@ jest.unstable_mockModule('../utils.js', () => ({
 // ── Dynamic imports ──────────────────────────────────────────────────────────
 
 const fs = await import('fs');
+const { __setCaseInsensitiveForTests } = await import('../pathKey.js');
 const { getAnswer, settings, handleExit } = await import('../utils.js');
 const { default: createConversionList } =
   await import('../createConversionList.js');
@@ -153,6 +161,10 @@ describe('self-overwrite protection', () => {
   // ────────────────────────────────────────────────────────────────────────
 
   describe('case-insensitive path matching', () => {
+    // Simulate a case-insensitive drive (Windows, macOS default, exFAT).
+    beforeEach(() => __setCaseInsensitiveForTests(true));
+    afterEach(() => __setCaseInsensitiveForTests(null));
+
     it('detects SONG.WAV → song.wav as self-overwrite', async () => {
       settings.inputFilePath = '/Input';
       settings.outputFilePath = '/input';

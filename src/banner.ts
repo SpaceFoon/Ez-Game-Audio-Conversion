@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SEA banner: the sentinel below is replaced with the exact cfonts
  * ANSI output string by scripts/gen-banner.js during the build:sea pipeline.
  * The banner is left-aligned in the string and centered at runtime based on

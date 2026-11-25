@@ -17,6 +17,9 @@ import {
   reportSearchErrors,
 } from './utils.js';
 import logger from './logger.js';
+import { isSamePath, pathKey, realPathOr } from './pathKey.js';
+import { findLoopTaggedFile } from './loopTagScan.js';
+import type { LoopDataMode } from './types/settings.js';
 import type {
   AudioFormat,
   ConversionCandidate,
@@ -61,14 +64,15 @@ export const buildBasenameWithFormat = (
 export const pathsResolveToSameFile = (
   inputFile: string,
   outputFile: string
-): boolean =>
-  resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase();
+): boolean => isSamePath(inputFile, outputFile);
 
-// Get a unique output file name
+// Get a unique output file name. `isReserved` reports names already planned
+// in this batch (not yet on disk) so two outputs never get the same copy name.
 const getOutputFileCopy = async (
   inputFile: string,
   outputFormat: AudioFormat,
   outputFolder: string,
+  isReserved: (filePath: string) => boolean = () => false,
   copyNumber: number = 1
 ): Promise<string> => {
   const parsed = parseCopyFilename(inputFile);
@@ -80,11 +84,12 @@ const getOutputFileCopy = async (
     outputFolder,
     `${baseNameCopy}-copy(${copyNumber})`
   )}.${outputFormat}`;
-  if (existsSync(outputFileCopy)) {
+  if (existsSync(outputFileCopy) || isReserved(outputFileCopy)) {
     outputFileCopy = await getOutputFileCopy(
       outputFileCopy,
       outputFormat,
       outputFolder,
+      isReserved,
       copyNumber + 1
     );
   }
@@ -121,6 +126,58 @@ const askOggCodec = async (): Promise<OggCodec> => {
   return input;
 };
 
+/**
+ * Ask what to do with loop tags. `offerForce` is true when WAV or M4A is
+ * among the outputs: those formats can't store loop tags reliably, so by
+ * default they are left out there.
+ */
+export const askLoopDataMode = async (
+  exampleFile: string,
+  offerForce: boolean
+): Promise<LoopDataMode> => {
+  while (true) {
+    const answer = (
+      await getAnswer(
+        chalk.blue.bold(
+          `\n🔁 Some input files have loop points (e.g. ${basename(exampleFile)}).`,
+          '\n   Leave blank to keep them in OGG, FLAC, MP3 and AIFF outputs.',
+          '\n   Type "skip" to leave loop tags out of every output.',
+          ...(offerForce
+            ? [
+                '\n   Type "force" to also write them to WAV (as a smpl loop chunk) and M4A.',
+              ]
+            : []),
+          '\n   Loop tags: '
+        )
+      )
+    )
+      .trim()
+      .toLowerCase();
+
+    let mode: LoopDataMode | null = null;
+    if (answer === '' || answer === 'keep' || answer === 'auto') mode = 'auto';
+    else if (answer === 'skip' || answer === 's') mode = 'skip';
+    else if (offerForce && (answer === 'force' || answer === 'f'))
+      mode = 'force';
+
+    if (!mode) {
+      logger.warn(
+        `\n⚠️ Please leave blank, or type "skip"${offerForce ? ' or "force"' : ''}.`
+      );
+      continue;
+    }
+
+    const label =
+      mode === 'auto'
+        ? 'keep where supported'
+        : mode === 'skip'
+          ? 'skip'
+          : 'write to every format';
+    logger.log(chalk.green.italic(`\n ✨ Loop tags: ${label} ✅`));
+    return mode;
+  }
+};
+
 export const getRelativeOutputDir = (
   inputRoot: string,
   inputFile: string
@@ -135,7 +192,13 @@ export const getRelativeOutputDir = (
   }
 
   // Guard against writing outside output root if paths are inconsistent.
-  if (relDir.startsWith('..') || isAbsolute(relDir)) {
+  // (A folder merely *named* "..something" is fine — only a real ".." segment escapes.)
+  if (
+    relDir === '..' ||
+    relDir.startsWith('../') ||
+    relDir.startsWith('..\\') ||
+    isAbsolute(relDir)
+  ) {
     logger.warn(
       `Could not preserve folder structure for ${inputFile}; falling back to output root.`
     );
@@ -145,15 +208,24 @@ export const getRelativeOutputDir = (
   return relDir;
 };
 
-/** Normalized path key for O(1) output conflict lookups. */
+/**
+ * Normalized path key for O(1) output conflict lookups. Resolves symlinked or
+ * aliased folders (so an output folder that is really the input folder can't
+ * overwrite inputs) and always folds case (see pathKey.ts for why).
+ */
 export const normalizeOutputPathKey = (filePath: string): string =>
-  resolve(filePath).toLowerCase();
+  pathKey(filePath);
 
 /** Walk root once and collect existing file paths (avoids per-output existsSync). */
 export const scanExistingFiles = (rootPath: string): Set<string> => {
   const found = new Set<string>();
+  // Folders already walked (by real path) so symlink loops can't recurse forever.
+  const visited = new Set<string>();
 
   const walk = (dir: string): void => {
+    const real = realPathOr(dir);
+    if (visited.has(real)) return;
+    visited.add(real);
     let entries: string[];
     try {
       entries = readdirSync(dir);
@@ -180,6 +252,29 @@ export const scanExistingFiles = (rootPath: string): Set<string> => {
   return found;
 };
 
+/**
+ * Existing files in just the given folders (not their subfolders): the only
+ * places this batch can write to. Scanning the whole output root instead
+ * would walk an entire drive when the output folder is e.g. `D:\\`.
+ */
+export const scanExistingFilesIn = (dirs: Iterable<string>): Set<string> => {
+  const found = new Set<string>();
+  for (const dir of dirs) {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      continue; // Folder doesn't exist yet (or can't be read): nothing to clash with.
+    }
+    // Subfolders are included on purpose: a folder named like an output
+    // blocks that output just as a file would.
+    for (const name of names) {
+      found.add(normalizeOutputPathKey(join(dir, name)));
+    }
+  }
+  return found;
+};
+
 //Create final list of output files to convert
 const createConversionList = async (
   files: string[]
@@ -192,6 +287,9 @@ const createConversionList = async (
     singleFileMode,
   } = settings;
   let outputFolder: string | null = null;
+
+  // Loop-tag handling is asked per batch too; default to keeping them.
+  settings.loopDataMode = 'auto';
 
   // Choose Vorbis/Opus fresh for each batch that includes OGG output.
   if (outputFormats.includes('ogg')) {
@@ -225,41 +323,28 @@ const createConversionList = async (
     handleExit(1);
   }
 
-  // Pre-calculate and create all unique output directories ONCE
-  // This avoids 180k+ existsSync calls (30k files × 6 formats)
-  if (inputFilePath !== outputFilePath) {
-    logger.log(chalk.cyan('\n📁 Preparing output directories...'));
-    const outputDirs = new Set<string>();
-    for (const inputFile of files) {
-      try {
-        const relPath = getRelativeOutputDir(inputFilePath, inputFile);
-        outputDirs.add(join(outputFilePath, relPath));
-      } catch {
-        // Path issues are handled later in the main loop
-      }
+  // The folders outputs will be written to: the output folder mirrors the
+  // input tree, or (same-folder mode) each input's own folder.
+  const outputRoot =
+    inputFilePath !== outputFilePath ? outputFilePath : inputFilePath;
+  const targetDirs = new Set<string>();
+  for (const inputFile of files) {
+    try {
+      targetDirs.add(
+        join(outputRoot, getRelativeOutputDir(inputFilePath, inputFile))
+      );
+    } catch {
+      // Path issues are handled later in the main loop
     }
-    logger.log(chalk.cyan(`   Creating ${outputDirs.size} directories...`));
-    for (const dir of outputDirs) {
-      if (!existsSync(dir)) {
-        try {
-          mkdirSync(dir, { recursive: true });
-        } catch (error) {
-          logger.error(
-            chalk.redBright.bold("Couldn't create directory:", dir),
-            error
-          );
-        }
-      }
-    }
-    logger.log(chalk.green('   ✅ Directories ready'));
   }
-
-  const conflictCheckRoot =
-    resolve(inputFilePath) === resolve(outputFilePath)
-      ? inputFilePath
-      : outputFilePath;
-  const existingOutputs = scanExistingFiles(conflictCheckRoot);
+  const existingOutputs = scanExistingFilesIn(targetDirs);
   const skipConflictChecks = existingOutputs.size === 0;
+  const plannedOutputs = new Set<string>();
+  // Every input in this batch: an existing output that is also an input must
+  // never be overwritten, even after "o"/"oa" (it may not be converted yet).
+  const inputKeys = new Set(files.map(normalizeOutputPathKey));
+  const isPlannedOutput = (outputFile: string): boolean =>
+    plannedOutputs.has(normalizeOutputPathKey(outputFile));
   const outputAlreadyExists = (outputFile: string): boolean =>
     existingOutputs.has(normalizeOutputPathKey(outputFile));
 
@@ -329,7 +414,7 @@ const createConversionList = async (
       // Stops from overwriting input file.
       // resolve() normalises .., ./, trailing slashes, and relative vs absolute.
       if (
-        resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()
+        normalizeOutputPathKey(inputFile) === normalizeOutputPathKey(outputFile)
       ) {
         logger.log(
           chalk.yellow(
@@ -354,15 +439,20 @@ const createConversionList = async (
             outputFile = await getOutputFileCopy(
               inputFile,
               outputFormat,
-              outputFolder || dirname(inputFile)
+              outputFolder || dirname(inputFile),
+              isPlannedOutput
             );
             break;
           }
-          convertSelf = await getAnswer(
-            chalk.blueBright(
-              '\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file(1).ogg).\n\n Type "yes" or "no": '
+          convertSelf = (
+            await getAnswer(
+              chalk.blueBright(
+                '\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file-copy(1).ogg).\n\n Type "yes" or "no": '
+              )
             )
-          );
+          )
+            .trim()
+            .toLowerCase();
           if (
             convertSelf !== '' &&
             convertSelf !== 'yes' &&
@@ -386,17 +476,22 @@ const createConversionList = async (
           outputFile = await getOutputFileCopy(
             inputFile,
             outputFormat,
-            outputFolder || dirname(inputFile)
+            outputFolder || dirname(inputFile),
+            isPlannedOutput
           );
           action = 'convert';
           response = null;
         },
         ra: async () => {
-          if (!outputAlreadyExists(outputFile)) return;
+          // A name another input in this batch already claimed is a conflict
+          // too; renaming beats silently dropping this input later.
+          if (!outputAlreadyExists(outputFile) && !isPlannedOutput(outputFile))
+            return;
           outputFile = await getOutputFileCopy(
             outputFile,
             outputFormat,
-            outputFolder || dirname(outputFile)
+            outputFolder || dirname(outputFile),
+            isPlannedOutput
           );
           action = 'convert';
         },
@@ -410,50 +505,77 @@ const createConversionList = async (
         },
       };
 
-      // Handle file exists responses
-      switch (response) {
-        case '':
-          logger.error('response was empty:', response);
-          break;
-        case 'ra':
-          await responseActions['ra']?.();
-          break;
-        case 'sa':
-          await responseActions['sa']?.();
-          break;
-        case 'oa':
-          logger.log(
-            chalk.red('🔺🚩OVERWRITE FILE🚩'),
-            chalk.yellow(outputFile, ' 🔺')
-          );
-          break;
-        default:
-          while (true) {
-            if (!response) {
-              if (!skipConflictChecks && outputAlreadyExists(outputFile)) {
-                logger.log(
-                  chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
-                );
+      // Handle file exists responses. Skip entirely when this item is already
+      // skipped (e.g. user declined same-type conversion) — otherwise a rename
+      // answer here or a prior "ra" would flip it back to 'convert'.
+      if (action !== 'skip') {
+        switch (response) {
+          case '':
+            logger.error('response was empty:', response);
+            break;
+          case 'ra':
+            await responseActions['ra']?.();
+            break;
+          case 'sa':
+            await responseActions['sa']?.();
+            break;
+          case 'oa':
+            if (outputAlreadyExists(outputFile)) {
+              logger.log(
+                chalk.red('🔺🚩OVERWRITE FILE🚩'),
+                chalk.yellow(outputFile, ' 🔺')
+              );
+            }
+            break;
+          default:
+            while (true) {
+              if (!response) {
+                if (!skipConflictChecks && outputAlreadyExists(outputFile)) {
+                  logger.log(
+                    chalk.red.bold(`\n🚨 ${outputFile} 🤔 already exists!`)
+                  );
 
-                response = await getAnswer(
-                  chalk.blue.bold(
-                    `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
-                  )
-                );
-                response = response ? response.trim().toLowerCase() : '';
+                  response = await getAnswer(
+                    chalk.blue.bold(
+                      `\n[O]verwrite, [R]ename or [S]kip? 👀 Add 'a' for all (e.g., oa, ra, sa)`
+                    )
+                  );
+                  response = response ? response.trim().toLowerCase() : '';
 
-                if (response && responseActions[response]) {
-                  await responseActions[response]?.();
-                  break;
+                  if (response && responseActions[response]) {
+                    await responseActions[response]?.();
+                    break;
+                  } else {
+                    response = null;
+                    logger.warn('\n⚠️ Invalid selection! Try again ⚠️');
+                  }
                 } else {
-                  response = null;
-                  logger.warn('\n⚠️ Invalid selection! Try again ⚠️');
+                  break;
                 }
-              } else {
-                break;
               }
             }
-          }
+        }
+      }
+
+      if (
+        action === 'convert' &&
+        inputKeys.has(normalizeOutputPathKey(outputFile))
+      ) {
+        logger.warn(
+          chalk.yellow(
+            `⚠️  ${outputFile} is one of your input files — renaming the output instead of overwriting it.`
+          )
+        );
+        outputFile = await getOutputFileCopy(
+          outputFile,
+          outputFormat,
+          outputFolder || dirname(outputFile),
+          isPlannedOutput
+        );
+      }
+
+      if (action === 'convert') {
+        plannedOutputs.add(normalizeOutputPathKey(outputFile));
       }
 
       // Add to conversion list
@@ -481,6 +603,22 @@ const createConversionList = async (
     );
   }
 
+  // Ask how to handle loop tags only when an input actually has some.
+  const toConvert = conversionList.filter((x) => x.action === 'convert');
+  if (toConvert.length > 0) {
+    const loopFile = findLoopTaggedFile(
+      new Set(toConvert.map((x) => x.inputFile))
+    );
+    if (loopFile) {
+      settings.loopDataMode = await askLoopDataMode(
+        loopFile,
+        toConvert.some(
+          (x) => x.outputFormat === 'wav' || x.outputFormat === 'm4a'
+        )
+      );
+    }
+  }
+
   // Process the conversion list
   while (true) {
     // Function to remove duplicates based on outputFile.
@@ -492,7 +630,8 @@ const createConversionList = async (
     ): ConversionCandidate[] => {
       const seen = new Map<string, string>();
       return list.filter((conversion: ConversionCandidate) => {
-        const firstInput = seen.get(conversion.outputFile);
+        const key = normalizeOutputPathKey(conversion.outputFile);
+        const firstInput = seen.get(key);
         if (firstInput !== undefined) {
           logger.warn(
             chalk.yellow(
@@ -501,7 +640,7 @@ const createConversionList = async (
           );
           return false;
         }
-        seen.set(conversion.outputFile, conversion.inputFile);
+        seen.set(key, conversion.inputFile);
         return true;
       });
     };
@@ -565,12 +704,31 @@ const createConversionList = async (
       )
     );
 
-    if (/^no$/i.test(accept_answer)) {
+    const accepted = accept_answer.trim();
+    if (/^no?$/i.test(accepted)) {
       logger.log('\n🚫 Conversion cancelled. Restarting program 🚫');
       handleExit(0);
-    } else if (!/^yes$/i.test(accept_answer)) {
+    } else if (!/^y(es)?$/i.test(accepted)) {
       logger.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');
       continue;
+    }
+
+    // Create output folders only now that the user has said yes, and only
+    // for files that will actually be written.
+    const outputDirs = new Set(
+      filesToConvert.map((f) => dirname(f.outputFile))
+    );
+    for (const dir of outputDirs) {
+      if (!existsSync(dir)) {
+        try {
+          mkdirSync(dir, { recursive: true });
+        } catch (error) {
+          logger.error(
+            chalk.redBright.bold("Couldn't create directory:", dir),
+            error
+          );
+        }
+      }
     }
 
     return filesToConvert;

@@ -9,21 +9,83 @@ import {
   formatMetaDataArgs,
   convertLoopPoints,
   formatLoopData,
+  clearSourceLoopTagArgs,
 } from './metadataService.js';
+import { getAudioStream } from './audioStream.js';
 import { platformSlug, getErrorMessage, findBinary } from './utils.js';
+import { removeIfWrittenSince } from './fileCleanup.js';
+import { writeWavSmplLoop } from './wavLoops.js';
+import { isEmptyFlac } from './outputChecks.js';
+import { isCaseInsensitiveDir } from './pathKey.js';
 import logger from './logger.js';
 import type { LoopDataMode } from './types/settings.js';
 
-/** Returns true when output path contains characters unsafe for ffmpeg spawn args. */
-export const outputPathHasInvalidCharacters = (outputFile: string): boolean => {
-  if (outputFile.includes('"')) return true;
-  if (outputFile.includes('\n') || outputFile.includes('\r')) return true;
+/**
+ * Returns true when the output path can't be used as a filename.
+ * Control characters are rejected everywhere. The Windows-reserved characters
+ * (<>:"|?*) are only rejected on Windows — they are legal on Linux and macOS,
+ * so names like "Track 01: Intro" must still convert there.
+ */
+export const outputPathHasInvalidCharacters = (
+  outputFile: string,
+  platform: string = platformSlug
+): boolean => {
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1F]/.test(outputFile)) return true;
+  if (platform !== 'windows') return false;
 
   const pathToCheck = /^[A-Za-z]:/.test(outputFile)
     ? outputFile.slice(2)
     : outputFile;
-  // eslint-disable-next-line no-control-regex
-  return /[\x00-\x1F<>:|?*]/.test(pathToCheck);
+  return /[<>:"|?*]/.test(pathToCheck);
+};
+
+/** Layouts libvorbis stores as-is. */
+const VORBIS_LAYOUTS = new Set([
+  'mono',
+  'stereo',
+  '3.0',
+  'quad',
+  'quad(side)',
+  '5.0',
+  '5.0(side)',
+  '5.1',
+  '5.1(side)',
+  '6.1',
+  '7.1',
+  'downmix',
+]);
+/** The Vorbis layout for each channel count. */
+const VORBIS_LAYOUT_FOR_CHANNELS = [
+  '',
+  'mono',
+  'stereo',
+  '3.0',
+  'quad',
+  '5.0',
+  '5.1',
+  '6.1',
+  '7.1',
+];
+
+/**
+ * Layout to remix to before Vorbis encoding, or null when the source layout
+ * is already a Vorbis one (or unknown, so there's nothing to remap).
+ */
+/**
+ * False for layouts with no speaker positions: missing, "unknown", or
+ * ffmpeg's "6 channels" style.
+ */
+export const hasNamedLayout = (layout: string | undefined): boolean =>
+  !!layout && layout !== 'unknown' && !/channels?$/.test(layout);
+
+export const vorbisRemixLayout = (
+  stream: { channels?: number; channel_layout?: string } | undefined
+): string | null => {
+  const layout = stream?.channel_layout;
+  const channels = Number(stream?.channels);
+  if (!hasNamedLayout(layout) || VORBIS_LAYOUTS.has(layout!)) return null;
+  return VORBIS_LAYOUT_FOR_CHANNELS[channels] || null;
 };
 
 type WorkerFileContext = {
@@ -48,8 +110,13 @@ const failWorker = (reason: unknown): Promise<never> => {
   return Promise.reject(new Error(msg));
 };
 
+// Set once any error has been posted, so the top-level catch only reports
+// failures nothing else has explained (e.g. an unexpected throw).
+let errorPosted = false;
+
 // Send structured error to manager (no hard exit here; allow caller to throw/reject)
 const postError = (reason: unknown, fileCtx: WorkerFileContext = {}) => {
+  errorPosted = true;
   const msg =
     reason instanceof Error
       ? reason.message
@@ -93,7 +160,7 @@ const converterWorker = async ({
   }
 
   // Validate output file path
-  if (outputFile.includes('"')) {
+  if (platformSlug === 'windows' && outputFile.includes('"')) {
     return failWorker(
       `Output file path contains quotes which will cause problems: ${outputFile}`
     );
@@ -105,7 +172,7 @@ const converterWorker = async ({
 
   if (outputPathHasInvalidCharacters(outputFile)) {
     return failWorker(
-      `Output file path contains invalid characters (control chars or <>:|?*): ${outputFile}`
+      `Output file path contains invalid characters (control chars${platformSlug === 'windows' ? ' or <>:|?*' : ''}): ${outputFile}`
     );
   }
 
@@ -119,7 +186,12 @@ const converterWorker = async ({
   // Defense in depth: never allow ffmpeg -y to overwrite the source file.
   // The upstream guard in createConversionList should prevent this, but if
   // anything slips through, this hard stop protects the user's data.
-  if (resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()) {
+  const sameIgnoringCase =
+    resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase();
+  if (
+    resolve(inputFile) === resolve(outputFile) ||
+    (sameIgnoringCase && isCaseInsensitiveDir(dirname(resolve(inputFile))))
+  ) {
     return failWorker(
       `CRITICAL: output path resolves to input file — refusing to overwrite: ${inputFile}`
     );
@@ -132,33 +204,33 @@ const converterWorker = async ({
       `Could not read metadata from input file (ffprobe failed): ${inputFile}`
     );
   }
+  if (!getAudioStream(metadata)) {
+    return failWorker(`Input file has no audio stream: ${inputFile}`);
+  }
 
   // Get formatted metadata and channels as arrays (safe for spawn)
   const { metaDataArgs, channelsArgs } = formatMetaDataArgs(
     metadata,
-    inputFile
+    inputFile,
+    outputFormat
   );
 
   // Convert loop points if needed
-  const { newSampleRate, loopStart, loopLength } = convertLoopPoints(
-    metadata,
-    outputFormat,
-    oggCodec
-  );
+  const { newSampleRate, loopStart, loopLength, hasLoopEnd } =
+    convertLoopPoints(metadata, outputFormat, oggCodec, inputFile);
 
   // Build sample rate args for ffmpeg command
   const sampleRateArgs = newSampleRate ? ['-ar', String(newSampleRate)] : [];
 
   // Format loop data for ffmpeg command
   let loopDataArgs: string[] = [];
+  // WAV has no tag field for loops; "force" writes a smpl chunk after ffmpeg.
+  let wavSmplLoop: { loopStart: number; loopLength: number } | null = null;
   if (loopDataMode === 'skip') {
     loopDataArgs = [];
   } else if (
-    loopStart !== null &&
-    loopLength !== null &&
     !isNaN(loopStart) &&
-    !isNaN(loopLength) &&
-    !(loopStart === 0 && loopLength === 0)
+    !(loopStart === 0 && (loopLength === 0 || isNaN(loopLength)))
   ) {
     const fmt = outputFormat.toLowerCase();
     const unsupportedFormat = fmt === 'm4a' || fmt === 'wav';
@@ -167,8 +239,12 @@ const converterWorker = async ({
         `Loop points are not supported for ${fmt.toUpperCase()} format`
       );
       loopDataArgs = [];
+    } else if (fmt === 'wav') {
+      wavSmplLoop = { loopStart, loopLength };
     } else {
-      loopDataArgs = formatLoopData(loopStart, loopLength);
+      loopDataArgs = formatLoopData(loopStart, loopLength, hasLoopEnd);
+      // The MP4 writer drops custom tags unless told to keep them.
+      if (fmt === 'm4a') loopDataArgs.push('-movflags', 'use_metadata_tags');
     }
   }
 
@@ -212,9 +288,10 @@ const converterWorker = async ({
     },
     aiff: {
       codec: 'pcm_s16le',
-      // Add support for AIFF metadata - keep metadata and write ID3 tags
+      // Write tags as ID3. Tags are rebuilt like every other format: copying
+      // them through would lose OGG/Opus tags, which ffmpeg keeps per stream
+      // while the AIFF writer only reads file-level tags.
       additionalOptions: ['-write_id3v2', '1'],
-      preserveMetadata: true, // Flag to avoid using -map_metadata -1 for AIFF
     },
     flac: { codec: 'flac', additionalOptions: ['-compression_level', '1'] }, //Minimal compression but 30% smaller than without.
   };
@@ -260,7 +337,18 @@ const converterWorker = async ({
   } = getFormatConfig(outputFormat, oggCodec);
 
   // Build the command arguments array
-  const ffmpegArgs: string[] = ['-loglevel', 'error', '-i', inputFile];
+  // -xerror: stop at the first decode error, so a corrupt or truncated input
+  // fails instead of "succeeding" with missing audio. -abort_on: an input
+  // with no samples fails instead of producing an output with no audio.
+  const ffmpegArgs: string[] = [
+    '-loglevel',
+    'error',
+    '-xerror',
+    '-abort_on',
+    'empty_output_stream',
+    '-i',
+    inputFile,
+  ];
 
   // Only use -map_metadata -1 if we don't need to preserve original metadata
   if (!preserveMetadata) {
@@ -280,6 +368,16 @@ const converterWorker = async ({
     ffmpegArgs.push(...sampleRateArgs);
   }
 
+  // FLAC keeps the source bit depth. Without this, lossy and 8/16-bit sources
+  // decode to float and come out as 24-bit FLAC: bigger, with no added detail.
+  if (outputFormat === 'flac') {
+    const stream = getAudioStream(metadata);
+    const bits = Number(
+      stream?.bits_per_raw_sample || stream?.bits_per_sample || 0
+    );
+    if (!(bits > 16)) ffmpegArgs.push('-sample_fmt', 's16');
+  }
+
   // Add basic options
   ffmpegArgs.push('-vn', '-y');
 
@@ -290,14 +388,49 @@ const converterWorker = async ({
     ffmpegArgs.push(...metaDataArgs);
   }
 
+  // Formats that keep source metadata would otherwise carry the original loop
+  // tags through even when loop data is meant to be dropped.
+  if (preserveMetadata && loopDataMode === 'skip') {
+    ffmpegArgs.push(...clearSourceLoopTagArgs(metadata));
+  }
+
   // Add loop metadata args
   if (loopDataArgs.length) {
     ffmpegArgs.push(...loopDataArgs);
   }
 
-  // Add channels args
+  // MP3 (LAME) only encodes mono/stereo, so a surround source is downmixed.
   if (channelsArgs && channelsArgs.length) {
-    ffmpegArgs.push(...channelsArgs);
+    const channelCount = Number(channelsArgs[channelsArgs.indexOf('-ac') + 1]);
+    if (outputFormat === 'mp3' && channelCount > 2) {
+      ffmpegArgs.push('-ac', '2');
+    } else {
+      // -ac only for sources with no named layout: it gives them the default
+      // layout for their channel count, which the AAC encoder requires. On a
+      // named layout (quad, 5.1(side), ...) it would remix into the default
+      // one and move sound to other speakers, so it is left out there.
+      if (!hasNamedLayout(getAudioStream(metadata)?.channel_layout)) {
+        ffmpegArgs.push(...channelsArgs);
+      }
+      // libopus's default surround mapping rejects every 3- and 4-channel
+      // layout (and anything over 8). Mapping family 255 stores the channels
+      // as-is, so the conversion succeeds instead of failing.
+      const isOpus = outputFormat === 'ogg' && oggCodec === 'opus';
+      if (
+        isOpus &&
+        (channelCount === 3 || channelCount === 4 || channelCount > 8)
+      ) {
+        ffmpegArgs.push('-mapping_family', '255');
+      }
+    }
+  }
+
+  // Vorbis has one fixed speaker layout per channel count. Other layouts
+  // (2.1, 4.0, 6.1(back), ...) would only be relabelled, so channels play from
+  // the wrong speakers; remix them to the Vorbis layout instead.
+  if (outputFormat === 'ogg' && oggCodec === 'vorbis') {
+    const remix = vorbisRemixLayout(getAudioStream(metadata));
+    if (remix) ffmpegArgs.push('-af', `aformat=channel_layouts=${remix}`);
   }
 
   // Add output file name
@@ -319,7 +452,27 @@ const converterWorker = async ({
     }
   }
 
-  await runFFMPEG(resolvedFfmpegPath, ffmpegArgs, outputFile, inputFile);
+  const writeSmpl = wavSmplLoop
+    ? () => {
+        if (
+          !writeWavSmplLoop(
+            outputFile,
+            wavSmplLoop!.loopStart,
+            wavSmplLoop!.loopLength
+          )
+        ) {
+          logger.warn(`Could not write WAV loop points to ${outputFile}`);
+        }
+      }
+    : undefined;
+
+  await runFFMPEG(
+    resolvedFfmpegPath,
+    ffmpegArgs,
+    outputFile,
+    inputFile,
+    writeSmpl
+  );
 };
 
 const runConversion = async (): Promise<void> => {
@@ -369,8 +522,10 @@ const runFFMPEG = (
   ffmpegPath: string,
   ffmpegArgs: string[],
   outputFile: string,
-  inputFile: string
+  inputFile: string,
+  afterSuccess?: () => void
 ): Promise<void> => {
+  const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     try {
       // Execute command
@@ -379,6 +534,18 @@ const runFFMPEG = (
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
+      // Let the manager kill ffmpeg if the batch is aborted; terminating this
+      // thread does not stop the child process.
+      if (ffmpegCommand.pid) {
+        parentPort?.postMessage({ type: 'pid', data: ffmpegCommand.pid });
+      }
+
+      // ffmpeg -y truncates the output first, so a failed run leaves a
+      // partial file behind. Remove it so it isn't mistaken for a result —
+      // but only if this run wrote it (a read-only existing file that ffmpeg
+      // could not open must be left alone).
+      const removePartialOutput = () =>
+        removeIfWrittenSince(outputFile, startedAt);
 
       // Collect error output for better diagnostics
       let errorOutput = '';
@@ -394,7 +561,13 @@ const runFFMPEG = (
 
       // Handle successful completion
       ffmpegCommand.on('exit', (code: number | null) => {
-        if (code === 0) {
+        // FLAC exits 0 for an input with no audio, leaving a header-only file.
+        const emptyOutput =
+          code === 0 &&
+          outputFile.toLowerCase().endsWith('.flac') &&
+          isEmptyFlac(outputFile);
+        if (code === 0 && !emptyOutput) {
+          afterSuccess?.();
           parentPort?.postMessage({ type: 'code', data: code });
           resolve(undefined);
         } else {
@@ -402,9 +575,12 @@ const runFFMPEG = (
           const formatInfo = fileExt
             ? ` [${fileExt.toUpperCase()} format]`
             : '';
-          const msg = `ffmpeg exited with code ${code}${formatInfo}. ${
-            errorOutput || 'No error output'
-          }`;
+          const msg = emptyOutput
+            ? `The input has no audio samples${formatInfo}; no file was written.`
+            : `ffmpeg exited with code ${code}${formatInfo}. ${
+                errorOutput || 'No error output'
+              }`;
+          removePartialOutput();
           postError(msg, { inputFile, outputFile });
           reject(new Error(msg));
         }
@@ -415,6 +591,7 @@ const runFFMPEG = (
         const msg = `ERROR in ffmpegCommand: ${String(
           error instanceof Error ? error.message : error
         )}`;
+        removePartialOutput();
         postError(msg, { inputFile, outputFile });
         reject(new Error(msg));
       });
@@ -436,8 +613,17 @@ if (
   workerData !== null &&
   'file' in workerData
 ) {
-  void runConversion().catch(() => {
-    // Failure already reported to parent via postError
+  void runConversion().catch((error: unknown) => {
+    // Most failures were already reported via postError. Anything else (an
+    // unexpected throw) must still reach the parent with its real reason,
+    // not just a bare "exited without reporting success".
+    if (!errorPosted) {
+      const f = (workerData && workerData.file) || {};
+      postError(`Unexpected worker error: ${getErrorMessage(error)}`, {
+        inputFile: f.inputFile,
+        outputFile: f.outputFile,
+      });
+    }
   });
 }
 

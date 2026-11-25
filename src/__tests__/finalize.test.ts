@@ -8,6 +8,7 @@ jest.unstable_mockModule('../utils.js', () => ({
   isPackagedRuntime: false,
   runtimeBaseDir: '/mock/base',
   writeSummaryToLogs: jest.fn(),
+  getLogFileNames: () => ({ log: 'logs.csv', error: 'error.csv' }),
   reportSearchErrors: jest.fn(async () => {}),
 }));
 

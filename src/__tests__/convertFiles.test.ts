@@ -387,7 +387,7 @@ describe('convertFiles', () => {
     );
   }, 30000);
 
-  it('should detect permission errors and stop the batch', async () => {
+  it('should fail a file with a permission error without stopping the batch', async () => {
     workerMock.mockImplementation(() => {
       const handlers: WorkerHandlers = {};
       const worker = {
@@ -418,17 +418,17 @@ describe('convertFiles', () => {
     const result = await withTimeout(
       convertFiles(createTestFiles(1)),
       5000,
-      "Test 'should detect permission errors and stop the batch' timed out"
+      "Test 'should fail a file with a permission error' timed out"
     );
 
     expect(result.failedFiles).toHaveLength(1);
     expect(result.successfulFiles).toHaveLength(0);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Stopping due to file permission/access error')
+    expect(console.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Stopping due to')
     );
   }, 30000);
 
-  it('should prompt multiple times when concurrent workers hit fatal errors together', async () => {
+  it('should prompt once when concurrent workers hit fatal errors together', async () => {
     cpusMock.mockReturnValueOnce([{}, {}]);
 
     const queuedWorkers: Array<{
@@ -480,16 +480,11 @@ describe('convertFiles', () => {
     const result = await withTimeout(
       convertFiles(createTestFiles(2)),
       5000,
-      "Test 'should prompt multiple times when concurrent workers hit fatal errors together' timed out"
+      "Test 'should prompt once when concurrent workers hit fatal errors together' timed out"
     );
 
-    expect(getAnswerMock).toHaveBeenCalledTimes(2);
-    expect(getAnswerMock).toHaveBeenNthCalledWith(
-      1,
-      'Press ENTER to return to the main menu...'
-    );
-    expect(getAnswerMock).toHaveBeenNthCalledWith(
-      2,
+    expect(getAnswerMock).toHaveBeenCalledTimes(1);
+    expect(getAnswerMock).toHaveBeenCalledWith(
       'Press ENTER to return to the main menu...'
     );
     expect(result.failedFiles).toHaveLength(2);

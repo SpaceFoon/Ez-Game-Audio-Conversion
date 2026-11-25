@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, statSync } from 'fs';
 import chalk from 'chalk';
 import { dirname, extname, resolve } from 'path';
+import * as os from 'os';
 import { getAnswer } from './utils.js';
-import ExitProgramError from './exitProgramError.js';
+import ExitProgramError, { UserQuitError } from './exitProgramError.js';
 import logger from './logger.js';
 import type { Settings } from './types/settings.js';
 import type { AudioFormat } from './types/audio.js';
@@ -17,23 +18,53 @@ export const parseFormats = (
 ): AudioFormat[] => {
   if (formatString.trim() === '') return [...allowed];
 
+  // Common alternative spellings.
+  const aliases: Record<string, string> = { aif: 'aiff', opus: 'ogg' };
   return [
     ...new Set(
       formatString
         .toLowerCase()
         .split(/[\s,]+/)
         .filter(Boolean)
+        .map((f) => f.replace(/^\./, ''))
+        .map((f) => aliases[f] ?? f)
         .filter((f): f is AudioFormat => allowed.includes(f as AudioFormat))
     ),
   ];
 };
+
+/**
+ * Clean a pasted or dragged-in path:
+ * - trim whitespace and drop one pair of matching surrounding quotes
+ *   (Windows "Copy as path" and drag-and-drop add them);
+ * - on macOS/Linux, undo shell escaping (`My\\ Folder` → `My Folder`), which
+ *   is how Terminal and most Linux terminals drop a path in;
+ * - expand a leading `~` to the home folder.
+ */
+export const cleanPathInput = (
+  raw: string,
+  platform: NodeJS.Platform = process.platform
+): string => {
+  const trimmed = raw.trim();
+  const match = /^(["'])(.*)\1$/.exec(trimmed);
+  let path = (match ? match[2]! : trimmed).trim();
+  // Backslash is the path separator on Windows, so leave it alone there.
+  if (!match && platform !== 'win32') path = path.replace(/\\(.)/g, '$1');
+  if (path === '~' || path.startsWith('~/') || path.startsWith('~\\')) {
+    path = (os.homedir?.() ?? '~') + path.slice(1);
+  }
+  return path;
+};
+
+/** Words that quit the app at the input-folder prompt. */
+const QUIT_WORDS = new Set(['q', 'quit', 'exit']);
 
 const promptOutputPath = async (
   inputFilePath: string,
   promptText: string
 ): Promise<string> => {
   while (true) {
-    const answer = await getAnswer(chalk.blue.bold(promptText));
+    const answer = cleanPathInput(await getAnswer(chalk.blue.bold(promptText)));
     const outputFilePath = answer === '' ? inputFilePath : resolve(answer);
 
     if (!existsSync(outputFilePath)) {
@@ -109,11 +140,16 @@ const promptOutputFormats = async (): Promise<AudioFormat[]> => {
 };
 
 // Entire input loop to get settings before converting.
-const getUserInput = async (settings: Settings): Promise<Settings> => {
+// `useCliArg` is true only on the first run: a folder/file passed on the
+// command line seeds that run, and later runs ask for a new input path.
+const getUserInput = async (
+  settings: Settings,
+  { useCliArg = true }: { useCliArg?: boolean } = {}
+): Promise<Settings> => {
   // Ogg Vorbis/Opus is chosen per batch in createConversionList; never reuse a prior run.
   settings.oggCodec = null;
 
-  const argPath = process.argv[2]?.trim();
+  const argPath = useCliArg ? process.argv[2]?.trim() : undefined;
 
   if (argPath) {
     const resolvedArgPath = resolve(argPath);
@@ -124,9 +160,11 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
       const pathStats = statSync(resolvedArgPath);
 
       if (pathStats.isFile()) {
-        const fileExt = extname(resolvedArgPath)
-          .toLowerCase()
-          .substring(1) as AudioFormat;
+        const rawExt = extname(resolvedArgPath).toLowerCase().substring(1);
+        // .aif is the short spelling of AIFF.
+        const fileExt = (
+          rawExt === 'aif' ? 'aiff' : rawExt === 'opus' ? 'ogg' : rawExt
+        ) as AudioFormat;
 
         if (!inputTypes.includes(fileExt)) {
           logger.error(
@@ -175,14 +213,30 @@ const getUserInput = async (settings: Settings): Promise<Settings> => {
 
   // No valid command-line argument — interactive mode
   while (true) {
-    const inputFilePath = await getAnswer(
+    const rawInputPath = await getAnswer(
       chalk.blue.bold(
         '\n 📁 Choose the folder to search for files to convert. ',
         '\n 🔍 This will recursively search, ie: all subfolders ',
         '\n 🐭 Right-click to paste. ',
-        '\n ✏️  Input Folder Path: '
+        '\n ✏️  Input Folder Path (or q to quit): '
       )
     );
+
+    const inputFilePath = cleanPathInput(rawInputPath);
+
+    // Quit, unless a folder with that name really exists here.
+    if (
+      QUIT_WORDS.has(inputFilePath.toLowerCase()) &&
+      !existsSync(resolve(inputFilePath))
+    ) {
+      throw new UserQuitError();
+    }
+
+    // resolve('') is the working directory; never pick that silently.
+    if (inputFilePath === '') {
+      logger.warn('\n⚠️  Please enter a folder path.');
+      continue;
+    }
 
     const resolvedInputPath = resolve(inputFilePath);
 

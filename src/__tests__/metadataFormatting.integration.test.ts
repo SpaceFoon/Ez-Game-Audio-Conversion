@@ -14,6 +14,18 @@ import {
 } from '../metadataService.js';
 import type { AudioMetadata } from '../types/metadata.js';
 
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as joinPath } from 'path';
+import { __setLogFileStateForTests } from '../utils.js';
+
+// formatMetaDataArgs logs cleanup warnings to CSV; keep them out of the repo.
+const logDir = mkdtempSync(joinPath(tmpdir(), 'ezga-meta-logs-'));
+__setLogFileStateForTests(
+  joinPath(logDir, 'logs.csv'),
+  joinPath(logDir, 'error.csv')
+);
+
 describe('formatMetaDataArgs - Real Output Tests', () => {
   describe('basic metadata extraction', () => {
     it('should extract title and artist from stream tags', () => {
@@ -199,7 +211,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
       expect(result.metaDataArgs).toContain('title=Song "With" Quotes');
     });
 
-    it('should convert Windows newlines to escaped \\n', () => {
+    it('should normalise Windows newlines to \\n', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -224,11 +236,11 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // sanitizeMetaValueForArgs collapses newlines to spaces for spawn safety
-      expect(result.metaDataArgs).toContain('comment=Line 1 Line 2 Line 3');
+      // Line breaks are kept, normalised to \n
+      expect(result.metaDataArgs).toContain('comment=Line 1\nLine 2\nLine 3');
     });
 
-    it('should convert Unix newlines to escaped \\n', () => {
+    it('should keep Unix newlines', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -253,10 +265,10 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('lyrics=Verse 1 Chorus Verse 2');
+      expect(result.metaDataArgs).toContain('lyrics=Verse 1\nChorus\nVerse 2');
     });
 
-    it('should convert old Mac newlines (CR only) to escaped \\n', () => {
+    it('should normalise old Mac newlines (CR only) to \\n', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -281,7 +293,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('comment=Old Mac Style');
+      expect(result.metaDataArgs).toContain('comment=Old\nMac\nStyle');
     });
 
     it('should remove null bytes', () => {
@@ -338,7 +350,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
       const result = formatMetaDataArgs(metadata);
 
       expect(result.metaDataArgs).toContain(
-        'comment=Path: C:\\Music\\"Best" Songs Line 2'
+        'comment=Path: C:\\Music\\"Best" Songs\nLine 2'
       );
     });
   });
@@ -918,7 +930,7 @@ describe('convertLoopPoints - Real Output Tests', () => {
       expect(result.loopLength).toBe(96000);
     });
 
-    it('should convert 22050Hz to 24000Hz for opus', () => {
+    it('should convert 22050Hz to 48000Hz for opus (Opus always decodes at 48 kHz)', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -944,13 +956,12 @@ describe('convertLoopPoints - Real Output Tests', () => {
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
-      expect(result.newSampleRate).toBe(24000);
-      // 22050 * (24000/22050) ≈ 24000
-      expect(result.loopStart).toBe(Math.round(22050 * (24000 / 22050)));
-      expect(result.loopLength).toBe(Math.round(44100 * (24000 / 22050)));
+      expect(result.newSampleRate).toBe(48000);
+      expect(result.loopStart).toBe(48000);
+      expect(result.loopLength).toBe(96000);
     });
 
-    it('should convert 8000Hz to 8000Hz for opus (low sample rate)', () => {
+    it('should convert 8000Hz to 48000Hz for opus (low sample rate)', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -976,9 +987,9 @@ describe('convertLoopPoints - Real Output Tests', () => {
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
-      expect(result.newSampleRate).toBe(8000);
-      expect(result.loopStart).toBe(8000);
-      expect(result.loopLength).toBe(16000);
+      expect(result.newSampleRate).toBe(48000);
+      expect(result.loopStart).toBe(48000);
+      expect(result.loopLength).toBe(96000);
     });
   });
 
@@ -1023,15 +1034,13 @@ describe('formatLoopData - Real Output Tests', () => {
   it('should format loop data for ffmpeg as args array', () => {
     const result = formatLoopData(12345, 67890);
 
+    // One spelling each: ffmpeg's tag dictionary ignores case, so a second
+    // lowercase copy would replace the uppercase one.
     expect(result).toEqual([
       '-metadata',
       'LOOPSTART=12345',
       '-metadata',
       'LOOPLENGTH=67890',
-      '-metadata',
-      'loopstart=12345',
-      '-metadata',
-      'looplength=67890',
     ]);
   });
 
@@ -1041,10 +1050,21 @@ describe('formatLoopData - Real Output Tests', () => {
     expect(result).toEqual([]);
   });
 
-  it('should return empty array for NaN loop length', () => {
+  it('should keep a lone LOOPSTART when the loop length is unknown', () => {
     const result = formatLoopData(12345, NaN);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual(['-metadata', 'LOOPSTART=12345']);
+  });
+
+  it('should add LOOPEND when the source used LOOPEND', () => {
+    expect(formatLoopData(100, 2000, true)).toEqual([
+      '-metadata',
+      'LOOPSTART=100',
+      '-metadata',
+      'LOOPLENGTH=2000',
+      '-metadata',
+      'LOOPEND=2100',
+    ]);
   });
 
   it('should return empty array for both NaN', () => {
@@ -1061,10 +1081,6 @@ describe('formatLoopData - Real Output Tests', () => {
       'LOOPSTART=0',
       '-metadata',
       'LOOPLENGTH=100000',
-      '-metadata',
-      'loopstart=0',
-      '-metadata',
-      'looplength=100000',
     ]);
   });
 
@@ -1078,7 +1094,7 @@ describe('formatLoopData - Real Output Tests', () => {
     expect(result).toEqual(
       expect.arrayContaining(['-metadata', 'LOOPLENGTH=96000'])
     );
-    expect(result.length).toBe(8);
+    expect(result.length).toBe(4);
   });
 });
 

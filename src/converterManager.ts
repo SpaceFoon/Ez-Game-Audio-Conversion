@@ -19,15 +19,23 @@ import {
   isPackagedRuntime,
   findBinary,
 } from './utils.js';
+import { removeIfWrittenSince } from './fileCleanup.js';
+import { registerCancelCleanup } from './cancel.js';
 
 type WorkerManagerMessage =
   | { type: 'stderr'; data: string }
   | { type: 'error'; data: string }
+  | { type: 'warning'; data: string }
   | { type: 'code'; data: number }
   | { type: string; data?: unknown; [key: string]: unknown };
 
-type FatalFfmpegErrorKind = 'disk-space' | 'permission' | null;
+type FatalFfmpegErrorKind = 'disk-space' | null;
 
+/**
+ * Only a full disk stops the whole batch: it affects every job. A permission
+ * error belongs to one file (e.g. a read-only existing output), so that job
+ * fails on its own and the rest of the batch carries on.
+ */
 const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
   const diskSpacePatterns = [
     /\benospc\b/i,
@@ -40,20 +48,28 @@ const detectFatalFfmpegError = (stderrText: string): FatalFfmpegErrorKind => {
     return 'disk-space';
   }
 
-  const permissionPatterns = [
-    /\beacces\b/i,
-    /\beperm\b/i,
-    /permission denied/i,
-    /access is denied/i,
-    /operation not permitted/i,
-  ];
-
-  if (permissionPatterns.some((pattern) => pattern.test(stderrText))) {
-    return 'permission';
-  }
-
   return null;
 };
+
+/** Kill an ffmpeg process a worker started. Terminating the worker alone leaves it running. */
+const killProcess = (pid: number | undefined): void => {
+  if (!pid) return;
+  try {
+    process.kill(pid, 'SIGKILL');
+  } catch {
+    // Already exited.
+  }
+};
+
+/**
+ * Remove this job's own file paths from ffmpeg's stderr before looking for
+ * fatal conditions, so a folder named e.g. "Permission denied" can't abort
+ * the whole batch. A real error still matches on the text around the path.
+ */
+export const stripJobPaths = (text: string, paths: string[]): string =>
+  paths
+    .filter(Boolean)
+    .reduce((acc, path) => acc.split(path).join('<path>'), text);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -67,6 +83,16 @@ const convertFiles = async (
 ): Promise<ConversionJob> => {
   initializeFileNames();
   const jobStartTime = Date.now();
+  // CSV writes are async; keep them so we can wait for every row to land
+  // before returning (finalize writes the SUMMARY row right after).
+  const pendingLogs: Promise<unknown>[] = [];
+  const log = (...args: Parameters<typeof addToLog>): void => {
+    try {
+      pendingLogs.push(Promise.resolve(addToLog(...args)).catch(() => {}));
+    } catch {
+      // addToLog reports its own failures; never let logging break a batch
+    }
+  };
   let cpuNumber;
   try {
     cpuNumber = cpus().length;
@@ -81,8 +107,24 @@ const convertFiles = async (
   const maxConcurrentWorkers = Math.round(Math.min(cpuNumber, queue.length));
   const failedFiles: ConversionResult[] = [];
   const successfulFiles: ConversionResult[] = [];
-  const activeWorkers = new Set<Worker>();
+  // Each running worker, with the ffmpeg process it started (if any) and the
+  // output it is writing, so an abort can stop ffmpeg and clean up.
+  const activeWorkers = new Map<
+    Worker,
+    { pid?: number; outputFile: string; startedAt: number; killed?: boolean }
+  >();
+  // Ctrl+C: stop every running ffmpeg and remove what it had half-written.
+  const unregisterCancel = registerCancelCleanup(() => {
+    for (const [worker, entry] of activeWorkers) {
+      killProcess(entry.pid);
+      void worker.terminate?.();
+      removeIfWrittenSince(entry.outputFile, entry.startedAt);
+    }
+  });
+  const failedOutputs = new Set<string>();
   let abortRequested = false;
+  // Shared across workers so concurrent fatal errors prompt the user only once.
+  let fatalPrompt: Promise<unknown> | null = null;
   const showDetailedLogs = files.length <= QUIET_BATCH_THRESHOLD;
   const totalFiles = files.length;
   let completedCount = 0;
@@ -102,7 +144,8 @@ const convertFiles = async (
 
   /** De-duplicate and record a failed conversion, preserving the reason. */
   const recordFailure = (file: ConversionItem, error?: string) => {
-    if (!failedFiles.some((f) => f.outputFile === file.outputFile)) {
+    if (!failedOutputs.has(file.outputFile)) {
+      failedOutputs.add(file.outputFile);
       failedFiles.push({
         success: false,
         inputFile: file.inputFile,
@@ -124,6 +167,7 @@ const convertFiles = async (
     tasksLeft: number
   ): Promise<void> => {
     const workerStartTime = performance.now();
+    const jobStartedAt = Date.now();
     if (showDetailedLogs) {
       logger.log(
         chalk.cyanBright(
@@ -150,7 +194,7 @@ const convertFiles = async (
       ) => {
         if (errorLogged) return;
         errorLogged = true;
-        addToLog(
+        log(
           {
             type: 'error' as const,
             data: logData,
@@ -191,11 +235,23 @@ const convertFiles = async (
         const worker = new Worker(workerPath, {
           workerData,
         });
-        activeWorkers.add(worker);
+        activeWorkers.set(worker, {
+          outputFile: file.outputFile,
+          startedAt: jobStartedAt,
+        });
 
         worker.on('message', (message: unknown) => {
           if (!isRecord(message) || typeof message.type !== 'string') return;
           const typedMessage = message as WorkerManagerMessage;
+
+          // The worker reports its ffmpeg process so an abort can kill it.
+          if (typedMessage.type === 'pid') {
+            const entry = activeWorkers.get(worker);
+            if (entry && typeof typedMessage.data === 'number') {
+              entry.pid = typedMessage.data;
+            }
+            return;
+          }
 
           // Accumulate stderr messages (don't log each one individually)
           if (typedMessage.type === 'stderr') {
@@ -208,27 +264,29 @@ const convertFiles = async (
               file.outputFile
             );
 
-            const fatalKind = detectFatalFfmpegError(stderrOutput);
+            const fatalKind = detectFatalFfmpegError(
+              stripJobPaths(stderrOutput, [file.inputFile, file.outputFile])
+            );
             if (fatalKind && !fatalExitRequested) {
               fatalExitRequested = true;
               abortRequested = true;
               errorLogged = true;
 
-              // A fatal condition (disk full / permission denied) affects every
-              // job, not just this one. Stop in-flight workers immediately so we
-              // don't keep hammering a full disk; queued jobs are already
-              // skipped via the abortRequested check in the worker loop.
-              for (const other of activeWorkers) {
-                if (other !== worker) {
-                  void other.terminate?.();
-                }
+              // A full disk affects every job, not just this one. Stop the
+              // other in-flight jobs now — their ffmpeg processes too, which
+              // terminating the worker thread alone would leave running — and
+              // remove what they had half-written. Queued jobs are skipped via
+              // the abortRequested check in the worker loop.
+              for (const [other, entry] of activeWorkers) {
+                if (other === worker) continue;
+                entry.killed = true;
+                killProcess(entry.pid);
+                void other.terminate?.();
               }
 
               const fatalMessage =
-                fatalKind === 'disk-space'
-                  ? 'Fatal ffmpeg error: insufficient disk space.'
-                  : 'Fatal ffmpeg error: permission/access denied.';
-              addToLog(
+                'Fatal ffmpeg error: insufficient disk space.';
+              log(
                 {
                   type: 'error' as const,
                   data: `${fatalMessage} ${stderrOutput.trim()}`,
@@ -236,25 +294,30 @@ const convertFiles = async (
                 file
               );
 
-              if (fatalKind === 'disk-space') {
-                logger.error(
-                  '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
-                );
-              } else {
-                logger.error(
-                  '\n 🚨⛔🚨 Stopping due to file permission/access error! 🚨🔐🚨'
-                );
-              }
-
-              void getAnswer('Press ENTER to return to the main menu...').then(
-                () => {
-                  recordFailure(file, `${fatalMessage} ${stderrOutput.trim()}`);
-                  recordCompletion();
-                  resolveOnce();
-                }
+              logger.error(
+                '\n 🚨⛔🚨 Stopping due to insufficient disk space! 🚨💽🚨'
               );
+
+              fatalPrompt ??= getAnswer(
+                'Press ENTER to return to the main menu...'
+              );
+              void fatalPrompt.then(() => {
+                recordFailure(file, `${fatalMessage} ${stderrOutput.trim()}`);
+                recordCompletion();
+                resolveOnce();
+              });
               return;
             }
+            return;
+          }
+
+          // Non-fatal warnings (e.g. metadata cleanup): record in the error
+          // log without failing the job.
+          if (typedMessage.type === 'warning') {
+            log(
+              { type: 'error' as const, data: String(typedMessage.data ?? '') },
+              { inputFile: file.inputFile, outputFile: '[metadata-cleanup]' }
+            );
             return;
           }
 
@@ -277,7 +340,7 @@ const convertFiles = async (
 
             if (exitCode === 0) {
               // Success
-              addToLog({ type: 'code', data: exitCode }, file);
+              log({ type: 'code', data: exitCode }, file);
               successfulFiles.push({
                 success: true,
                 inputFile: file.inputFile,
@@ -319,7 +382,17 @@ const convertFiles = async (
         });
 
         worker.on('exit', (exitCode: number) => {
+          const entry = activeWorkers.get(worker);
           activeWorkers.delete(worker);
+          if (entry?.killed && !settled) {
+            // Stopped by a fatal abort before it finished: drop the partial file.
+            removeIfWrittenSince(file.outputFile, jobStartedAt);
+            recordFailureWithLog(
+              'Stopped: batch aborted after fatal ffmpeg error.',
+              'Stopped: batch aborted after fatal ffmpeg error.'
+            );
+            return;
+          }
           if (settled) return;
 
           // A successful conversion always settles first via the worker's
@@ -339,7 +412,7 @@ const convertFiles = async (
           error instanceof Error ? error.message : error
         )}`;
         logger.error(message);
-        addToLog(
+        log(
           {
             type: 'error' as const,
             data: message,
@@ -378,6 +451,19 @@ const convertFiles = async (
   }
 
   await Promise.all(workerPromises);
+  unregisterCancel();
+
+  // Files never started because a fatal error stopped the batch still need to
+  // show up in the results, otherwise the summary undercounts the batch.
+  if (abortRequested) {
+    for (const file of queue.splice(0)) {
+      const message = 'Skipped: batch aborted after fatal ffmpeg error.';
+      log({ type: 'error' as const, data: message }, file);
+      recordFailure(file, message);
+    }
+  }
+
+  await Promise.all(pendingLogs);
 
   if (!showDetailedLogs && totalFiles > 0) {
     process.stdout.write(

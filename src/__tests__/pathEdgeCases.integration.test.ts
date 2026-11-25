@@ -15,6 +15,7 @@ import {
   pathsResolveToSameFile,
 } from '../createConversionList.js';
 import { nextAvailableLogCsvPath } from '../utils.js';
+import { __setCaseInsensitiveForTests } from '../pathKey.js';
 import { outputPathHasInvalidCharacters } from '../converterWorker.js';
 import { parseFormats } from '../getUserInput.js';
 import type { AudioFormat } from '../types/audio.js';
@@ -211,7 +212,8 @@ describe('Path manipulation edge cases', () => {
 
 describe('File collision detection edge cases', () => {
   describe('case sensitivity', () => {
-    it('should treat uppercase and lowercase as same on Windows', () => {
+    it('should treat uppercase and lowercase as same on a case-insensitive drive', () => {
+      __setCaseInsensitiveForTests(true);
       // This is what the code does:
       const inputFile: string = '/input/Song.WAV';
       const outputFile: string = '/input/song.wav';
@@ -220,6 +222,15 @@ describe('File collision detection edge cases', () => {
       const isSameFile = pathsResolveToSameFile(inputFile, outputFile);
 
       expect(isSameFile).toBe(true);
+      __setCaseInsensitiveForTests(null);
+    });
+
+    it('should keep case-only differences apart on a case-sensitive drive', () => {
+      __setCaseInsensitiveForTests(false);
+      expect(pathsResolveToSameFile('/input/Song.WAV', '/input/song.wav')).toBe(
+        false
+      );
+      __setCaseInsensitiveForTests(null);
     });
 
     it('should detect same file with different case', () => {
@@ -278,7 +289,9 @@ describe('Filename sanitization edge cases', () => {
   // The app blocks these in converterWorker, but let's test the detection
   describe('dangerous character detection', () => {
     it('should detect quotes', () => {
-      expect(outputPathHasInvalidCharacters('/path/"file".mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/"file".mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect newlines', () => {
@@ -296,23 +309,33 @@ describe('Filename sanitization edge cases', () => {
     });
 
     it('should detect Windows < character', () => {
-      expect(outputPathHasInvalidCharacters('/path/file<name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file<name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows > character', () => {
-      expect(outputPathHasInvalidCharacters('/path/file>name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file>name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows pipe character', () => {
-      expect(outputPathHasInvalidCharacters('/path/file|name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file|name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows question mark', () => {
-      expect(outputPathHasInvalidCharacters('/path/file?name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file?name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should detect Windows asterisk', () => {
-      expect(outputPathHasInvalidCharacters('/path/file*name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file*name.mp3', 'windows')
+      ).toBe(true);
     });
 
     it('should allow Windows drive letter colon', () => {
@@ -320,7 +343,17 @@ describe('Filename sanitization edge cases', () => {
     });
 
     it('should detect colon NOT in drive letter position', () => {
-      expect(outputPathHasInvalidCharacters('/path/file:name.mp3')).toBe(true);
+      expect(
+        outputPathHasInvalidCharacters('/path/file:name.mp3', 'windows')
+      ).toBe(true);
+    });
+
+    it('allows Windows-reserved characters on Linux and macOS', () => {
+      for (const platform of ['linux', 'macos']) {
+        expect(
+          outputPathHasInvalidCharacters('/path/file:name?.mp3', platform)
+        ).toBe(false);
+      }
     });
 
     it('should allow normal paths', () => {

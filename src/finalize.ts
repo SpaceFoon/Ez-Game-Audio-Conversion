@@ -3,6 +3,7 @@ import {
   rl,
   writeSummaryToLogs,
   reportSearchErrors,
+  getLogFileNames,
 } from './utils.js';
 import chalk from 'chalk';
 import logger from './logger.js';
@@ -34,13 +35,15 @@ const finalize = async (
 
   // Write summary to CSV files
   writeSummaryToLogs(totalFiles, successCount, failCount, totalTime);
+  // logs(1).csv etc. when logs.csv was locked or already existed.
+  const logNames = getLogFileNames();
 
   if (successfulFiles && successfulFiles.length > 0) {
     logger.log('Successes:', successfulFiles.length);
     await showPagedList(
       'Successful conversions',
       successfulFiles.map((file) => file.outputFile),
-      'see logs.csv'
+      `see ${logNames.log}`
     );
   } else {
     logger.log('NO SUCCESSFUL CONVERSIONS.');
@@ -51,7 +54,7 @@ const finalize = async (
     await showPagedList(
       'Failed conversions',
       failedFiles.map((file) => file.outputFile),
-      'see error.csv'
+      `see ${logNames.error}`
     );
   } else {
     logger.log('No conversions failed.');
@@ -75,7 +78,14 @@ const finalize = async (
         chalk.blue(
           'Press ENTER to run another conversion, or type q then ENTER to quit.'
         ),
-        (answer?: string) => {
+        (answer?: string | null) => {
+          // Input ended (piped answers ran out, or Ctrl+D): nothing more to do.
+          if (answer === null) {
+            logger.log('\nInput ended — exiting.');
+            rl.close();
+            resolve(false);
+            return;
+          }
           const normalized = String(answer || '')
             .trim()
             .toLowerCase();

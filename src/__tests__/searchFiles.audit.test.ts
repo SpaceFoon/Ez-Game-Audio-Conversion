@@ -62,7 +62,9 @@ describe('searchFiles resilience', () => {
       if (String(targetPath).endsWith('broken.wav')) {
         throw new Error('EACCES: permission denied');
       }
-      return { isDirectory: () => false } as ReturnType<typeof fs.statSync>;
+      return { isDirectory: () => false, isFile: () => true } as ReturnType<
+        typeof fs.statSync
+      >;
     });
 
     const result = await searchFiles({
@@ -84,6 +86,7 @@ describe('searchFiles resilience', () => {
     readdirSyncMock.mockReturnValue(['loop'] as never);
     statSyncMock.mockReturnValue({
       isDirectory: () => true,
+      isFile: () => false,
     } as ReturnType<typeof fs.statSync>);
     // Simulate a symlink/junction loop: every path resolves to the same dir.
     realpathSyncMock.mockReturnValue('/audit/root' as never);
@@ -105,9 +108,13 @@ describe('searchFiles resilience', () => {
     statSyncMock.mockImplementation((targetPath) => {
       const pathStr = String(targetPath);
       if (pathStr.endsWith('symlink-dir')) {
-        return { isDirectory: () => true } as ReturnType<typeof fs.statSync>;
+        return { isDirectory: () => true, isFile: () => false } as ReturnType<
+          typeof fs.statSync
+        >;
       }
-      return { isDirectory: () => false } as ReturnType<typeof fs.statSync>;
+      return { isDirectory: () => false, isFile: () => true } as ReturnType<
+        typeof fs.statSync
+      >;
     });
     realpathSyncMock.mockImplementation((targetPath) => {
       if (String(targetPath).endsWith('symlink-dir')) {
@@ -131,6 +138,7 @@ describe('searchFiles resilience', () => {
     readdirSyncMock.mockReturnValue(['child'] as never);
     statSyncMock.mockReturnValue({
       isDirectory: () => true,
+      isFile: () => false,
     } as ReturnType<typeof fs.statSync>);
     realpathSyncMock.mockImplementation((p) => String(p) as never);
 

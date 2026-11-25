@@ -61,7 +61,7 @@ describe('audit characterization: converterManager', () => {
     console.error = jest.fn();
   });
 
-  it('silently drops queued jobs after fatal disk-space stderr (not counted as failed)', async () => {
+  it('counts queued jobs as failed after fatal disk-space stderr', async () => {
     let workerIndex = 0;
     workerMock.mockImplementation(() => {
       workerIndex++;
@@ -93,8 +93,6 @@ describe('audit characterization: converterManager', () => {
 
     expect(result.failedFiles.length).toBeGreaterThanOrEqual(1);
     expect(result.successfulFiles.length).toBeLessThan(5);
-    expect(
-      result.failedFiles.length + result.successfulFiles.length
-    ).toBeLessThan(5);
+    expect(result.failedFiles.length + result.successfulFiles.length).toBe(5);
   });
 });

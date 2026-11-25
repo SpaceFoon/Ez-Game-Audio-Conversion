@@ -57,11 +57,22 @@ const platformConfig = {
   },
   macos: {
     files: ['ffmpeg', 'ffprobe'],
-    // evermeet.cx ships Intel-only builds. Apple Silicon (arm64) uses Homebrew
-    // instead — see installMacosFromBrew() below.
+    // evermeet.cx ships Intel-only builds. Apple Silicon uses the same static
+    // arm64 builds as CI (martin-riedl.de). Homebrew's ffmpeg is not used: it
+    // links against Homebrew libraries, so a release packaged with it would
+    // fail with "Library not loaded" on machines without Homebrew ffmpeg.
     downloads:
       process.arch === 'arm64'
-        ? []
+        ? [
+            {
+              url: 'https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip',
+              archiveName: 'ffmpeg-macos-arm64.zip',
+            },
+            {
+              url: 'https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip',
+              archiveName: 'ffprobe-macos-arm64.zip',
+            },
+          ]
         : [
             {
               url: 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip',
@@ -103,9 +114,7 @@ if (!forceDownload && hasAllBinaries()) {
 try {
   mkdirSync(destinationDir, { recursive: true });
 
-  if (platformSlug === 'macos' && process.arch === 'arm64') {
-    installMacosFromBrew(destinationDir, config.files);
-  } else {
+  {
     rmSync(tempDir, { recursive: true, force: true });
     mkdirSync(tempDir, { recursive: true });
 
@@ -150,45 +159,6 @@ try {
   rmSync(tempDir, { recursive: true, force: true });
 }
 
-/**
- * evermeet.cx only publishes Intel macOS builds. On Apple Silicon, copy a
- * native Homebrew ffmpeg/ffprobe into ffmpeg-bin/macos/.
- */
-function installMacosFromBrew(destinationDir, fileNames) {
-  let brewPath;
-  try {
-    brewPath = execFileSync('which', ['brew'], { encoding: 'utf8' }).trim();
-  } catch {
-    throw new Error(
-      'Homebrew is required to install native arm64 FFmpeg (evermeet.cx is Intel-only). Install Homebrew from https://brew.sh then re-run, or copy arm64 ffmpeg/ffprobe into ffmpeg-bin/macos/ manually.'
-    );
-  }
-
-  log(`Using Homebrew at ${brewPath} for native arm64 FFmpeg.`);
-  try {
-    execFileSync('brew', ['list', '--versions', 'ffmpeg'], {
-      stdio: 'ignore',
-    });
-    log('Homebrew ffmpeg already installed.');
-  } catch {
-    log('Installing ffmpeg via Homebrew (this may take a few minutes)...');
-    execFileSync('brew', ['install', 'ffmpeg'], { stdio: 'inherit' });
-  }
-
-  const brewPrefix = execFileSync('brew', ['--prefix'], {
-    encoding: 'utf8',
-  }).trim();
-  const binDir = join(brewPrefix, 'bin');
-
-  for (const fileName of fileNames) {
-    const sourcePath = join(binDir, fileName);
-    if (!existsSync(sourcePath)) {
-      throw new Error(`Homebrew ffmpeg did not provide ${sourcePath}`);
-    }
-    copyFileSync(sourcePath, join(destinationDir, fileName));
-  }
-}
-
 function downloadFile(url, destination) {
   return new Promise((resolve, reject) => {
     const request = (currentUrl, redirectCount = 0) => {
@@ -224,10 +194,21 @@ function downloadFile(url, destination) {
         }
 
         const file = createWriteStream(destination);
+        // A dropped connection must fail the install, not hang it.
+        response.on('error', reject);
+        response.on('aborted', () =>
+          reject(new Error(`Connection lost while downloading ${currentUrl}`))
+        );
         response.pipe(file);
-        file.on('finish', () => file.close(resolve));
+        file.on('finish', () => {
+          if (response.complete) file.close(resolve);
+          else reject(new Error(`Incomplete download from ${currentUrl}`));
+        });
         file.on('error', reject);
       });
+      req.setTimeout(60_000, () =>
+        req.destroy(new Error(`Timed out downloading ${currentUrl}`))
+      );
       req.on('error', reject);
     };
 

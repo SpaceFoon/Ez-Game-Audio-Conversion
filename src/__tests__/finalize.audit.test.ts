@@ -7,6 +7,7 @@ jest.unstable_mockModule('../utils.js', () => ({
     close: jest.fn(),
   },
   writeSummaryToLogs: jest.fn(),
+  getLogFileNames: () => ({ log: 'logs.csv', error: 'error.csv' }),
   reportSearchErrors: jest.fn(async () => {}),
 }));
 
