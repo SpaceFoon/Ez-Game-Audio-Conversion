@@ -41,8 +41,8 @@ describe('metadataService pure logic (mutation hardening)', () => {
   });
 
   describe('sanitizeMetaValueForArgs', () => {
-    it('collapses CRLF and lone CR into spaces', () => {
-      expect(sanitizeMetaValueForArgs('a\r\nb\rc')).toBe('a b c');
+    it('normalises CRLF and lone CR to \\n', () => {
+      expect(sanitizeMetaValueForArgs('a\r\nb\rc\nd')).toBe('a\nb\nc\nd');
     });
   });
 

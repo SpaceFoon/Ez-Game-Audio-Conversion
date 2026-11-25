@@ -45,7 +45,7 @@ describe('metadata fuzz (adversarial inputs)', () => {
     );
   });
 
-  it('formatMetaDataArgs never throws and argv has no raw newline injection', () => {
+  it('formatMetaDataArgs never throws and argv has no carriage returns', () => {
     fc.assert(
       fc.property(
         fc.stringMatching(/^[a-zA-Z][a-zA-Z0-9_]{0,20}$/),
@@ -58,7 +58,8 @@ describe('metadata fuzz (adversarial inputs)', () => {
             streams: [{ tags: {} }],
           });
           for (const arg of metaDataArgs) {
-            expect(arg).not.toMatch(/\n|\r/);
+            expect(arg).not.toContain('\r');
+            expect(arg).not.toContain('\u0000');
           }
         }
       ),

@@ -211,7 +211,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
       expect(result.metaDataArgs).toContain('title=Song "With" Quotes');
     });
 
-    it('should convert Windows newlines to escaped \\n', () => {
+    it('should normalise Windows newlines to \\n', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -236,11 +236,11 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      // sanitizeMetaValueForArgs collapses newlines to spaces for spawn safety
-      expect(result.metaDataArgs).toContain('comment=Line 1 Line 2 Line 3');
+      // Line breaks are kept, normalised to \n
+      expect(result.metaDataArgs).toContain('comment=Line 1\nLine 2\nLine 3');
     });
 
-    it('should convert Unix newlines to escaped \\n', () => {
+    it('should keep Unix newlines', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -265,10 +265,10 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('lyrics=Verse 1 Chorus Verse 2');
+      expect(result.metaDataArgs).toContain('lyrics=Verse 1\nChorus\nVerse 2');
     });
 
-    it('should convert old Mac newlines (CR only) to escaped \\n', () => {
+    it('should normalise old Mac newlines (CR only) to \\n', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -293,7 +293,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
 
       const result = formatMetaDataArgs(metadata);
 
-      expect(result.metaDataArgs).toContain('comment=Old Mac Style');
+      expect(result.metaDataArgs).toContain('comment=Old\nMac\nStyle');
     });
 
     it('should remove null bytes', () => {
@@ -350,7 +350,7 @@ describe('formatMetaDataArgs - Real Output Tests', () => {
       const result = formatMetaDataArgs(metadata);
 
       expect(result.metaDataArgs).toContain(
-        'comment=Path: C:\\Music\\"Best" Songs Line 2'
+        'comment=Path: C:\\Music\\"Best" Songs\nLine 2'
       );
     });
   });

@@ -180,12 +180,12 @@ describe('metadataService', () => {
   });
 
   describe('sanitizeMetaValueForArgs', () => {
-    it('removes null bytes and replacement chars, normalizes line endings to spaces, and trims whitespace', () => {
+    it('removes null bytes and replacement chars, normalizes line endings to \\n, and trims whitespace', () => {
       const result = sanitizeMetaValueForArgs(
         '  A\u0000B\uFFFDC\r\nD\rE\u0000  '
       );
 
-      expect(result).toBe('ABC D E');
+      expect(result).toBe('ABC\nD\nE');
     });
   });
 

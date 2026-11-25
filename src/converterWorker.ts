@@ -71,14 +71,19 @@ const VORBIS_LAYOUT_FOR_CHANNELS = [
  * Layout to remix to before Vorbis encoding, or null when the source layout
  * is already a Vorbis one (or unknown, so there's nothing to remap).
  */
+/**
+ * False for layouts with no speaker positions: missing, "unknown", or
+ * ffmpeg's "6 channels" style.
+ */
+export const hasNamedLayout = (layout: string | undefined): boolean =>
+  !!layout && layout !== 'unknown' && !/channels?$/.test(layout);
+
 export const vorbisRemixLayout = (
   stream: { channels?: number; channel_layout?: string } | undefined
 ): string | null => {
   const layout = stream?.channel_layout;
   const channels = Number(stream?.channels);
-  if (!layout || VORBIS_LAYOUTS.has(layout)) return null;
-  // "6 channels"-style names carry no speaker positions.
-  if (/channels?$/.test(layout)) return null;
+  if (!hasNamedLayout(layout) || VORBIS_LAYOUTS.has(layout!)) return null;
   return VORBIS_LAYOUT_FOR_CHANNELS[channels] || null;
 };
 
@@ -399,9 +404,13 @@ const converterWorker = async ({
     if (outputFormat === 'mp3' && channelCount > 2) {
       ffmpegArgs.push('-ac', '2');
     } else {
-      // No -ac otherwise: ffmpeg keeps the channel count by itself, and -ac
-      // would remix any non-default layout (quad, 5.1(side), ...) into the
-      // default one for that count, moving sound to other speakers.
+      // -ac only for sources with no named layout: it gives them the default
+      // layout for their channel count, which the AAC encoder requires. On a
+      // named layout (quad, 5.1(side), ...) it would remix into the default
+      // one and move sound to other speakers, so it is left out there.
+      if (!hasNamedLayout(getAudioStream(metadata)?.channel_layout)) {
+        ffmpegArgs.push(...channelsArgs);
+      }
       // libopus's default surround mapping rejects every 3- and 4-channel
       // layout (and anything over 8). Mapping family 255 stores the channels
       // as-is, so the conversion succeeds instead of failing.

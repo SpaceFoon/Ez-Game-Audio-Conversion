@@ -6,7 +6,7 @@ For the mutation-hardening roadmap and progress log, see [TESTING-HARDENING-PLAN
 
 | ID | Finding | Status | Reproducing test |
 |----|---------|--------|------------------|
-| B44 | Embedded cover art is dropped from every output (`-vn`). Probably right for game audio; a product decision. | **Open** — by design? | — |
+| B44 | Embedded cover art is dropped from every output (`-vn`), and never has been kept. Documented in the README (Features, FAQ, Additional Notes). Copying it for MP3/M4A/FLAC would be a small change if wanted. | **Open** — documented, by design for now | — |
 
 ### Checked in the final pass and found OK
 
@@ -63,6 +63,9 @@ All run end to end with the bundled ffmpeg on Linux (Node 26):
 | B42 | Vorbis relabelled 2.1, 3.0(back), 4.0, 6.1(back), hexagonal, … as its own layout, so channels played from the wrong speakers | Those layouts are remixed to the Vorbis layout for the same channel count (`aformat`), e.g. 4.0 front-centre → front-left + front-right. Verified by per-channel level |
 | B43 | A WAV with zero samples "converted" to an output with no audio | ffmpeg runs with `-abort_on empty_output_stream`; the job fails and the empty output is removed. FLAC output still exits 0 (ffmpeg writes a header-only FLAC) — harmless |
 | B45 | `-ac <count>` on every job remixed non-default layouts: a quad source came out as 4.0 with both rear channels folded into back-centre, in every format | `-ac` is only passed for the MP3 stereo downmix; quad, 5.1(side), etc. are kept as they are. FLAC keeps non-standard layouts via `WAVEFORMATEXTENSIBLE_CHANNEL_MASK` (its warning is cosmetic) |
+| B46 | Regression from B45: sources with no named channel layout (`unknown`, "6 channels", e.g. some 6-channel M4As) failed to convert to M4A — the AAC encoder rejects unnamed layouts, and `-ac` had been labelling them | `-ac` is passed only for sources with no named layout (it labels them with the default layout; nothing to remix). Named layouts still get no `-ac`. Verified: unknown 6-ch and quad into all six formats, 12/12 |
+| B47 | Line breaks in tags (multi-line comments, lyrics) were flattened to spaces, "for spawn safety" — not needed, since ffmpeg runs without a shell | Kept as `\n` (CRLF/CR normalised). Verified in MP3, OGG, FLAC, M4A, AIFF and WAV |
+| B48 | "Start now?" rejected `yes` with surrounding spaces (common when pasting) | Answer is trimmed; `y`/`n` also accepted |
 | B1 | Two inputs mapping to the same output path: second silently dropped | Duplicate outputs are dropped with a "Skipping duplicate output" warning naming both inputs |
 | B2 | `isFileBusy` returned `false` after the EBUSY prompt without re-checking | Re-opens the file after the prompt (up to 10 attempts); returns `true` if still locked |
 | B3 | Worker `exit(0)` without a prior `code` message was treated as success | Success requires the worker's `code` message; an unconfirmed exit is recorded as a failure |

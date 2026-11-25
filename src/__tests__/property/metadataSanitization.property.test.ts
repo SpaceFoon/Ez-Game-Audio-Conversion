@@ -65,13 +65,13 @@ describe('property: metadata sanitization', () => {
     );
   });
 
-  it('AUDIT: embedded newlines are not passed through to ffmpeg metadata args', () => {
+  it('keeps embedded line breaks as \\n (no carriage returns)', () => {
     const { metaDataArgs } = formatMetaDataArgs({
       format: { tags: { title: 'hello\r\nworld' } },
       streams: [{ tags: {} }],
     });
 
-    expect(metaDataArgs.some((arg) => arg.includes('\n'))).toBe(false);
-    expect(metaDataArgs.some((arg) => arg.includes('hello'))).toBe(true);
+    expect(metaDataArgs).toContain('title=hello\nworld');
+    expect(metaDataArgs.some((arg) => arg.includes('\r'))).toBe(false);
   });
 });

@@ -323,7 +323,8 @@ describe('ffmpeg argument building - Integration Tests', () => {
       expect(args[mapMetadataIndex + 1]).toBe('-1');
     });
 
-    it('does not force a channel count for stereo MP3 (no -ac)', async () => {
+    it('does not force a channel count for a named stereo layout (no -ac)', async () => {
+      probeStreamOverride = { channel_layout: 'stereo' };
       await converterWorker({
         file: {
           inputFile: '/input/test.wav',
@@ -631,6 +632,16 @@ describe('source loop tags and channel handling', () => {
       expect(args).not.toContain('-af');
     }
   });
+
+  it.each([undefined, 'unknown', '6 channels'])(
+    'labels sources with no named layout (%s) with -ac, which AAC needs',
+    async (layout) => {
+      probeStreamOverride = { channels: 6, channel_layout: layout };
+      const args = await run('m4a', {});
+      expect(args[args.indexOf('-ac') + 1]).toBe('6');
+      expect(args).not.toContain('-af');
+    }
+  );
 
   it.each([
     ['4.0', 4, 'quad'],

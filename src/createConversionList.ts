@@ -704,10 +704,11 @@ const createConversionList = async (
       )
     );
 
-    if (/^no$/i.test(accept_answer)) {
+    const accepted = accept_answer.trim();
+    if (/^no?$/i.test(accepted)) {
       logger.log('\n🚫 Conversion cancelled. Restarting program 🚫');
       handleExit(0);
-    } else if (!/^yes$/i.test(accept_answer)) {
+    } else if (!/^y(es)?$/i.test(accepted)) {
       logger.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');
       continue;
     }

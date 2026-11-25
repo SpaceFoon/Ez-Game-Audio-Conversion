@@ -230,14 +230,15 @@ const SOURCE_LOOP_TAG_KEYS = new Set([
 export const isLoopTagKey = (key: string): boolean =>
   SOURCE_LOOP_TAG_KEYS.has(normalizeTagKey(key));
 
+// Line breaks are kept (normalised to \n): ffmpeg runs without a shell, so
+// each value reaches it as one argument, and multi-line comments and lyrics
+// are written correctly to every output format.
 export const sanitizeMetaValueForArgs = (raw: string): string =>
   String(raw)
     .split('\u0000')
     .join('')
     .replace(/\uFFFD/g, '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
-    .replace(/\n/g, ' ')
+    .replace(/\r\n?/g, '\n')
     .trim();
 
 const parseNumberAndTotal = (
