@@ -15,6 +15,7 @@ import { getAudioStream } from './audioStream.js';
 import { platformSlug, getErrorMessage, findBinary } from './utils.js';
 import { removeIfWrittenSince } from './fileCleanup.js';
 import { writeWavSmplLoop } from './wavLoops.js';
+import { isEmptyFlac } from './outputChecks.js';
 import { isCaseInsensitiveDir } from './pathKey.js';
 import logger from './logger.js';
 import type { LoopDataMode } from './types/settings.js';
@@ -560,7 +561,12 @@ const runFFMPEG = (
 
       // Handle successful completion
       ffmpegCommand.on('exit', (code: number | null) => {
-        if (code === 0) {
+        // FLAC exits 0 for an input with no audio, leaving a header-only file.
+        const emptyOutput =
+          code === 0 &&
+          outputFile.toLowerCase().endsWith('.flac') &&
+          isEmptyFlac(outputFile);
+        if (code === 0 && !emptyOutput) {
           afterSuccess?.();
           parentPort?.postMessage({ type: 'code', data: code });
           resolve(undefined);
@@ -569,9 +575,11 @@ const runFFMPEG = (
           const formatInfo = fileExt
             ? ` [${fileExt.toUpperCase()} format]`
             : '';
-          const msg = `ffmpeg exited with code ${code}${formatInfo}. ${
-            errorOutput || 'No error output'
-          }`;
+          const msg = emptyOutput
+            ? `The input has no audio samples${formatInfo}; no file was written.`
+            : `ffmpeg exited with code ${code}${formatInfo}. ${
+                errorOutput || 'No error output'
+              }`;
           removePartialOutput();
           postError(msg, { inputFile, outputFile });
           reject(new Error(msg));
