@@ -17,7 +17,7 @@ import {
   reportSearchErrors,
 } from './utils.js';
 import logger from './logger.js';
-import { createPathKeyer, isSamePath, realPathOr } from './pathKey.js';
+import { isSamePath, pathKey, realPathOr } from './pathKey.js';
 import type {
   AudioFormat,
   ConversionCandidate,
@@ -154,9 +154,6 @@ export const getRelativeOutputDir = (
   return relDir;
 };
 
-// Rebuilt per batch so symlink/folder changes between runs are picked up.
-let pathKey = createPathKeyer();
-
 /**
  * Normalized path key for O(1) output conflict lookups. Resolves symlinked or
  * aliased folders (so an output folder that is really the input folder can't
@@ -220,7 +217,6 @@ const createConversionList = async (
     oggCodec = null;
   }
 
-  pathKey = createPathKeyer();
   let convertSelf: string | null = null;
   const conversionList: ConversionCandidate[] = [];
   let response: string | null = null;
