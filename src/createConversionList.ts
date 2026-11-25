@@ -18,6 +18,8 @@ import {
 } from './utils.js';
 import logger from './logger.js';
 import { isSamePath, pathKey, realPathOr } from './pathKey.js';
+import { findLoopTaggedFile } from './loopTagScan.js';
+import type { LoopDataMode } from './types/settings.js';
 import type {
   AudioFormat,
   ConversionCandidate,
@@ -124,6 +126,58 @@ const askOggCodec = async (): Promise<OggCodec> => {
   return input;
 };
 
+/**
+ * Ask what to do with loop tags. `offerForce` is true when WAV or M4A is
+ * among the outputs: those formats can't store loop tags reliably, so by
+ * default they are left out there.
+ */
+export const askLoopDataMode = async (
+  exampleFile: string,
+  offerForce: boolean
+): Promise<LoopDataMode> => {
+  while (true) {
+    const answer = (
+      await getAnswer(
+        chalk.blue.bold(
+          `\n🔁 Some input files have loop points (e.g. ${basename(exampleFile)}).`,
+          '\n   Leave blank to keep them in OGG, FLAC, MP3 and AIFF outputs.',
+          '\n   Type "skip" to leave loop tags out of every output.',
+          ...(offerForce
+            ? [
+                '\n   Type "force" to also write them to WAV (as a smpl loop chunk) and M4A.',
+              ]
+            : []),
+          '\n   Loop tags: '
+        )
+      )
+    )
+      .trim()
+      .toLowerCase();
+
+    let mode: LoopDataMode | null = null;
+    if (answer === '' || answer === 'keep' || answer === 'auto') mode = 'auto';
+    else if (answer === 'skip' || answer === 's') mode = 'skip';
+    else if (offerForce && (answer === 'force' || answer === 'f'))
+      mode = 'force';
+
+    if (!mode) {
+      logger.warn(
+        `\n⚠️ Please leave blank, or type "skip"${offerForce ? ' or "force"' : ''}.`
+      );
+      continue;
+    }
+
+    const label =
+      mode === 'auto'
+        ? 'keep where supported'
+        : mode === 'skip'
+          ? 'skip'
+          : 'write to every format';
+    logger.log(chalk.green.italic(`\n ✨ Loop tags: ${label} ✅`));
+    return mode;
+  }
+};
+
 export const getRelativeOutputDir = (
   inputRoot: string,
   inputFile: string
@@ -198,6 +252,29 @@ export const scanExistingFiles = (rootPath: string): Set<string> => {
   return found;
 };
 
+/**
+ * Existing files in just the given folders (not their subfolders): the only
+ * places this batch can write to. Scanning the whole output root instead
+ * would walk an entire drive when the output folder is e.g. `D:\\`.
+ */
+export const scanExistingFilesIn = (dirs: Iterable<string>): Set<string> => {
+  const found = new Set<string>();
+  for (const dir of dirs) {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      continue; // Folder doesn't exist yet (or can't be read): nothing to clash with.
+    }
+    // Subfolders are included on purpose: a folder named like an output
+    // blocks that output just as a file would.
+    for (const name of names) {
+      found.add(normalizeOutputPathKey(join(dir, name)));
+    }
+  }
+  return found;
+};
+
 //Create final list of output files to convert
 const createConversionList = async (
   files: string[]
@@ -210,6 +287,9 @@ const createConversionList = async (
     singleFileMode,
   } = settings;
   let outputFolder: string | null = null;
+
+  // Loop-tag handling is asked per batch too; default to keeping them.
+  settings.loopDataMode = 'auto';
 
   // Choose Vorbis/Opus fresh for each batch that includes OGG output.
   if (outputFormats.includes('ogg')) {
@@ -243,40 +323,21 @@ const createConversionList = async (
     handleExit(1);
   }
 
-  // Pre-calculate and create all unique output directories ONCE
-  // This avoids 180k+ existsSync calls (30k files × 6 formats)
-  if (inputFilePath !== outputFilePath) {
-    logger.log(chalk.cyan('\n📁 Preparing output directories...'));
-    const outputDirs = new Set<string>();
-    for (const inputFile of files) {
-      try {
-        const relPath = getRelativeOutputDir(inputFilePath, inputFile);
-        outputDirs.add(join(outputFilePath, relPath));
-      } catch {
-        // Path issues are handled later in the main loop
-      }
+  // The folders outputs will be written to: the output folder mirrors the
+  // input tree, or (same-folder mode) each input's own folder.
+  const outputRoot =
+    inputFilePath !== outputFilePath ? outputFilePath : inputFilePath;
+  const targetDirs = new Set<string>();
+  for (const inputFile of files) {
+    try {
+      targetDirs.add(
+        join(outputRoot, getRelativeOutputDir(inputFilePath, inputFile))
+      );
+    } catch {
+      // Path issues are handled later in the main loop
     }
-    logger.log(chalk.cyan(`   Creating ${outputDirs.size} directories...`));
-    for (const dir of outputDirs) {
-      if (!existsSync(dir)) {
-        try {
-          mkdirSync(dir, { recursive: true });
-        } catch (error) {
-          logger.error(
-            chalk.redBright.bold("Couldn't create directory:", dir),
-            error
-          );
-        }
-      }
-    }
-    logger.log(chalk.green('   ✅ Directories ready'));
   }
-
-  const conflictCheckRoot =
-    resolve(inputFilePath) === resolve(outputFilePath)
-      ? inputFilePath
-      : outputFilePath;
-  const existingOutputs = scanExistingFiles(conflictCheckRoot);
+  const existingOutputs = scanExistingFilesIn(targetDirs);
   const skipConflictChecks = existingOutputs.size === 0;
   const plannedOutputs = new Set<string>();
   // Every input in this batch: an existing output that is also an input must
@@ -386,7 +447,7 @@ const createConversionList = async (
           convertSelf = (
             await getAnswer(
               chalk.blueBright(
-                '\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file(1).ogg).\n\n Type "yes" or "no": '
+                '\n 👋 Would you like to convert to the same file type?\n Useful for compressing existing files.\n Don\'t worry - your original files will not be overwritten.\n They\'ll be renamed automatically (e.g., file.ogg --> file-copy(1).ogg).\n\n Type "yes" or "no": '
               )
             )
           )
@@ -542,6 +603,22 @@ const createConversionList = async (
     );
   }
 
+  // Ask how to handle loop tags only when an input actually has some.
+  const toConvert = conversionList.filter((x) => x.action === 'convert');
+  if (toConvert.length > 0) {
+    const loopFile = findLoopTaggedFile(
+      new Set(toConvert.map((x) => x.inputFile))
+    );
+    if (loopFile) {
+      settings.loopDataMode = await askLoopDataMode(
+        loopFile,
+        toConvert.some(
+          (x) => x.outputFormat === 'wav' || x.outputFormat === 'm4a'
+        )
+      );
+    }
+  }
+
   // Process the conversion list
   while (true) {
     // Function to remove duplicates based on outputFile.
@@ -633,6 +710,24 @@ const createConversionList = async (
     } else if (!/^yes$/i.test(accept_answer)) {
       logger.warn('\n⚠️  Invalid input, please type "yes" or "no" ⚠️');
       continue;
+    }
+
+    // Create output folders only now that the user has said yes, and only
+    // for files that will actually be written.
+    const outputDirs = new Set(
+      filesToConvert.map((f) => dirname(f.outputFile))
+    );
+    for (const dir of outputDirs) {
+      if (!existsSync(dir)) {
+        try {
+          mkdirSync(dir, { recursive: true });
+        } catch (error) {
+          logger.error(
+            chalk.redBright.bold("Couldn't create directory:", dir),
+            error
+          );
+        }
+      }
     }
 
     return filesToConvert;

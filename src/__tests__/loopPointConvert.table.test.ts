@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { convertLoopPoints } from '../metadataService.ts';
 
 // Minimal fake metadata builder
@@ -20,6 +21,8 @@ describe('convertLoopPoints table cases', () => {
   const baseLoopStart = 1000;
   const baseLoopLength = 4000;
 
+  // Opus always decodes at 48 kHz, so every source rate is encoded at
+  // 48 kHz and loop points are scaled to 48 kHz units.
   const cases: Array<
     [
       sampleRate: number,
@@ -27,76 +30,14 @@ describe('convertLoopPoints table cases', () => {
       expectedStart: number,
       expectedLength: number,
     ]
-  > = [
-    // >= 32000 -> 48000
-    [
-      44100,
+  > = [6000, 8000, 9000, 12000, 13000, 16000, 20000, 22050, 24000, 44100].map(
+    (sr) => [
+      sr,
       48000,
-      Math.round(baseLoopStart * (48000 / 44100)),
-      Math.round(baseLoopLength * (48000 / 44100)),
-    ],
-    // between 22050 and <32000 -> 24000
-    // 24000 Hz falls into the >=22050 branch which maps to 24000 (no change)
-    [
-      24000,
-      24000,
-      Math.round(baseLoopStart * (24000 / 24000)),
-      Math.round(baseLoopLength * (24000 / 24000)),
-    ],
-    [
-      22050,
-      24000,
-      Math.round(baseLoopStart * (24000 / 22050)),
-      Math.round(baseLoopLength * (24000 / 22050)),
-    ],
-    // >16000 to <22050 -> 24000 (same branch as >=22050? original code has else if (sampleRateNumber >= 22050) 24000; else if (sampleRateNumber > 16000) 24000).
-    [
-      20000,
-      24000,
-      Math.round(baseLoopStart * (24000 / 20000)),
-      Math.round(baseLoopLength * (24000 / 20000)),
-    ],
-    // >12000 to <=16000 -> 16000
-    [
-      16000,
-      16000,
-      Math.round(baseLoopStart * (16000 / 16000)),
-      Math.round(baseLoopLength * (16000 / 16000)),
-    ],
-    [
-      13000,
-      16000,
-      Math.round(baseLoopStart * (16000 / 13000)),
-      Math.round(baseLoopLength * (16000 / 13000)),
-    ],
-    // >8000 to <=12000 -> 12000
-    [
-      12000,
-      12000,
-      Math.round(baseLoopStart * (12000 / 12000)),
-      Math.round(baseLoopLength * (12000 / 12000)),
-    ],
-    [
-      9000,
-      12000,
-      Math.round(baseLoopStart * (12000 / 9000)),
-      Math.round(baseLoopLength * (12000 / 9000)),
-    ],
-    // <=8000 -> 8000
-    [
-      8000,
-      8000,
-      Math.round(baseLoopStart * (8000 / 8000)),
-      Math.round(baseLoopLength * (8000 / 8000)),
-    ],
-    // <8000 -> 8000
-    [
-      6000,
-      8000,
-      Math.round(baseLoopStart * (8000 / 6000)),
-      Math.round(baseLoopLength * (8000 / 6000)),
-    ],
-  ];
+      Math.round(baseLoopStart * (48000 / sr)),
+      Math.round(baseLoopLength * (48000 / sr)),
+    ]
+  );
 
   it.each(cases)(
     'adjusts sample rate %d -> %s',
@@ -112,10 +53,11 @@ describe('convertLoopPoints table cases', () => {
   );
 
   it.each([
-    [8000, 8000],
-    [12000, 12000],
-    [16000, 16000],
+    [8000, 48000],
+    [12000, 48000],
+    [16000, 48000],
     [32000, 48000],
+    [48000, 48000],
   ])(
     'handles opus boundary sample rate %d -> %d explicitly',
     (sampleRate, expectedRate) => {
@@ -138,7 +80,7 @@ describe('convertLoopPoints table cases', () => {
     expect(res.loopLength).toBe(baseLoopLength);
   });
 
-  it('returns null sample rate when either loop point is NaN during opus conversion', () => {
+  it('keeps the explicit 48 kHz rate and scales a lone loop start during opus conversion', () => {
     const meta = {
       streams: [
         {
@@ -151,8 +93,8 @@ describe('convertLoopPoints table cases', () => {
     };
     const res = convertLoopPoints(meta as any, 'ogg', 'opus');
 
-    expect(res.newSampleRate).toBeNull();
-    expect(res.loopStart).toBe(1000);
+    expect(res.newSampleRate).toBe(48000);
+    expect(res.loopStart).toBe(Math.round(1000 * (48000 / 44100)));
     expect(res.loopLength).toBeNaN();
   });
 
@@ -172,6 +114,7 @@ describe('convertLoopPoints table cases', () => {
   });
 
   it('ignores non-numeric loop tags', () => {
+    console.error = jest.fn();
     const meta = {
       streams: [
         {
@@ -192,6 +135,51 @@ describe('convertLoopPoints table cases', () => {
     const res = convertLoopPoints(meta as any, 'mp3', 'vorbis');
     expect(res.loopStart).toBe(0);
     expect(res.loopLength).toBe(0);
+  });
+
+  it('rescales mp3 loop points when the source rate is above 48 kHz', () => {
+    const meta = makeMeta(96000, baseLoopStart, baseLoopLength);
+    const res = convertLoopPoints(meta as any, 'mp3', 'vorbis');
+    expect(res.newSampleRate).toBe(48000);
+    expect(res.loopStart).toBe(500);
+    expect(res.loopLength).toBe(2000);
+  });
+
+  it('reads loop tags in any letter case and LOOPEND instead of LOOPLENGTH', () => {
+    const meta = {
+      streams: [
+        {
+          codec_type: 'audio',
+          sample_rate: '44100',
+          channels: 2,
+          tags: { LoopStart: '100', LOOP_END: '2100' },
+        },
+      ],
+      format: { tags: {} },
+    };
+    const res = convertLoopPoints(meta as any, 'flac', 'vorbis');
+    expect(res.loopStart).toBe(100);
+    expect(res.loopLength).toBe(2000);
+    expect(res.hasLoopEnd).toBe(true);
+  });
+
+  it('skips a cover-art stream listed before the audio stream', () => {
+    const meta = {
+      streams: [
+        { codec_type: 'video', tags: { LOOPSTART: '1', LOOPLENGTH: '2' } },
+        {
+          codec_type: 'audio',
+          sample_rate: '96000',
+          channels: 1,
+          tags: { LOOPSTART: '9600', LOOPLENGTH: '48000' },
+        },
+      ],
+      format: { tags: {} },
+    };
+    const res = convertLoopPoints(meta as any, 'mp3', 'vorbis');
+    expect(res.newSampleRate).toBe(48000);
+    expect(res.loopStart).toBe(4800);
+    expect(res.loopLength).toBe(24000);
   });
 
   it('uses only the first audio stream for loop conversion', () => {

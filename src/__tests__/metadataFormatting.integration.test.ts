@@ -930,7 +930,7 @@ describe('convertLoopPoints - Real Output Tests', () => {
       expect(result.loopLength).toBe(96000);
     });
 
-    it('should convert 22050Hz to 24000Hz for opus', () => {
+    it('should convert 22050Hz to 48000Hz for opus (Opus always decodes at 48 kHz)', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -956,13 +956,12 @@ describe('convertLoopPoints - Real Output Tests', () => {
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
-      expect(result.newSampleRate).toBe(24000);
-      // 22050 * (24000/22050) ≈ 24000
-      expect(result.loopStart).toBe(Math.round(22050 * (24000 / 22050)));
-      expect(result.loopLength).toBe(Math.round(44100 * (24000 / 22050)));
+      expect(result.newSampleRate).toBe(48000);
+      expect(result.loopStart).toBe(48000);
+      expect(result.loopLength).toBe(96000);
     });
 
-    it('should convert 8000Hz to 8000Hz for opus (low sample rate)', () => {
+    it('should convert 8000Hz to 48000Hz for opus (low sample rate)', () => {
       const metadata: AudioMetadata = {
         streams: [
           {
@@ -988,9 +987,9 @@ describe('convertLoopPoints - Real Output Tests', () => {
 
       const result = convertLoopPoints(metadata, 'ogg', 'opus');
 
-      expect(result.newSampleRate).toBe(8000);
-      expect(result.loopStart).toBe(8000);
-      expect(result.loopLength).toBe(16000);
+      expect(result.newSampleRate).toBe(48000);
+      expect(result.loopStart).toBe(48000);
+      expect(result.loopLength).toBe(96000);
     });
   });
 
@@ -1035,15 +1034,13 @@ describe('formatLoopData - Real Output Tests', () => {
   it('should format loop data for ffmpeg as args array', () => {
     const result = formatLoopData(12345, 67890);
 
+    // One spelling each: ffmpeg's tag dictionary ignores case, so a second
+    // lowercase copy would replace the uppercase one.
     expect(result).toEqual([
       '-metadata',
       'LOOPSTART=12345',
       '-metadata',
       'LOOPLENGTH=67890',
-      '-metadata',
-      'loopstart=12345',
-      '-metadata',
-      'looplength=67890',
     ]);
   });
 
@@ -1053,10 +1050,21 @@ describe('formatLoopData - Real Output Tests', () => {
     expect(result).toEqual([]);
   });
 
-  it('should return empty array for NaN loop length', () => {
+  it('should keep a lone LOOPSTART when the loop length is unknown', () => {
     const result = formatLoopData(12345, NaN);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual(['-metadata', 'LOOPSTART=12345']);
+  });
+
+  it('should add LOOPEND when the source used LOOPEND', () => {
+    expect(formatLoopData(100, 2000, true)).toEqual([
+      '-metadata',
+      'LOOPSTART=100',
+      '-metadata',
+      'LOOPLENGTH=2000',
+      '-metadata',
+      'LOOPEND=2100',
+    ]);
   });
 
   it('should return empty array for both NaN', () => {
@@ -1073,10 +1081,6 @@ describe('formatLoopData - Real Output Tests', () => {
       'LOOPSTART=0',
       '-metadata',
       'LOOPLENGTH=100000',
-      '-metadata',
-      'loopstart=0',
-      '-metadata',
-      'looplength=100000',
     ]);
   });
 
@@ -1090,7 +1094,7 @@ describe('formatLoopData - Real Output Tests', () => {
     expect(result).toEqual(
       expect.arrayContaining(['-metadata', 'LOOPLENGTH=96000'])
     );
-    expect(result.length).toBe(8);
+    expect(result.length).toBe(4);
   });
 });
 

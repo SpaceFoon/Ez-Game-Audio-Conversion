@@ -106,6 +106,7 @@ const defaultSpawnImplementation = () => {
 
 const { runConversion, converterWorker } =
   await import('../converterWorker.js');
+const { __setCaseInsensitiveForTests } = await import('../pathKey.js');
 
 const getMetaDataMock = metadataService.getMetaData as jest.MockedFunction<
   typeof metadataService.getMetaData
@@ -501,7 +502,18 @@ describe('converterWorker.js', () => {
     expect(args.join(' ')).not.toContain('LOOPSTART=1000');
   }, 10000);
 
-  it('does not re-apply metadata args when preserving metadata for AIFF', async () => {
+  it('runs ffmpeg with -xerror so a corrupt input fails instead of "succeeding"', async () => {
+    fs.existsSync.mockReturnValue(true);
+    await converterWorker({
+      file: { inputFile: 'in.mp3', outputFile: 'out.ogg', outputFormat: 'ogg' },
+      settings: { oggCodec: 'vorbis' },
+    });
+    const args = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(args.indexOf('-xerror')).toBeGreaterThan(-1);
+    expect(args.indexOf('-xerror')).toBeLessThan(args.indexOf('-i'));
+  }, 10000);
+
+  it('rebuilds tags for AIFF like every other format (OGG tags would otherwise be lost)', async () => {
     fs.existsSync.mockReturnValue(true);
 
     await converterWorker({
@@ -517,7 +529,8 @@ describe('converterWorker.js', () => {
 
     expect(args).toContain('-write_id3v2');
     expect(args).toContain('1');
-    expect(args).not.toContain('title=Test');
+    expect(args).toContain('title=Test');
+    expect(args.join(' ')).toContain('-map_metadata -1');
   }, 10000);
 
   it('handles directory creation error gracefully', async () => {
@@ -695,8 +708,9 @@ describe('converterWorker.js', () => {
       ).rejects.toThrow(/CRITICAL.*refusing to overwrite/i);
     }, 10000);
 
-    it('rejects when paths differ only by case', async () => {
+    it('rejects when paths differ only by case on a case-insensitive drive', async () => {
       fs.existsSync.mockReturnValue(true);
+      __setCaseInsensitiveForTests(true);
       await expect(
         converterWorker({
           file: {
@@ -707,6 +721,23 @@ describe('converterWorker.js', () => {
           settings: { oggCodec: 'vorbis' },
         })
       ).rejects.toThrow(/CRITICAL.*refusing to overwrite/i);
+      __setCaseInsensitiveForTests(null);
+    }, 10000);
+
+    it('allows a case-only difference on a case-sensitive drive (different files)', async () => {
+      fs.existsSync.mockReturnValue(true);
+      __setCaseInsensitiveForTests(false);
+      await expect(
+        converterWorker({
+          file: {
+            inputFile: '/music/Song.WAV',
+            outputFile: '/music/song.wav',
+            outputFormat: 'wav',
+          },
+          settings: { oggCodec: 'vorbis' },
+        })
+      ).resolves.toBeUndefined();
+      __setCaseInsensitiveForTests(null);
     }, 10000);
 
     it('rejects when paths resolve to same file via ..', async () => {

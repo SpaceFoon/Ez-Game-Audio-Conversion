@@ -62,6 +62,8 @@ if (!existsSync(join(repoRoot, 'ffmpeg-bin', 'linux', 'ffmpeg'))) {
 // 1. Fictional library: "Starfall" game audio, ~0.4 s generated tones.
 // ---------------------------------------------------------------------------
 const workRoot = mkdtempSync('/tmp/ezga-');
+// Remove the work folder however the run ends (a failed capture used to leave it).
+process.on('exit', () => rmSync(workRoot, { recursive: true, force: true }));
 if (workRoot.length !== DISPLAY_ROOT.length) {
   throw new Error(`Unexpected work folder length: ${workRoot}`);
 }

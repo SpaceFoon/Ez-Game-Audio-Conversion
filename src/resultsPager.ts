@@ -41,9 +41,13 @@ export const moveOffset = (
   return Math.max(0, Math.min(next, maxOffset));
 };
 
-/** Truncate a display line so it never wraps (wrapping breaks redraw math). */
+/**
+ * Truncate a display line so it never wraps (wrapping breaks redraw math).
+ * Cuts the start, not the end: every row shares the same folder prefix, and
+ * the file name at the end is what tells them apart.
+ */
 export const truncateLine = (line: string, width: number): string =>
-  line.length < width ? line : `${line.slice(0, Math.max(1, width - 2))}…`;
+  line.length < width ? line : `…${line.slice(-Math.max(1, width - 2))}`;
 
 const isExitKey = (key: { name?: string; ctrl?: boolean }): boolean =>
   Boolean(key.ctrl && key.name === 'c') ||
@@ -104,6 +108,8 @@ const interactivePager = (
         for (const listener of saved) stdin.on('keypress', listener);
         if (stdin.setRawMode) stdin.setRawMode(wasRaw);
         resolve();
+        // Ctrl+C means quit everywhere, not just "leave the list".
+        if (key.ctrl && key.name === 'c') process.emit('SIGINT', 'SIGINT');
         return;
       }
       const next = moveOffset(offset, key.name ?? '', items.length, pageSize);

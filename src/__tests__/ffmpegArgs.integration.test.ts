@@ -304,7 +304,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
       expect(args).toContain('-1');
     });
 
-    it('should NOT strip metadata for AIFF (preserveMetadata=true)', async () => {
+    it('should rebuild metadata for AIFF like other formats (-map_metadata -1)', async () => {
       await converterWorker({
         file: {
           inputFile: '/input/test.mp3',
@@ -316,13 +316,11 @@ describe('ffmpeg argument building - Integration Tests', () => {
 
       const args = capturedSpawnArgs[0].args;
 
-      // For AIFF, should NOT have -map_metadata -1
+      // AIFF tags are rebuilt from the probed metadata: copying them through
+      // loses OGG/Opus tags, which ffmpeg keeps per stream.
       const mapMetadataIndex = args.indexOf('-map_metadata');
-
-      // Either not present at all, or not followed by -1
-      if (mapMetadataIndex !== -1) {
-        expect(args[mapMetadataIndex + 1]).not.toBe('-1');
-      }
+      expect(mapMetadataIndex).not.toBe(-1);
+      expect(args[mapMetadataIndex + 1]).toBe('-1');
     });
 
     it('should include channel specification (-ac)', async () => {
@@ -602,20 +600,31 @@ describe('source loop tags and channel handling', () => {
     expect(values).not.toContain('LOOP_LENGTH=22050');
   });
 
-  it('clears source loop tags on AIFF (keeps metadata) in "skip" mode', async () => {
+  it('drops source loop tags on AIFF in "skip" mode', async () => {
     probeStreamOverride = {
       tags: { LOOPSTART: '22050', LOOPLENGTH: '22050' },
     };
-    const values = metadataValues(await run('aiff', { loopDataMode: 'skip' }));
-    expect(values).toEqual(
-      expect.arrayContaining(['LOOPSTART=', 'LOOPLENGTH='])
-    );
+    const args = await run('aiff', { loopDataMode: 'skip' });
+    expect(args.join(' ')).toContain('-map_metadata -1');
+    expect(metadataValues(args).some((v) => /^loop/i.test(v))).toBe(false);
   });
 
   it('downmixes surround sources to stereo for MP3', async () => {
     probeStreamOverride = { channels: 6 };
     const args = await run('mp3', {});
     expect(args[args.indexOf('-ac') + 1]).toBe('2');
+  });
+
+  it('uses Opus mapping family 255 for 4-channel sources (the default mapping rejects them)', async () => {
+    probeStreamOverride = { channels: 4 };
+    const args = await run('ogg', { oggCodec: 'opus' });
+    expect(args.join(' ')).toContain('-mapping_family 255');
+  });
+
+  it('keeps the default Opus mapping for 5.1', async () => {
+    probeStreamOverride = { channels: 6 };
+    const args = await run('ogg', { oggCodec: 'opus' });
+    expect(args).not.toContain('-mapping_family');
   });
 
   it('keeps surround channel count for formats that support it', async () => {

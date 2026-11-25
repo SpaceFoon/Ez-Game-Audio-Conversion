@@ -1,15 +1,26 @@
 import chalk from 'chalk';
 import os from 'os';
 import { resolve } from 'path';
+import { realpathSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { config } from 'dotenv';
 import getUserInput from './getUserInput.js';
 import searchFiles from './searchFiles.js';
 import createConversionList from './createConversionList.js';
 import { convertFiles } from './converterManager.js';
-import { settings, isSeaRuntime, rl } from './utils.js';
+import {
+  settings,
+  isSeaRuntime,
+  rl,
+  findBinary,
+  platformSlug,
+} from './utils.js';
 import finalize from './finalize.js';
-import ExitProgramError from './exitProgramError.js';
+import ExitProgramError, {
+  InputClosedError,
+  UserQuitError,
+} from './exitProgramError.js';
+import { runCancelCleanups } from './cancel.js';
 import logger from './logger.js';
 import { renderSeaBanner } from './banner.js';
 // Ensure global type augmentation is loaded for ts-node/tsc
@@ -17,7 +28,7 @@ import './types/global.js';
 
 // Skip dotenv in SEA — there is no .env file and v17 prints noisy banners.
 if (!isSeaRuntime) {
-  config();
+  config({ quiet: true });
 }
 
 const initializeGlobalEnv = (): void => {
@@ -97,8 +108,29 @@ const runConversionPipeline = async (useCliArg: boolean): Promise<boolean> => {
   return await finalize(failedFiles, successfulFiles, jobStartTime);
 };
 
+/**
+ * Ctrl+C (or a termination signal): stop any running ffmpeg, remove the
+ * outputs it was half-way through writing, and exit with the conventional
+ * "interrupted" status.
+ */
+let cancelling = false;
+const onCancel = (signal: NodeJS.Signals): void => {
+  if (cancelling) return;
+  cancelling = true;
+  logger.log('\n🛑 Cancelled — stopping conversions and cleaning up...');
+  runCancelCleanups();
+  try {
+    rl.close();
+  } catch {
+    // already closed
+  }
+  process.exit(signal === 'SIGTERM' ? 143 : 130);
+};
+
 async function runApp(): Promise<void> {
   initializeGlobalEnv();
+  process.on('SIGINT', onCancel);
+  process.on('SIGTERM', onCancel);
 
   // Worker is loaded dynamically by converterManager when needed
   logRuntimeMode();
@@ -106,6 +138,25 @@ async function runApp(): Promise<void> {
   resizeTerminal();
 
   await renderBanner();
+
+  // Check for ffmpeg before asking anything: otherwise the user answers every
+  // prompt and then each file fails with "ffprobe failed".
+  const missing = ['ffmpeg', 'ffprobe'].filter(
+    (tool) =>
+      !findBinary(platformSlug === 'windows' ? `${tool}.exe` : tool, [
+        `ffmpeg-bin/${platformSlug}`,
+      ])
+  );
+  if (missing.length > 0) {
+    logger.error(
+      chalk.redBright(
+        `\n❌ ${missing.join(' and ')} not found. Place ${missing.length > 1 ? 'them' : 'it'} in ffmpeg-bin/${platformSlug}/ next to the app (see ffmpeg-bin/README.md).`
+      )
+    );
+    rl.close();
+    process.exitCode = 1;
+    return;
+  }
 
   let isFirstRun = true;
   while (true) {
@@ -121,6 +172,20 @@ async function runApp(): Promise<void> {
     } catch (error: unknown) {
       if (error instanceof ExitProgramError) {
         continue;
+      }
+      if (error instanceof UserQuitError) {
+        logger.log('Exiting at user request.');
+        rl.close();
+        return;
+      }
+      if (error instanceof InputClosedError) {
+        // Piped answers ran out (or Ctrl+D) before every question was answered.
+        logger.error(
+          '\nInput ended before all questions were answered — exiting.'
+        );
+        rl.close();
+        process.exitCode = 1;
+        return;
       }
       logger.error('Fatal Error', error);
       // Release stdin so the process can exit, and report the failure.
@@ -140,8 +205,17 @@ const isMainModule = (() => {
     // In CJS bundles, import.meta.url can be empty/invalid; fall back to direct-run behavior.
     if (!import.meta?.url) return true;
 
-    const modulePath = resolve(fileURLToPath(import.meta.url));
-    const argPath = resolve(entryArg);
+    // Compare real paths: import.meta.url is already symlink-free, argv[1]
+    // is not, so running through a symlinked folder would otherwise never start.
+    const real = (p: string) => {
+      try {
+        return realpathSync(p);
+      } catch {
+        return resolve(p);
+      }
+    };
+    const modulePath = real(fileURLToPath(import.meta.url));
+    const argPath = real(resolve(entryArg));
     return modulePath === argPath;
   } catch {
     // If fileURLToPath fails, we're likely in bundled/CJS context.

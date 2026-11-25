@@ -28,8 +28,9 @@ jobs:
       - name: Download ffmpeg binaries
         run: npm run install:ffmpeg
 
+      # Check only: `npm run fix` rewrites files, so bad formatting never failed CI.
       - name: Lint and format
-        run: npm run fix
+        run: npx eslint . && npx prettier --check .
 
       - name: Type check and build
         run: npm run build

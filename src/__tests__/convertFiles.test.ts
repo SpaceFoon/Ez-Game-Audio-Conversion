@@ -387,7 +387,7 @@ describe('convertFiles', () => {
     );
   }, 30000);
 
-  it('should detect permission errors and stop the batch', async () => {
+  it('should fail a file with a permission error without stopping the batch', async () => {
     workerMock.mockImplementation(() => {
       const handlers: WorkerHandlers = {};
       const worker = {
@@ -418,13 +418,13 @@ describe('convertFiles', () => {
     const result = await withTimeout(
       convertFiles(createTestFiles(1)),
       5000,
-      "Test 'should detect permission errors and stop the batch' timed out"
+      "Test 'should fail a file with a permission error' timed out"
     );
 
     expect(result.failedFiles).toHaveLength(1);
     expect(result.successfulFiles).toHaveLength(0);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Stopping due to file permission/access error')
+    expect(console.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Stopping due to')
     );
   }, 30000);
 

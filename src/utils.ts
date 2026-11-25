@@ -9,9 +9,9 @@ import {
 } from 'fs';
 import moment from 'moment';
 import chalk from 'chalk';
-import { dirname, join } from 'path';
+import { basename, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import ExitProgramError from './exitProgramError.js';
+import ExitProgramError, { InputClosedError } from './exitProgramError.js';
 import logger from './logger.js';
 import type { Settings, LogEntry, FileInfo } from './types/settings.js';
 
@@ -128,16 +128,60 @@ export let settings: Settings = {
 };
 
 // Provide a Jest-friendly stub to avoid open handle (TTYWRAP) issues during tests
-type ReadLineLike = {
-  question: (q: string, cb: (answer: string) => void) => void;
+// `answer` is null when input has ended.
+export type ReadLineLike = {
+  question: (q: string, cb: (answer: string | null) => void) => void;
   close: () => void;
+};
+
+/**
+ * Wrap readline so no input line is lost. readline drops lines that arrive
+ * while no question is pending, so piped answers (`printf "a\nb\n" | app`)
+ * would all but vanish; buffer them and hand them out in order instead.
+ * Once stdin ends, pending and later questions get `null`.
+ */
+const createBufferedReadline = (): ReadLineLike => {
+  const iface = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    // Line editing only on a real terminal; piped input is read as plain lines.
+    terminal: Boolean(process.stdin.isTTY && process.stdout.isTTY),
+  });
+  const lines: string[] = [];
+  const waiting: Array<(answer: string | null) => void> = [];
+  let ended = false;
+
+  iface.on('line', (line) => {
+    const next = waiting.shift();
+    if (next) next(line);
+    else lines.push(line);
+  });
+  iface.on('close', () => {
+    ended = true;
+    for (const next of waiting.splice(0)) next(null);
+  });
+  // Ctrl+C in raw mode reaches readline as a key, not a signal; forward it.
+  iface.on('SIGINT', () => {
+    process.emit('SIGINT', 'SIGINT');
+  });
+
+  return {
+    question: (q, cb) => {
+      // Piped input isn't echoed, so end the prompt line ourselves.
+      if (q) process.stdout.write(process.stdin.isTTY ? q : `${q}\n`);
+      if (lines.length > 0) cb(lines.shift()!);
+      else if (ended) cb(null);
+      else waiting.push(cb);
+    },
+    close: () => iface.close(),
+  };
 };
 
 let rl: ReadLineLike;
 if (process.env.JEST_WORKER_ID) {
   // In Jest, do not bind to real stdio to prevent open handles
   rl = {
-    question: (_q: string, cb: (answer: string) => void) => cb(''),
+    question: (_q: string, cb: (answer: string | null) => void) => cb(''),
     close: () => {},
   };
   // Fully release the TTY handle so Jest can exit cleanly.
@@ -149,11 +193,7 @@ if (process.env.JEST_WORKER_ID) {
     // Ignore stdin cleanup errors
   }
 } else {
-  rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  }) as unknown as ReadLineLike;
+  rl = createBufferedReadline();
 }
 
 /**
@@ -161,21 +201,23 @@ if (process.env.JEST_WORKER_ID) {
  * silently ignores rl.question() while another question is pending, so a
  * second concurrent prompt (e.g. a locked-log-file prompt racing the fatal
  * "Press ENTER" prompt) would never resolve and hang the batch. Queue instead.
+ * Rejects with InputClosedError once stdin has ended.
  */
 export const createSerialAsker = (getRl: () => ReadLineLike) => {
   let queue: Promise<unknown> = Promise.resolve();
 
   return (question: string | string[]): Promise<string> => {
     const ask = (): Promise<string> =>
-      new Promise((resolve) => {
+      new Promise((resolve, reject) => {
         // Handle array of strings (from chalk)
         const formattedQuestion = Array.isArray(question)
           ? question.join(' ')
           : question;
         // Always echo the question so Windows PowerShell/cmd users see it even if ANSI is suppressed
         logger.log(formattedQuestion);
-        getRl().question('', (answer: string) => {
-          resolve(answer);
+        getRl().question('', (answer) => {
+          if (answer === null) reject(new InputClosedError());
+          else resolve(answer);
         });
       });
 
@@ -248,6 +290,12 @@ export const __getLogFileStateForTests = (): {
 } => ({
   logFile: fileNameL,
   errorFile: fileNameE,
+});
+
+/** File names (not paths) of this run's CSV logs, e.g. "logs(1).csv". */
+export const getLogFileNames = (): { log: string; error: string } => ({
+  log: fileNameL ? basename(fileNameL) : 'logs.csv',
+  error: fileNameE ? basename(fileNameE) : 'error.csv',
 });
 
 export const initializeFileNames = () => {

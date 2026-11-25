@@ -6,27 +6,62 @@ For the mutation-hardening roadmap and progress log, see [TESTING-HARDENING-PLAN
 
 | ID | Finding | Status | Reproducing test |
 |----|---------|--------|------------------|
-| B6 | Fatal abort terminates worker threads but not their ffmpeg child processes — `worker.terminate()` does not kill spawned children, so in-flight ffmpeg keeps writing to a full disk (B4 only half fixed). Verified: a child spawned in a worker is still alive after `terminate()`. `src/converterManager.ts:246` | **Open** — confirmed | — |
-| B7 | `recordFailure` dedupes with `failedFiles.some(...)` → O(n²). 50k failures ≈ 4.5 s, 250k ≈ 2 min; hit when ffmpeg is missing, every file fails, or the abort path marks the queue as skipped. Outputs are already unique after `removeDuplicates`. `src/converterManager.ts:128` | **Open** — confirmed | — |
-| B8 | One existing read-only output (with `o`/`oa`) aborts the whole batch: ffmpeg's `<path>: Permission denied` still matches after `stripJobPaths`, so a per-file error is treated as batch-fatal and every queued file is marked skipped. `src/converterManager.ts:44` | **Open** — confirmed by code reading | — |
-| B9 | Sample rate, channel count and loop conversion read `streams[0]`, not the first audio stream. If cover art is stream 0: `-ac 2` fallback (mono→stereo, surround downmix) and Opus loop points are not rescaled. `src/metadataService.ts:405,455,524` | **Open** — plausible | — |
-| B10 | Failed or killed ffmpeg runs leave a truncated output file (`-y`); the next run treats it as "already exists" and `sa` skips it. `src/converterWorker.ts:422` | **Open** — plausible | — |
-| B12 | Packaged smoke test can't fail when the binary doesn't start: a crash or kill (`status` null, `signal` set, no `res.error`) only prints a warning, and missing startup text is also only a warning → exit 0. A broken release binary still passes CI. `src/__tests__/smokeTest.mjs:133-160` | **Open** — confirmed by code reading | — |
-| B13 | Container and stream housekeeping tags are copied into outputs as real tags. An ffmpeg-made M4A → OGG gets `handler_name=SoundHandler`, `vendor_id=[0][0][0][0]`, `major_brand=M4A`, `minor_version`, `compatible_brands`, `language=und`. Verified with ffprobe on the output. Passthrough in `formatMetaDataArgs` needs a denylist. `src/metadataService.ts:435` | **Open** — confirmed | — |
-| B14 | iTunes gapless info (`iTunSMPB`) is copied to re-encoded outputs. It describes the *source* encoder's priming/padding, so gapless players trim the wrong samples — bad for seamless loops. The canonical entry `itunessmpb` doesn't even match the real key (normalizes to `itunsmpb`), so it goes through passthrough. `src/metadataService.ts:76,435` | **Open** — plausible (needs an iTunes-encoded source to confirm) | — |
-| B15 | Opus output fails for some multichannel layouts. A 4-channel WAV (layout 4.0) → Opus exits 234: `Invalid channel layout 4.0 for specified mapping family -1`. The same file → Vorbis "succeeds" but warns the output channel layout is wrong. 5.1 and 5.1(side) work. Fix: `-mapping_family 255` or downmix for unsupported layouts. `src/converterWorker.ts:212,320` | **Open** — confirmed | — |
-| B16 | OGG/Opus → AIFF drops **all** tags (title, artist, …). AIFF uses `preserveMetadata` and skips `metaDataArgs`, but Vorbis comments are stream-level in ffmpeg and the AIFF ID3 writer only keeps global metadata. Verified: `title=MyTitle artist=Me` OGG → AIFF has only `encoder`. `src/converterWorker.ts:231,303` | **Open** — confirmed | — |
-| B17 | Each loop tag is written twice (`LOOPSTART` + `loopstart`), but ffmpeg's metadata dictionary ignores case, so the second overwrites the first. Every output ends up with only lowercase `loopstart`/`looplength`; the uppercase form the comment calls "most widely supported" is never written. Readers that match ID3 TXXX/Vorbis keys case-sensitively miss the loop. Verified on OGG, FLAC, MP3, AIFF. `src/metadataService.ts:586` | **Open** — confirmed | — |
-| B18 | No timeout on ffprobe (`spawnSync`) or ffmpeg. A file that never returns data (a FIFO or device named `*.wav`, a stalled network or cloud-placeholder file) hangs that worker and the whole batch forever. ffprobe also uses the default 1 MB `maxBuffer`, so huge tags give ENOBUFS → "Could not read metadata". `src/metadataService.ts:360`, `src/converterWorker.ts:404` | **Open** — plausible | — |
-| B19 | Case-folded `pathKey` on case-sensitive Linux makes `removeDuplicates` drop real files: `Boss.wav` and `boss.wav` in one folder map to `Boss.ogg`/`boss.ogg`, which are treated as one output, so the second input is skipped (not just prompted, as the `pathKey.ts` comment assumes). `src/createConversionList.ts:556` | **Open** — confirmed by code reading | — |
-| B20 | `npm run install:ffmpeg` on Apple Silicon copies Homebrew's ffmpeg, which is linked against Homebrew dylibs. A local `npm run package` on an arm64 Mac then ships an ffmpeg that fails with "Library not loaded" on machines without Homebrew ffmpeg. CI is unaffected (it uses static builds). `downloadFile` also has no timeout and ignores mid-stream errors, so a dropped connection can hang the install. `scripts/install-ffmpeg.js:157,192` | **Open** — plausible | — |
-| B21 | `loopDataMode` (`skip`/`force`) can't be set by the user: nothing in `getUserInput` or the settings sets it, so the app always runs `auto` and those modes only exist in tests. `src/converterManager.ts:200` | **Open** — gap | — |
-| B11 | Same-type prompt says files become `file(1).ogg`, but they're actually named `file-copy(1).ogg`. `src/createConversionList.ts:389` | **Open** — nit | — |
+| B42 | Vorbis has no 4.0/3-channel mapping either: a 4.0 WAV → Vorbis succeeds, but ffmpeg warns the output channel layout is wrong (players may route channels to the wrong speakers). Opus was fixed (B15); Vorbis would need a remap or downmix decision. | **Open** — low | — |
+| B43 | A WAV with a header but zero samples still "converts" to an output with no audio stream: ffmpeg exits 0 and ffprobe reports no duration to check against. Harmless (empty in, empty out). | **Open** — nit | — |
+| B44 | Embedded cover art is dropped from every output (`-vn`). Probably right for game audio; a product decision. | **Open** — by design? | — |
+
+### Checked in the final pass and found OK
+
+All run end to end with the bundled ffmpeg on Linux (Node 26):
+
+- 6×6 format matrix (36 conversions): tags, channels and sample rate correct, apart from the entries above.
+- Sample rates 8 kHz–192 kHz and 8/24/32-bit-float sources into all six formats (84 conversions, none failed).
+- Opus loop rescaling from every source rate at or above 32 kHz.
+- 26 unusual filenames (spaces, quotes, `%d`, `:`, leading `-`, unicode, emoji, 220-character names); only tab/newline names are rejected, by design.
+- Rename-all, same-folder same-type rename, single-file mode, 40-file quiet-mode batch (every CSV row written).
+- Packaged SEA build: folder argument, single-file argument, missing ffmpeg and missing worker file all report clear errors.
+- Decoded audio stays sample-aligned for Vorbis, Opus, MP3 and AAC sources. ffmpeg itself changes the length slightly (AAC +956 trailing samples, Vorbis −128); that is upstream behaviour, not this app.
 
 ## Resolved (see also [`KNOWN_TEST_FINDINGS.md`](KNOWN_TEST_FINDINGS.md))
 
 | ID | Finding | Resolution |
 |----|---------|------------|
+| B6 | Fatal abort left ffmpeg running (terminating a worker doesn't kill its child) | Workers report their ffmpeg PID; an abort (and Ctrl+C) kills it and removes the half-written output. Verified with an output symlinked to `/dev/full`: no ffmpeg left, no partial files |
+| B7 | O(n²) failure dedupe | `Set` lookup |
+| B8 | One read-only output aborted the whole batch | Only a full disk is batch-fatal; permission errors fail that one file. Verified: 1 failed, 7 converted, read-only file untouched |
+| B9 | `streams[0]` used instead of the audio stream | `getAudioStream()` (first `codec_type: audio`) everywhere; inputs with no audio stream fail clearly |
+| B10 | Failed/killed jobs left truncated outputs | Removed on failure, but only if this job wrote them (mtime check), so a pre-existing file ffmpeg never opened is never deleted |
+| B11 | Same-type prompt showed `file(1).ogg` | Now shows `file-copy(1).ogg` |
+| B12 | Smoke test couldn't fail | Fails on a signal/crash or missing startup text |
+| B13 | Container housekeeping tags copied into outputs | Never-copied list: MP4 brands, handler/vendor ids, creation time, source encoder, `language=und` |
+| B14 | iTunes gapless info (`iTunSMPB`) copied | Never copied |
+| B15 | Opus failed on 3/4-channel layouts | Opus mapping family 255 for 3–4 (and >8) channels; verified 2.1, 3.0, 4.0, quad, 5.1 |
+| B16 | OGG/Opus → AIFF dropped all tags | AIFF tags are rebuilt like every other format |
+| B17 | Loop tags written twice, only lowercase survived | Written once, uppercase `LOOPSTART`/`LOOPLENGTH` |
+| B18 | No ffprobe timeout; FIFO/device files hang | 60 s timeout + 64 MB buffer; search only picks regular files |
+| B19 | Case folding on case-sensitive drives dropped real files | Case is ignored only where the filesystem ignores it (read-only per-folder probe); verified on ext4 and exFAT |
+| B20 | Apple Silicon install copied Homebrew's dylib-linked ffmpeg; downloads could hang | Static arm64 builds (same source as CI); 60 s timeout, aborted/incomplete downloads fail |
+| B21 | `loopDataMode` `skip`/`force` couldn't be set; `force` also wrote tags that ffmpeg drops from WAV and M4A | Before "Start now?", the app asks how to handle loop tags, only when an input has some (quick byte scan of the header/trailer and WAV `smpl` chunk). Blank = keep, `skip` = leave out, `force` (offered when WAV/M4A is an output) = WAV gets a `smpl` loop chunk, M4A keeps the tags via `use_metadata_tags`. Verified with the bundled ffmpeg |
+| B22 | Piped answers lost; silent exits; Ctrl+C didn't cancel, then crashed | Input lines are buffered; ended input exits 1 with a message (0 at the final prompt); Ctrl+C kills ffmpeg, removes partial outputs and exits 130. Verified in a pty |
+| B23 | MP3 loops wrong when the sample rate changes | MP3/AAC rates are picked explicitly and loop points rescaled (e.g. 96 kHz → 48 kHz) |
+| B24 | `LOOPEND` sources lost half the loop | `LOOPEND` read (length = end − start) and written back alongside `LOOPLENGTH` |
+| B25 | Context-menu script broke on paths with spaces or `)` | No space stripping, no `( )` blocks, `=`-safe parsing; `.aif`/`.opus` entries added. **Not run on Windows yet** |
+| B26 | `q` treated as a path; `aif` dropped; `.opus` not searched | `q`/`quit`/`exit` quit; `aif`→aiff, `opus`→ogg; `.opus` files found with the OGG input format |
+| B27 | Track/disc totals lost or written as `track_total` | `3/12` in the track field for MP3/M4A/AIFF/WAV; `TRACKTOTAL`/`DISCTOTAL` for OGG/FLAC |
+| B28 | Whole output tree scanned every batch | Only the folders the batch writes to are listed |
+| B29 | Output folders created before "Start now?" | Created after "yes", only for files being written |
+| B30 | Corrupt/truncated inputs counted as successes | ffmpeg runs with `-xerror`; damaged MP3/FLAC now fail with the decoder error (see B43 for zero-length WAVs) |
+| B31 | Symlinked project path never started | Entry check compares real paths |
+| B32 | WAV `smpl` loops not read | RIFF `smpl` chunk parsed when a WAV has no loop tags; verified WAV → OGG/FLAC/MP3 |
+| B33 | Mixed-case loop tags deleted; bad values silent | Loop tags matched ignoring case/separators; invalid values logged as warnings |
+| B34 | Pager hid file names | Long lines are cut at the start, keeping the file name |
+| B35 | Release `.sha256` files named the pre-rename archive | Workflow rewrites the name after renaming and checks it (`sha256sum -c`). **Takes effect on the next release run** |
+| B36 | Portfolio workflow ran fork PRs on the self-hosted runner | Fork PRs are skipped. **Takes effect once merged** |
+| B37 | Escaped/dragged paths and `~` rejected | Shell escapes undone on macOS/Linux; `~` expanded |
+| B38 | CI lint step rewrote files instead of checking | `eslint .` + `prettier --check .` |
+| B39 | `npm.cmd` spawned without a shell on Windows | npm run through `node $npm_execpath`. **Not run on Windows yet** |
+| B40 | Opus loop units for sources under 32 kHz | Opus is always encoded at 48 kHz, so loop tags are in the units players decode at |
+| B41 | Nits | (a) FLAC keeps the source bit depth (16-bit for lossy/≤16-bit sources); (b) ffmpeg/ffprobe checked before any prompt; (c) pager hints name the real log files; (e) `winston` removed; (f) dotenv runs quietly; (h) BOM removed from `banner.ts`; (i) `capture.mjs` removes its temp folder on failure. (d) cover art → B44; (g) see `CLAUDE.md` |
 | B1 | Two inputs mapping to the same output path: second silently dropped | Duplicate outputs are dropped with a "Skipping duplicate output" warning naming both inputs |
 | B2 | `isFileBusy` returned `false` after the EBUSY prompt without re-checking | Re-opens the file after the prompt (up to 10 attempts); returns `true` if still locked |
 | B3 | Worker `exit(0)` without a prior `code` message was treated as success | Success requires the worker's `code` message; an unconfirmed exit is recorded as a failure |

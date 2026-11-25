@@ -12,6 +12,8 @@ reg delete "HKEY_CURRENT_USER\SOFTWARE\Classes\SystemFileAssociations\.flac\shel
 reg delete "HKEY_CURRENT_USER\SOFTWARE\Classes\SystemFileAssociations\.ogg\shell\EZ-Game-Audio" /f 2>nul
 reg delete "HKEY_CURRENT_USER\SOFTWARE\Classes\SystemFileAssociations\.m4a\shell\EZ-Game-Audio" /f 2>nul
 reg delete "HKEY_CURRENT_USER\SOFTWARE\Classes\SystemFileAssociations\.aiff\shell\EZ-Game-Audio" /f 2>nul
+reg delete "HKEY_CURRENT_USER\SOFTWARE\Classes\SystemFileAssociations\.aif\shell\EZ-Game-Audio" /f 2>nul
+reg delete "HKEY_CURRENT_USER\SOFTWARE\Classes\SystemFileAssociations\.opus\shell\EZ-Game-Audio" /f 2>nul
 
 echo Context menu entries removed successfully!
 echo To reinstall, run add_context_menu.bat

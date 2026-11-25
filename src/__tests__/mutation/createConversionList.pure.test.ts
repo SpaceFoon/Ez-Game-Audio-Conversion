@@ -91,10 +91,17 @@ describe('createConversionList pure exports (mutation hardening)', () => {
   });
 
   describe('pathsResolveToSameFile', () => {
-    it('returns true for case-only differences on the same path', () => {
+    it('returns true for case-only differences on a case-insensitive drive', async () => {
+      const { __setCaseInsensitiveForTests } = await import('../../pathKey.js');
+      __setCaseInsensitiveForTests(true);
       expect(pathsResolveToSameFile('/tmp/Song.WAV', '/tmp/song.wav')).toBe(
         true
       );
+      __setCaseInsensitiveForTests(false);
+      expect(pathsResolveToSameFile('/tmp/Song.WAV', '/tmp/song.wav')).toBe(
+        false
+      );
+      __setCaseInsensitiveForTests(null);
     });
 
     it('returns false for different files', () => {

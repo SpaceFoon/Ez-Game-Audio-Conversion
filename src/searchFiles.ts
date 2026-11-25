@@ -9,9 +9,16 @@ import type { Settings } from './types/settings.js';
 // resolution is unavailable. Real loops are caught earlier by the visited set.
 export const MAX_WALK_DEPTH = 512;
 
-/** File extensions that belong to an input format (AIFF is also saved as .aif). */
+/**
+ * File extensions that belong to an input format: AIFF is also saved as
+ * .aif, and Ogg Opus files usually use .opus.
+ */
 export const extensionsForFormat = (format: string): string[] =>
-  format === 'aiff' ? ['.aiff', '.aif'] : [`.${format}`];
+  format === 'aiff'
+    ? ['.aiff', '.aif']
+    : format === 'ogg'
+      ? ['.ogg', '.opus']
+      : [`.${format}`];
 
 /**
  * macOS writes "._name" metadata stubs next to real files on FAT/exFAT/network
@@ -120,7 +127,8 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
       if (stats.isDirectory()) {
         // Recursively walk into subdirectories
         walk(inputFilePath, depth + 1);
-      } else {
+      } else if (stats.isFile()) {
+        // Regular files only: a FIFO or device named *.wav would hang ffprobe.
         // Check if the file has a matching extension
         const fileExtension = extname(file).toLowerCase();
         if (

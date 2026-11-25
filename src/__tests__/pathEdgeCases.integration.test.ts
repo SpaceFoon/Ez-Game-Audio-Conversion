@@ -15,6 +15,7 @@ import {
   pathsResolveToSameFile,
 } from '../createConversionList.js';
 import { nextAvailableLogCsvPath } from '../utils.js';
+import { __setCaseInsensitiveForTests } from '../pathKey.js';
 import { outputPathHasInvalidCharacters } from '../converterWorker.js';
 import { parseFormats } from '../getUserInput.js';
 import type { AudioFormat } from '../types/audio.js';
@@ -211,7 +212,8 @@ describe('Path manipulation edge cases', () => {
 
 describe('File collision detection edge cases', () => {
   describe('case sensitivity', () => {
-    it('should treat uppercase and lowercase as same on Windows', () => {
+    it('should treat uppercase and lowercase as same on a case-insensitive drive', () => {
+      __setCaseInsensitiveForTests(true);
       // This is what the code does:
       const inputFile: string = '/input/Song.WAV';
       const outputFile: string = '/input/song.wav';
@@ -220,6 +222,15 @@ describe('File collision detection edge cases', () => {
       const isSameFile = pathsResolveToSameFile(inputFile, outputFile);
 
       expect(isSameFile).toBe(true);
+      __setCaseInsensitiveForTests(null);
+    });
+
+    it('should keep case-only differences apart on a case-sensitive drive', () => {
+      __setCaseInsensitiveForTests(false);
+      expect(pathsResolveToSameFile('/input/Song.WAV', '/input/song.wav')).toBe(
+        false
+      );
+      __setCaseInsensitiveForTests(null);
     });
 
     it('should detect same file with different case', () => {

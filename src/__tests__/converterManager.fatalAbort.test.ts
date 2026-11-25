@@ -116,4 +116,42 @@ describe('convertFiles fatal abort accounting', () => {
     expect(enterPrompts).toHaveLength(1);
     expect(result.failedFiles).toHaveLength(4);
   });
+
+  it('kills the ffmpeg processes of other in-flight jobs on a disk-full abort', async () => {
+    const workers: ReturnType<typeof createMockWorker>[] = [];
+    workerMock.mockImplementation(() => {
+      const w = createMockWorker({ manual: true }) as ReturnType<
+        typeof createMockWorker
+      > & { terminate: jest.Mock };
+      w.terminate = jest.fn();
+      workers.push(w);
+      return w;
+    });
+    const killSpy = jest
+      .spyOn(process, 'kill')
+      .mockImplementation(() => true as never);
+
+    const pending = convertFiles(makeFiles(2));
+    await Promise.resolve();
+    expect(workers).toHaveLength(2);
+
+    workers[0]!.emitMessage({ type: 'pid', data: 4242 });
+    workers[1]!.emitMessage({ type: 'pid', data: 4343 });
+    workers[0]!.emitMessage({
+      type: 'stderr',
+      data: 'No space left on device',
+    });
+    for (const w of workers) w.emitExit(1);
+    const result = await pending;
+
+    // Only the other job's ffmpeg is killed; the failing one exits by itself.
+    expect(killSpy).toHaveBeenCalledWith(4343, 'SIGKILL');
+    expect(killSpy).not.toHaveBeenCalledWith(4242, 'SIGKILL');
+    expect(
+      (workers[1] as unknown as { terminate: jest.Mock }).terminate
+    ).toHaveBeenCalled();
+    expect(result.failedFiles).toHaveLength(2);
+    expect(result.successfulFiles).toHaveLength(0);
+    killSpy.mockRestore();
+  });
 });

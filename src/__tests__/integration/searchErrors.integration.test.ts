@@ -90,7 +90,9 @@ describe('search errors end-to-end integration', () => {
       if (String(targetPath).endsWith('locked.wav')) {
         throw new Error('EACCES: permission denied');
       }
-      return { isDirectory: () => false } as ReturnType<typeof fs.statSync>;
+      return { isDirectory: () => false, isFile: () => true } as ReturnType<
+        typeof fs.statSync
+      >;
     });
 
     const files = await searchFiles({

@@ -51,8 +51,17 @@ describe('truncateLine', () => {
   it('truncates long lines with an ellipsis and never exceeds width', () => {
     const long = 'x'.repeat(200);
     const out = truncateLine(long, 80);
-    expect(out.endsWith('…')).toBe(true);
+    expect(out.startsWith('…')).toBe(true);
     expect(out.length).toBeLessThanOrEqual(80);
+  });
+
+  it('keeps the file name visible when the shared folder prefix is cut', () => {
+    const prefix = '/very/long/shared/output/folder/'.repeat(4);
+    const a = truncateLine(`${prefix}boss-theme.ogg`, 60);
+    const b = truncateLine(`${prefix}title-theme.ogg`, 60);
+    expect(a.endsWith('boss-theme.ogg')).toBe(true);
+    expect(b.endsWith('title-theme.ogg')).toBe(true);
+    expect(a).not.toBe(b);
   });
 
   it('keeps a line exactly at width - 1', () => {

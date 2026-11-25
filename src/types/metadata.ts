@@ -4,6 +4,9 @@ export interface AudioStream {
   codec_type: string;
   sample_rate: string;
   channels: number;
+  /** Source bit depth (FLAC, PCM); absent for lossy codecs. */
+  bits_per_raw_sample?: string | number;
+  bits_per_sample?: string | number;
   duration?: string;
   bit_rate?: string;
   tags?: {

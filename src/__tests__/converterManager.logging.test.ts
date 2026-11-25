@@ -100,7 +100,7 @@ describe('convertFiles log writes and fatal detection', () => {
     expect(result.failedFiles).toHaveLength(1);
   });
 
-  it('still aborts when ffmpeg reports a real permission error for the path', async () => {
+  it('fails only that file when ffmpeg reports a permission error (no batch abort)', async () => {
     addToLogMock.mockResolvedValue(undefined);
     const files = makeFiles(3);
     let calls = 0;
@@ -118,10 +118,11 @@ describe('convertFiles log writes and fatal detection', () => {
       return w;
     });
 
-    await convertFiles(files);
+    const result = await convertFiles(files);
 
-    expect(getAnswer).toHaveBeenCalledWith(
-      'Press ENTER to return to the main menu...'
-    );
+    // A read-only output affects one file; the rest of the batch carries on.
+    expect(getAnswer).not.toHaveBeenCalled();
+    expect(result.successfulFiles).toHaveLength(2);
+    expect(result.failedFiles).toHaveLength(1);
   });
 });

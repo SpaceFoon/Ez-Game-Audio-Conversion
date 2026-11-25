@@ -154,7 +154,7 @@ When converting to Opus format, loop points must be adjusted for sample rate cha
 - The converter automatically adjusts `LOOPSTART` and `LOOPLENGTH` values based on the ratio between original and target sample rates
 - This preserves timing accuracy when loop-enabled audio changes sample rates
 
-**Limitation**: Loop points can only be written to OGG, FLAC, MP3, and AIFF. They can be read from all formats but cannot be written to WAV or M4A.
+**Limitation**: By default loop points are written to OGG, FLAC, MP3, and AIFF only. They can be read from all formats (including the WAV `smpl` chunk). When an input has loop tags, `createConversionList` asks how to handle them (`settings.loopDataMode`): keep (default), `skip`, or `force` — which writes a `smpl` loop chunk to WAV outputs (`src/wavLoops.ts`) and keeps tags in M4A via `-movflags use_metadata_tags`.
 
 ### Metadata Preservation
 
@@ -254,7 +254,7 @@ All tests run sequentially (`--runInBand`) to prevent file system race condition
 
 CI downloads ffmpeg and runs the full suite including integration tests. See `ci.integration.guard.test.ts`.
 
-**Test count:** 594 tests across 40 test files.
+**Test count:** 889 tests across 72 test files.
 
 **Scripts:**
 - `npm run test:unit` - Fast loop (no ffmpeg integration)
@@ -314,7 +314,7 @@ The project uses GitHub Actions to automatically build releases for all platform
 Runs on every push/PR to `dev` or `main`:
 - Linting and formatting
 - TypeScript compilation
-- Tests with coverage (594 tests; ffmpeg installed in CI)
+- Tests with coverage (889 tests; ffmpeg installed in CI)
 - Build verification
 
 ### Creating a Release

@@ -33,6 +33,7 @@ const {
   getRelativeOutputDir,
 } = await import('../createConversionList.js');
 const { default: searchFiles } = await import('../searchFiles.js');
+const { isCaseInsensitiveDir } = await import('../pathKey.js');
 
 const getAnswerMock = getAnswer as unknown as jest.Mock<
   (prompt?: unknown) => Promise<string>
@@ -111,7 +112,7 @@ describe('createConversionList on a real file system', () => {
     expect([...found].some((p) => p.endsWith('a.wav'))).toBe(true);
   });
 
-  it('treats outputs differing only by case as duplicates', async () => {
+  it('treats outputs differing only by case as duplicates only where case is ignored', async () => {
     const a = touch('in', 'A.wav');
     const b = touch('in', 'a.flac');
     configure(join(root, 'in'), join(root, 'out'), ['wav', 'flac'], ['mp3']);
@@ -119,7 +120,10 @@ describe('createConversionList on a real file system', () => {
 
     const list = await createConversionList([a, b]);
 
-    expect(list).toHaveLength(1);
+    // A.mp3 and a.mp3 are the same file on a case-insensitive drive, but two
+    // different files on a case-sensitive one — and both must be kept there.
+    const insensitive = isCaseInsensitiveDir(root);
+    expect(list).toHaveLength(insensitive ? 1 : 2);
   });
 
   it('"ra" renames a second input that maps to an already planned output', async () => {

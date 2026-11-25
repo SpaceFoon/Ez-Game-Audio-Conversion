@@ -11,7 +11,11 @@ import {
   formatLoopData,
   clearSourceLoopTagArgs,
 } from './metadataService.js';
+import { getAudioStream } from './audioStream.js';
 import { platformSlug, getErrorMessage, findBinary } from './utils.js';
+import { removeIfWrittenSince } from './fileCleanup.js';
+import { writeWavSmplLoop } from './wavLoops.js';
+import { isCaseInsensitiveDir } from './pathKey.js';
 import logger from './logger.js';
 import type { LoopDataMode } from './types/settings.js';
 
@@ -133,7 +137,12 @@ const converterWorker = async ({
   // Defense in depth: never allow ffmpeg -y to overwrite the source file.
   // The upstream guard in createConversionList should prevent this, but if
   // anything slips through, this hard stop protects the user's data.
-  if (resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()) {
+  const sameIgnoringCase =
+    resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase();
+  if (
+    resolve(inputFile) === resolve(outputFile) ||
+    (sameIgnoringCase && isCaseInsensitiveDir(dirname(resolve(inputFile))))
+  ) {
     return failWorker(
       `CRITICAL: output path resolves to input file — refusing to overwrite: ${inputFile}`
     );
@@ -146,33 +155,33 @@ const converterWorker = async ({
       `Could not read metadata from input file (ffprobe failed): ${inputFile}`
     );
   }
+  if (!getAudioStream(metadata)) {
+    return failWorker(`Input file has no audio stream: ${inputFile}`);
+  }
 
   // Get formatted metadata and channels as arrays (safe for spawn)
   const { metaDataArgs, channelsArgs } = formatMetaDataArgs(
     metadata,
-    inputFile
+    inputFile,
+    outputFormat
   );
 
   // Convert loop points if needed
-  const { newSampleRate, loopStart, loopLength } = convertLoopPoints(
-    metadata,
-    outputFormat,
-    oggCodec
-  );
+  const { newSampleRate, loopStart, loopLength, hasLoopEnd } =
+    convertLoopPoints(metadata, outputFormat, oggCodec, inputFile);
 
   // Build sample rate args for ffmpeg command
   const sampleRateArgs = newSampleRate ? ['-ar', String(newSampleRate)] : [];
 
   // Format loop data for ffmpeg command
   let loopDataArgs: string[] = [];
+  // WAV has no tag field for loops; "force" writes a smpl chunk after ffmpeg.
+  let wavSmplLoop: { loopStart: number; loopLength: number } | null = null;
   if (loopDataMode === 'skip') {
     loopDataArgs = [];
   } else if (
-    loopStart !== null &&
-    loopLength !== null &&
     !isNaN(loopStart) &&
-    !isNaN(loopLength) &&
-    !(loopStart === 0 && loopLength === 0)
+    !(loopStart === 0 && (loopLength === 0 || isNaN(loopLength)))
   ) {
     const fmt = outputFormat.toLowerCase();
     const unsupportedFormat = fmt === 'm4a' || fmt === 'wav';
@@ -181,8 +190,12 @@ const converterWorker = async ({
         `Loop points are not supported for ${fmt.toUpperCase()} format`
       );
       loopDataArgs = [];
+    } else if (fmt === 'wav') {
+      wavSmplLoop = { loopStart, loopLength };
     } else {
-      loopDataArgs = formatLoopData(loopStart, loopLength);
+      loopDataArgs = formatLoopData(loopStart, loopLength, hasLoopEnd);
+      // The MP4 writer drops custom tags unless told to keep them.
+      if (fmt === 'm4a') loopDataArgs.push('-movflags', 'use_metadata_tags');
     }
   }
 
@@ -226,9 +239,10 @@ const converterWorker = async ({
     },
     aiff: {
       codec: 'pcm_s16le',
-      // Add support for AIFF metadata - keep metadata and write ID3 tags
+      // Write tags as ID3. Tags are rebuilt like every other format: copying
+      // them through would lose OGG/Opus tags, which ffmpeg keeps per stream
+      // while the AIFF writer only reads file-level tags.
       additionalOptions: ['-write_id3v2', '1'],
-      preserveMetadata: true, // Flag to avoid using -map_metadata -1 for AIFF
     },
     flac: { codec: 'flac', additionalOptions: ['-compression_level', '1'] }, //Minimal compression but 30% smaller than without.
   };
@@ -274,7 +288,15 @@ const converterWorker = async ({
   } = getFormatConfig(outputFormat, oggCodec);
 
   // Build the command arguments array
-  const ffmpegArgs: string[] = ['-loglevel', 'error', '-i', inputFile];
+  // -xerror: stop at the first decode error, so a corrupt or truncated input
+  // fails instead of "succeeding" with missing audio.
+  const ffmpegArgs: string[] = [
+    '-loglevel',
+    'error',
+    '-xerror',
+    '-i',
+    inputFile,
+  ];
 
   // Only use -map_metadata -1 if we don't need to preserve original metadata
   if (!preserveMetadata) {
@@ -292,6 +314,16 @@ const converterWorker = async ({
   // Add sample rate if specified
   if (sampleRateArgs.length) {
     ffmpegArgs.push(...sampleRateArgs);
+  }
+
+  // FLAC keeps the source bit depth. Without this, lossy and 8/16-bit sources
+  // decode to float and come out as 24-bit FLAC: bigger, with no added detail.
+  if (outputFormat === 'flac') {
+    const stream = getAudioStream(metadata);
+    const bits = Number(
+      stream?.bits_per_raw_sample || stream?.bits_per_sample || 0
+    );
+    if (!(bits > 16)) ffmpegArgs.push('-sample_fmt', 's16');
   }
 
   // Add basic options
@@ -323,6 +355,16 @@ const converterWorker = async ({
       ffmpegArgs.push('-ac', '2');
     } else {
       ffmpegArgs.push(...channelsArgs);
+      // libopus's default surround mapping rejects every 3- and 4-channel
+      // layout (and anything over 8). Mapping family 255 stores the channels
+      // as-is, so the conversion succeeds instead of failing.
+      const isOpus = outputFormat === 'ogg' && oggCodec === 'opus';
+      if (
+        isOpus &&
+        (channelCount === 3 || channelCount === 4 || channelCount > 8)
+      ) {
+        ffmpegArgs.push('-mapping_family', '255');
+      }
     }
   }
 
@@ -345,7 +387,27 @@ const converterWorker = async ({
     }
   }
 
-  await runFFMPEG(resolvedFfmpegPath, ffmpegArgs, outputFile, inputFile);
+  const writeSmpl = wavSmplLoop
+    ? () => {
+        if (
+          !writeWavSmplLoop(
+            outputFile,
+            wavSmplLoop!.loopStart,
+            wavSmplLoop!.loopLength
+          )
+        ) {
+          logger.warn(`Could not write WAV loop points to ${outputFile}`);
+        }
+      }
+    : undefined;
+
+  await runFFMPEG(
+    resolvedFfmpegPath,
+    ffmpegArgs,
+    outputFile,
+    inputFile,
+    writeSmpl
+  );
 };
 
 const runConversion = async (): Promise<void> => {
@@ -395,8 +457,10 @@ const runFFMPEG = (
   ffmpegPath: string,
   ffmpegArgs: string[],
   outputFile: string,
-  inputFile: string
+  inputFile: string,
+  afterSuccess?: () => void
 ): Promise<void> => {
+  const startedAt = Date.now();
   return new Promise((resolve, reject) => {
     try {
       // Execute command
@@ -405,6 +469,18 @@ const runFFMPEG = (
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
+      // Let the manager kill ffmpeg if the batch is aborted; terminating this
+      // thread does not stop the child process.
+      if (ffmpegCommand.pid) {
+        parentPort?.postMessage({ type: 'pid', data: ffmpegCommand.pid });
+      }
+
+      // ffmpeg -y truncates the output first, so a failed run leaves a
+      // partial file behind. Remove it so it isn't mistaken for a result —
+      // but only if this run wrote it (a read-only existing file that ffmpeg
+      // could not open must be left alone).
+      const removePartialOutput = () =>
+        removeIfWrittenSince(outputFile, startedAt);
 
       // Collect error output for better diagnostics
       let errorOutput = '';
@@ -421,6 +497,7 @@ const runFFMPEG = (
       // Handle successful completion
       ffmpegCommand.on('exit', (code: number | null) => {
         if (code === 0) {
+          afterSuccess?.();
           parentPort?.postMessage({ type: 'code', data: code });
           resolve(undefined);
         } else {
@@ -431,6 +508,7 @@ const runFFMPEG = (
           const msg = `ffmpeg exited with code ${code}${formatInfo}. ${
             errorOutput || 'No error output'
           }`;
+          removePartialOutput();
           postError(msg, { inputFile, outputFile });
           reject(new Error(msg));
         }
@@ -441,6 +519,7 @@ const runFFMPEG = (
         const msg = `ERROR in ffmpegCommand: ${String(
           error instanceof Error ? error.message : error
         )}`;
+        removePartialOutput();
         postError(msg, { inputFile, outputFile });
         reject(new Error(msg));
       });
