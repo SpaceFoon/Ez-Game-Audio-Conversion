@@ -139,9 +139,9 @@ const getUserInput = async (
       const pathStats = statSync(resolvedArgPath);
 
       if (pathStats.isFile()) {
-        const fileExt = extname(resolvedArgPath)
-          .toLowerCase()
-          .substring(1) as AudioFormat;
+        const rawExt = extname(resolvedArgPath).toLowerCase().substring(1);
+        // .aif is the short spelling of AIFF.
+        const fileExt = (rawExt === 'aif' ? 'aiff' : rawExt) as AudioFormat;
 
         if (!inputTypes.includes(fileExt)) {
           logger.error(

@@ -14,6 +14,8 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 // But we DON'T mock metadataService - we want to test real formatting logic
 
 let capturedSpawnArgs: { command: string; args: string[] }[] = [];
+// Per-test override for the ffprobe stream (channels, tags, sample rate).
+let probeStreamOverride: Record<string, unknown> | null = null;
 
 jest.unstable_mockModule('fs', () => ({
   existsSync: jest.fn((path: string) => {
@@ -61,6 +63,7 @@ jest.unstable_mockModule('child_process', () => ({
           channels: 2,
           sample_rate: '44100',
           tags: {},
+          ...probeStreamOverride,
         },
       ],
       format: {
@@ -95,6 +98,7 @@ describe('ffmpeg argument building - Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     capturedSpawnArgs = [];
+    probeStreamOverride = null;
   });
 
   describe('basic format conversions', () => {
@@ -552,5 +556,71 @@ describe('codec selection validation', () => {
 
     expect(codecIndex).not.toBe(-1);
     expect(args[codecIndex + 1]).toBe('libopus');
+  });
+});
+
+describe('source loop tags and channel handling', () => {
+  beforeEach(() => {
+    capturedSpawnArgs = [];
+    probeStreamOverride = null;
+  });
+
+  const run = async (
+    outputFormat: string,
+    settings: Record<string, string>
+  ) => {
+    await converterWorker({
+      file: {
+        inputFile: '/input/loop.flac',
+        outputFile: `/output/loop.${outputFormat}`,
+        outputFormat,
+      },
+      settings: { oggCodec: 'vorbis', ...settings },
+    });
+    return capturedSpawnArgs[0].args;
+  };
+
+  const metadataValues = (args: string[]) =>
+    args.filter((_, i) => args[i - 1] === '-metadata');
+
+  it('does not copy source loop tags when loop mode is "skip"', async () => {
+    probeStreamOverride = {
+      tags: { title: 'T', LOOPSTART: '22050', LOOPLENGTH: '22050' },
+    };
+    const values = metadataValues(await run('ogg', { loopDataMode: 'skip' }));
+    expect(values).toContain('title=T');
+    expect(values.some((v) => /^loop/i.test(v))).toBe(false);
+  });
+
+  it('drops unconverted LOOP_START variants when Opus resamples', async () => {
+    probeStreamOverride = {
+      tags: { LOOP_START: '22050', LOOP_LENGTH: '22050' },
+    };
+    const values = metadataValues(await run('ogg', { oggCodec: 'opus' }));
+    expect(values).toContain('LOOPSTART=24000');
+    expect(values).not.toContain('LOOP_START=22050');
+    expect(values).not.toContain('LOOP_LENGTH=22050');
+  });
+
+  it('clears source loop tags on AIFF (keeps metadata) in "skip" mode', async () => {
+    probeStreamOverride = {
+      tags: { LOOPSTART: '22050', LOOPLENGTH: '22050' },
+    };
+    const values = metadataValues(await run('aiff', { loopDataMode: 'skip' }));
+    expect(values).toEqual(
+      expect.arrayContaining(['LOOPSTART=', 'LOOPLENGTH='])
+    );
+  });
+
+  it('downmixes surround sources to stereo for MP3', async () => {
+    probeStreamOverride = { channels: 6 };
+    const args = await run('mp3', {});
+    expect(args[args.indexOf('-ac') + 1]).toBe('2');
+  });
+
+  it('keeps surround channel count for formats that support it', async () => {
+    probeStreamOverride = { channels: 6 };
+    const args = await run('flac', {});
+    expect(args[args.indexOf('-ac') + 1]).toBe('6');
   });
 });

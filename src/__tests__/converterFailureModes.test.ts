@@ -50,7 +50,7 @@ jest.unstable_mockModule('os', () => ({
 }));
 
 const { Worker } = await import('worker_threads');
-const { getAnswer } = await import('../utils.js');
+const { getAnswer, addToLog } = await import('../utils.js');
 const { convertFiles } = await import('../converterManager.js');
 
 type WorkerHandlers = {
@@ -229,5 +229,34 @@ describe('converter failure modes', () => {
     // confirmed by the worker's 'code' message, so an unconfirmed exit is a failure.
     expect(result.successfulFiles).toHaveLength(0);
     expect(result.failedFiles).toHaveLength(1);
+  });
+  it('logs worker warning messages without failing the job', async () => {
+    workerMock.mockImplementation(() => {
+      const handlers: WorkerHandlers = {};
+      const worker = {
+        on: jest.fn((event: string, handler: (...args: unknown[]) => void) => {
+          if (event === 'message') {
+            handlers.message = handler as (message: unknown) => void;
+          }
+          if (event === 'exit') {
+            handlers.exit = handler as unknown as (code: number) => void;
+            handlers.message?.({ type: 'warning', data: 'bad tag cleaned' });
+            handlers.message?.({ type: 'code', data: 0 });
+            handlers.exit(0);
+          }
+          return worker;
+        }),
+      };
+      return worker as unknown as InstanceType<typeof Worker>;
+    });
+
+    const result = await convertFiles(createTestFiles(1));
+
+    expect(result.successfulFiles).toHaveLength(1);
+    expect(result.failedFiles).toHaveLength(0);
+    expect(addToLog).toHaveBeenCalledWith(
+      { type: 'error', data: 'bad tag cleaned' },
+      expect.objectContaining({ inputFile: 'C:/Music/testfile0.mp3' })
+    );
   });
 });

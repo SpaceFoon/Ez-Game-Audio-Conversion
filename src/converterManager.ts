@@ -23,6 +23,7 @@ import {
 type WorkerManagerMessage =
   | { type: 'stderr'; data: string }
   | { type: 'error'; data: string }
+  | { type: 'warning'; data: string }
   | { type: 'code'; data: number }
   | { type: string; data?: unknown; [key: string]: unknown };
 
@@ -280,6 +281,16 @@ const convertFiles = async (
               });
               return;
             }
+            return;
+          }
+
+          // Non-fatal warnings (e.g. metadata cleanup): record in the error
+          // log without failing the job.
+          if (typedMessage.type === 'warning') {
+            log(
+              { type: 'error' as const, data: String(typedMessage.data ?? '') },
+              { inputFile: file.inputFile, outputFile: '[metadata-cleanup]' }
+            );
             return;
           }
 

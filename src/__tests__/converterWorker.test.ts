@@ -27,6 +27,7 @@ jest.unstable_mockModule('../utils.js', () => ({
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
+  clearSourceLoopTagArgs: jest.fn(() => []),
   getMetaData: jest.fn(),
   formatMetaDataArgs: jest.fn(),
   convertLoopPoints: jest.fn(),

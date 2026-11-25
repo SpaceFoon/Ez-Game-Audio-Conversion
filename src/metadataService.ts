@@ -2,6 +2,7 @@
 import type { AudioMetadata } from './types/metadata.js';
 
 import { spawnSync } from 'child_process';
+import * as workerThreads from 'worker_threads';
 import { platformSlug, findBinary, addToLog } from './utils.js';
 import logger from './logger.js';
 
@@ -187,6 +188,19 @@ const resolveCanonicalKey = (key: string): string | undefined => {
 
 const isSafeMetaKey = (key: string): boolean => /^[A-Za-z0-9_.:-]+$/.test(key);
 
+// Loop tags are never copied from the source: the worker writes them itself
+// (converted for sample-rate changes, or omitted for 'skip'/unsupported
+// formats). Passing the originals through would leave stale values behind,
+// e.g. an unconverted LOOP_START next to the resampled loopstart for Opus.
+const SOURCE_LOOP_TAG_KEYS = new Set([
+  'loopstart',
+  'looplength',
+  'itunesloopstart',
+  'ituneslooplength',
+]);
+export const isLoopTagKey = (key: string): boolean =>
+  SOURCE_LOOP_TAG_KEYS.has(normalizeTagKey(key));
+
 export const sanitizeMetaValueForArgs = (raw: string): string =>
   String(raw)
     .split('\u0000')
@@ -218,6 +232,16 @@ const logMetadataCleanupWarning = (
   inputFile?: string
 ): void => {
   logger.error(message);
+  // Worker threads have their own copy of utils' module state (no output
+  // path, no chosen log file), so writing from here would spawn stray
+  // logs(N).csv/error(N).csv files in the cwd. Hand the warning to the parent,
+  // which owns the run's log files.
+  const port =
+    workerThreads.isMainThread === false ? workerThreads.parentPort : null;
+  if (port) {
+    port.postMessage({ type: 'warning', data: message });
+    return;
+  }
   void addToLog(
     { type: 'error', data: message },
     inputFile ? { inputFile, outputFile: '[metadata-cleanup]' } : undefined
@@ -409,7 +433,7 @@ export const formatMetaDataArgs = (
   }
 
   for (const [key, value] of passthrough.entries()) {
-    if (!isSafeMetaKey(key)) continue;
+    if (!isSafeMetaKey(key) || isLoopTagKey(key)) continue;
     const rawString = String(value);
     const clean = sanitizeMetaValueForArgs(rawString);
     if (rawString.includes('\uFFFD')) {
@@ -573,6 +597,22 @@ export const formatLoopData = (loopStart: number, loopLength: number) => {
     '-metadata',
     `looplength=${loopLength}`,
   ];
+};
+
+/**
+ * ffmpeg args that delete every loop tag found in the source. Needed when the
+ * output keeps source metadata (AIFF) but loop data must be dropped ('skip').
+ */
+export const clearSourceLoopTagArgs = (
+  metaData: AudioMetadata | null
+): string[] => {
+  const keys = new Set<string>();
+  for (const tags of [metaData?.streams?.[0]?.tags, metaData?.format?.tags]) {
+    for (const key of Object.keys(tags || {})) {
+      if (isLoopTagKey(key) && isSafeMetaKey(key)) keys.add(key);
+    }
+  }
+  return [...keys].flatMap((key) => ['-metadata', `${key}=`]);
 };
 
 export { getMetaData };

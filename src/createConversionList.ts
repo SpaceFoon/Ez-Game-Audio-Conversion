@@ -17,6 +17,7 @@ import {
   reportSearchErrors,
 } from './utils.js';
 import logger from './logger.js';
+import { createPathKeyer, isSamePath, realPathOr } from './pathKey.js';
 import type {
   AudioFormat,
   ConversionCandidate,
@@ -61,8 +62,7 @@ export const buildBasenameWithFormat = (
 export const pathsResolveToSameFile = (
   inputFile: string,
   outputFile: string
-): boolean =>
-  resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase();
+): boolean => isSamePath(inputFile, outputFile);
 
 // Get a unique output file name. `isReserved` reports names already planned
 // in this batch (not yet on disk) so two outputs never get the same copy name.
@@ -138,7 +138,13 @@ export const getRelativeOutputDir = (
   }
 
   // Guard against writing outside output root if paths are inconsistent.
-  if (relDir.startsWith('..') || isAbsolute(relDir)) {
+  // (A folder merely *named* "..something" is fine — only a real ".." segment escapes.)
+  if (
+    relDir === '..' ||
+    relDir.startsWith('../') ||
+    relDir.startsWith('..\\') ||
+    isAbsolute(relDir)
+  ) {
     logger.warn(
       `Could not preserve folder structure for ${inputFile}; falling back to output root.`
     );
@@ -148,15 +154,27 @@ export const getRelativeOutputDir = (
   return relDir;
 };
 
-/** Normalized path key for O(1) output conflict lookups. */
+// Rebuilt per batch so symlink/folder changes between runs are picked up.
+let pathKey = createPathKeyer();
+
+/**
+ * Normalized path key for O(1) output conflict lookups. Resolves symlinked or
+ * aliased folders (so an output folder that is really the input folder can't
+ * overwrite inputs) and folds case only on case-insensitive file systems.
+ */
 export const normalizeOutputPathKey = (filePath: string): string =>
-  resolve(filePath).toLowerCase();
+  pathKey(filePath);
 
 /** Walk root once and collect existing file paths (avoids per-output existsSync). */
 export const scanExistingFiles = (rootPath: string): Set<string> => {
   const found = new Set<string>();
+  // Folders already walked (by real path) so symlink loops can't recurse forever.
+  const visited = new Set<string>();
 
   const walk = (dir: string): void => {
+    const real = realPathOr(dir);
+    if (visited.has(real)) return;
+    visited.add(real);
     let entries: string[];
     try {
       entries = readdirSync(dir);
@@ -202,6 +220,7 @@ const createConversionList = async (
     oggCodec = null;
   }
 
+  pathKey = createPathKeyer();
   let convertSelf: string | null = null;
   const conversionList: ConversionCandidate[] = [];
   let response: string | null = null;
@@ -338,7 +357,7 @@ const createConversionList = async (
       // Stops from overwriting input file.
       // resolve() normalises .., ./, trailing slashes, and relative vs absolute.
       if (
-        resolve(inputFile).toLowerCase() === resolve(outputFile).toLowerCase()
+        normalizeOutputPathKey(inputFile) === normalizeOutputPathKey(outputFile)
       ) {
         logger.log(
           chalk.yellow(
@@ -407,7 +426,10 @@ const createConversionList = async (
           response = null;
         },
         ra: async () => {
-          if (!outputAlreadyExists(outputFile)) return;
+          // A name another input in this batch already claimed is a conflict
+          // too; renaming beats silently dropping this input later.
+          if (!outputAlreadyExists(outputFile) && !isPlannedOutput(outputFile))
+            return;
           outputFile = await getOutputFileCopy(
             outputFile,
             outputFormat,
@@ -535,7 +557,8 @@ const createConversionList = async (
     ): ConversionCandidate[] => {
       const seen = new Map<string, string>();
       return list.filter((conversion: ConversionCandidate) => {
-        const firstInput = seen.get(conversion.outputFile);
+        const key = normalizeOutputPathKey(conversion.outputFile);
+        const firstInput = seen.get(key);
         if (firstInput !== undefined) {
           logger.warn(
             chalk.yellow(
@@ -544,7 +567,7 @@ const createConversionList = async (
           );
           return false;
         }
-        seen.set(conversion.outputFile, conversion.inputFile);
+        seen.set(key, conversion.inputFile);
         return true;
       });
     };

@@ -9,6 +9,7 @@ import {
   formatMetaDataArgs,
   convertLoopPoints,
   formatLoopData,
+  clearSourceLoopTagArgs,
 } from './metadataService.js';
 import { platformSlug, getErrorMessage, findBinary } from './utils.js';
 import logger from './logger.js';
@@ -56,8 +57,13 @@ const failWorker = (reason: unknown): Promise<never> => {
   return Promise.reject(new Error(msg));
 };
 
+// Set once any error has been posted, so the top-level catch only reports
+// failures nothing else has explained (e.g. an unexpected throw).
+let errorPosted = false;
+
 // Send structured error to manager (no hard exit here; allow caller to throw/reject)
 const postError = (reason: unknown, fileCtx: WorkerFileContext = {}) => {
+  errorPosted = true;
   const msg =
     reason instanceof Error
       ? reason.message
@@ -298,14 +304,26 @@ const converterWorker = async ({
     ffmpegArgs.push(...metaDataArgs);
   }
 
+  // Formats that keep source metadata would otherwise carry the original loop
+  // tags through even when loop data is meant to be dropped.
+  if (preserveMetadata && loopDataMode === 'skip') {
+    ffmpegArgs.push(...clearSourceLoopTagArgs(metadata));
+  }
+
   // Add loop metadata args
   if (loopDataArgs.length) {
     ffmpegArgs.push(...loopDataArgs);
   }
 
-  // Add channels args
+  // Add channels args. MP3 (LAME) only encodes mono/stereo, so a surround
+  // source must be downmixed rather than forcing its channel count.
   if (channelsArgs && channelsArgs.length) {
-    ffmpegArgs.push(...channelsArgs);
+    const channelCount = Number(channelsArgs[channelsArgs.indexOf('-ac') + 1]);
+    if (outputFormat === 'mp3' && channelCount > 2) {
+      ffmpegArgs.push('-ac', '2');
+    } else {
+      ffmpegArgs.push(...channelsArgs);
+    }
   }
 
   // Add output file name
@@ -444,8 +462,17 @@ if (
   workerData !== null &&
   'file' in workerData
 ) {
-  void runConversion().catch(() => {
-    // Failure already reported to parent via postError
+  void runConversion().catch((error: unknown) => {
+    // Most failures were already reported via postError. Anything else (an
+    // unexpected throw) must still reach the parent with its real reason,
+    // not just a bare "exited without reporting success".
+    if (!errorPosted) {
+      const f = (workerData && workerData.file) || {};
+      postError(`Unexpected worker error: ${getErrorMessage(error)}`, {
+        inputFile: f.inputFile,
+        outputFile: f.outputFile,
+      });
+    }
   });
 }
 

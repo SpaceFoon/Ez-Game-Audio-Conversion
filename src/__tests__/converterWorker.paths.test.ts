@@ -79,6 +79,7 @@ jest.unstable_mockModule('../utils.js', () => ({
 }));
 
 jest.unstable_mockModule('../metadataService.js', () => ({
+  clearSourceLoopTagArgs: jest.fn(() => []),
   getMetaData: jest.fn(async () => ({
     streams: [{ sample_rate: '44100', channels: 2, tags: {} }],
     format: { tags: {} },

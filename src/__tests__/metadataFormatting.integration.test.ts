@@ -14,6 +14,18 @@ import {
 } from '../metadataService.js';
 import type { AudioMetadata } from '../types/metadata.js';
 
+import { mkdtempSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as joinPath } from 'path';
+import { __setLogFileStateForTests } from '../utils.js';
+
+// formatMetaDataArgs logs cleanup warnings to CSV; keep them out of the repo.
+const logDir = mkdtempSync(joinPath(tmpdir(), 'ezga-meta-logs-'));
+__setLogFileStateForTests(
+  joinPath(logDir, 'logs.csv'),
+  joinPath(logDir, 'error.csv')
+);
+
 describe('formatMetaDataArgs - Real Output Tests', () => {
   describe('basic metadata extraction', () => {
     it('should extract title and artist from stream tags', () => {

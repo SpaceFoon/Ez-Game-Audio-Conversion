@@ -9,11 +9,24 @@ import type { Settings } from './types/settings.js';
 // resolution is unavailable. Real loops are caught earlier by the visited set.
 export const MAX_WALK_DEPTH = 512;
 
+/** File extensions that belong to an input format (AIFF is also saved as .aif). */
+export const extensionsForFormat = (format: string): string[] =>
+  format === 'aiff' ? ['.aiff', '.aif'] : [`.${format}`];
+
+/**
+ * macOS writes "._name" metadata stubs next to real files on FAT/exFAT/network
+ * drives. They share the audio extension but aren't audio, so ffmpeg fails.
+ */
+export const isAppleDoubleFile = (fileName: string): boolean =>
+  fileName.startsWith('._');
+
 //Searches for files that meet criteria
 const searchFiles = (settings: Settings): Promise<string[]> => {
   // Fresh error list for this run; reported at the end of the batch.
   clearSearchErrors();
-  const fileExtensions = settings.inputFormats.map((format) => `.${format}`);
+  const fileExtensions = settings.inputFormats.flatMap((format) =>
+    extensionsForFormat(format)
+  );
   const searchPath = settings.inputFilePath;
 
   const allFiles: string[] = [];
@@ -110,7 +123,10 @@ const searchFiles = (settings: Settings): Promise<string[]> => {
       } else {
         // Check if the file has a matching extension
         const fileExtension = extname(file).toLowerCase();
-        if (fileExtensions.includes(fileExtension)) {
+        if (
+          fileExtensions.includes(fileExtension) &&
+          !isAppleDoubleFile(file)
+        ) {
           allFiles.push(inputFilePath);
         }
       }
