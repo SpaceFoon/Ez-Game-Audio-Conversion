@@ -60,7 +60,10 @@ jobs:
 
   e2e-real-ffmpeg:
     name: E2E (${{ matrix.platform }})
-    runs-on: ${{ matrix.os != 'ubuntu-latest' && matrix.os || github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Linux"]') }}
+    # Windows leg runs on the local self-hosted Windows runner. Fork PRs fall back
+    # to ubuntu-latest so untrusted code never reaches self-hosted hardware.
+    # macOS stays on GitHub-hosted runners.
+    runs-on: ${{ matrix.os == 'windows-latest' && (github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Windows"]')) || matrix.os != 'ubuntu-latest' && matrix.os || github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Linux"]') }}
     strategy:
       fail-fast: false
       matrix:
