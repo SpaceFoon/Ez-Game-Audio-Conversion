@@ -60,17 +60,11 @@ jobs:
 
   e2e-real-ffmpeg:
     name: E2E (${{ matrix.platform }})
-    # Windows leg runs on the local self-hosted Windows runner. Fork PRs fall back
-    # to ubuntu-latest so untrusted code never reaches self-hosted hardware.
-    # macOS stays on GitHub-hosted runners.
-    runs-on: ${{ matrix.os == 'windows-latest' && (github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Windows"]')) || matrix.os != 'ubuntu-latest' && matrix.os || github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Linux"]') }}
+    runs-on: ${{ matrix.os != 'ubuntu-latest' && matrix.os || github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted","Linux"]') }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            platform: windows
-
           - os: ubuntu-latest
             platform: linux
 
@@ -97,6 +91,41 @@ jobs:
         uses: ./.github/actions/setup-ffmpeg-bin
         with:
           platform: ${{ matrix.platform }}
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Run E2E tests (real ffmpeg + workers)
+        run: npm run test:e2e
+        env:
+          E2E_REQUIRED: "1"
+
+  e2e-windows:
+    name: E2E (windows)
+    # Fork PRs skip this job. It runs on the local Windows runner, which must
+    # never execute fork code.
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+    runs-on: [self-hosted, Windows]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: ${{ runner.environment == 'github-hosted' && 'npm' || '' }}
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          EZ_AUDIO_SKIP_FFMPEG_DOWNLOAD: "1"
+
+      # Mirrors + retries live in the composite action; see its action.yml.
+      - name: Download ffmpeg
+        uses: ./.github/actions/setup-ffmpeg-bin
+        with:
+          platform: windows
 
       - name: Build TypeScript
         run: npm run build
