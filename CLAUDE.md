@@ -76,8 +76,8 @@ npm run portfolio:media        # writes portfolio-media/ez-game-audio-readme.png
 ```
 
 Real run of the TUI on generated test tones, rendered with xterm.js in headless
-Chromium. CI: `.github/workflows/portfolio-media.yml` uploads the `portfolio-media`
-artifact, which the portfolio publishes without review — never put real paths or
+Chromium. CI: `.github/workflows/portfolio-media.yml` copies the image to
+`~/portfolio-media/<repo>/latest/` on the CI PC, which the portfolio publishes without review — never put real paths or
 data on screen. See `scripts/portfolio-media/README.md`.
 
 ### Code Quality

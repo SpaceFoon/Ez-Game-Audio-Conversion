@@ -2,8 +2,8 @@
 
 Renders `ez-game-audio-readme.png` (1361×651) for the portfolio: the real
 terminal UI finishing a conversion run of a small fictional game-audio library.
-CI runs it in `.github/workflows/portfolio-media.yml` and uploads the file as
-the `portfolio-media` artifact, which the portfolio imports without review.
+CI runs it in `.github/workflows/portfolio-media.yml` on the `pc` runner and copies
+the file to `~/portfolio-media/<repo>/latest/`, which the portfolio imports without review.
 
 ## Run it locally (Linux)
 
