@@ -1,7 +1,8 @@
 # Renders the portfolio screenshot (ez-game-audio-readme.png) of the real
-# terminal UI converting a small fictional game-audio library, and uploads it
-# as the `portfolio-media` artifact. A puller on the portfolio machine imports
-# it automatically, so the screen must never show private data.
+# terminal UI converting a small fictional game-audio library, and copies it to
+# this PC's disk at $HOME/portfolio-media/<repo>/latest/ (no GitHub artifact).
+# A puller on the portfolio machine imports it from there, so the screen must
+# never show private data.
 # Local equivalent: npm run portfolio:media  (see scripts/portfolio-media/README.md)
 name: Portfolio media
 
@@ -35,7 +36,8 @@ jobs:
     # Never run pull requests from forks on the self-hosted runner: they would
     # execute their own code there and produce the published artifact.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux]
+    # This PC's runner (label "pc"). Fork PRs are excluded above.
+    runs-on: [self-hosted, Linux, pc]
     timeout-minutes: 20
     steps:
       - name: Checkout
@@ -56,12 +58,47 @@ jobs:
         run: npm run portfolio:media:setup
 
       - name: Render screenshot
-        run: node scripts/portfolio-media/capture.mjs portfolio-media
+        shell: bash
+        run: |
+          mkdir -p portfolio-media
+          node scripts/portfolio-media/capture.mjs portfolio-media 2>&1 | tee portfolio-media/capture.log
 
-      - name: Upload portfolio media
-        uses: actions/upload-artifact@v4
-        with:
-          name: portfolio-media
-          path: portfolio-media/ez-game-audio-readme.png
-          if-no-files-found: error
-          retention-days: 14
+      - name: Publish portfolio media to this PC
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="portfolio-media/ez-game-audio-readme.png"
+          test -s "$src"
+          repo="${GITHUB_REPOSITORY#*/}"
+          dest="$HOME/portfolio-media/$repo"
+          mkdir -p "$dest"
+
+          # Build the complete folder under a temp name first, so a reader never
+          # sees a half-written copy.
+          tmp="$(mktemp -d "$dest/.latest-tmp.XXXXXX")"
+          chmod 755 "$tmp"
+          cp "$src" "$tmp/"
+
+          # Rename it into place. A directory cannot be renamed over a non-empty
+          # one, so move the old latest aside first and put it back if the swap fails.
+          old="$dest/.latest-old.$$"
+          if [ -e "$dest/latest" ]; then mv "$dest/latest" "$old"; fi
+          if ! mv "$tmp" "$dest/latest"; then
+            if [ -e "$old" ]; then mv "$old" "$dest/latest"; fi
+            exit 1
+          fi
+          rm -rf "$old"
+          echo "Published to $dest/latest"
+
+      - name: Copy logs to this PC on failure
+        if: failure()
+        shell: bash
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          logs="$HOME/portfolio-media/$repo/logs"
+          mkdir -p "$logs"
+          prefix="run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          for f in portfolio-media/capture.log portfolio-media/transcript.txt; do
+            if [ -f "$f" ]; then cp "$f" "$logs/$prefix-$(basename "$f")"; fi
+          done
+          echo "Logs for $prefix are in $logs"
